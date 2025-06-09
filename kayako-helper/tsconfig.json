@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target":            "ES2020",
+    "module":            "ESNext",
+    "moduleResolution":  "Node",
+    "strict":            true,
+    "esModuleInterop":   true,
+    "skipLibCheck":      true,
+    "resolveJsonModule": true,
+    "allowJs":           true,    // for a gradual migration
+    "checkJs":           false,   // disable JS-in-TS checking
+    "isolatedModules":   true,
+    "jsx":               "preserve",
+    "baseUrl":           "./src",
+    "paths": {
+      "@/*": ["*"]
+    },
+    "types": [
+      "chrome",              // Chrome extension APIs
+      "vite/client"          // Vite’s import.meta.hot, etc.
+    ]
+  },
+  "include": [
+    "src",
+    "vite.config.ts",
+    "../../../../../Program Files/JetBrains/WebStorm2023.3/plugins/javascript-impl/jsLanguageServicesImpl/external/lib.es5.d.ts"
+  ]
+}

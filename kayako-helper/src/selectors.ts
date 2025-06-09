@@ -1,4 +1,4 @@
-// src/selectors.js
+// src/selectors.ts
 export const SEL = {
     /* UI */
     tabStrip:            '[class^="ko-tab-strip__tabs_"]', // where the export button goes

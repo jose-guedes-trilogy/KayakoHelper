@@ -1,10 +1,7 @@
-/* Reply-box resizer v3.1
-   – Adds a 6 px “grab bar” at the top of the editor chrome
-   – Drag ↑ increases height, drag ↓ decreases (floor 44 px)
-   – Persists height per conversation tab until page reload            */
+// modules/replyResizer.ts
 
-import { SEL }           from '../selectors.js';
-import { currentConvId } from '../utils/location.js';
+import { SEL }           from '@/selectors';
+import { currentConvId } from '@/utils/location';
 
 /* ------------------------------------------------------------------ */
 /*  Config / State                                                    */
@@ -14,30 +11,37 @@ const DEFAULT_MAX = 350;      // px if nothing stored yet
 const MIN_HEIGHT  = 44;       // don’t collapse completely
 const BAR_CLASS   = 'ktx-resize-bar';
 
-let stored      = {};         // { convId | "global" : px }
-let currentConv = null;
+let stored: Record<string, number> = {};  // { convId | "global" : px }
+let currentConv: string | null     = null;
 
 /* ------------------------------------------------------------------ */
 /*  Public bootstrap                                                  */
 /* ------------------------------------------------------------------ */
-export function bootReplyResizer() {
-    ensureChrome();           // patch current tab
-    watchConversation();      // keep watching SPA navigation
+export function bootReplyResizer(): void {
+    ensureChrome();      // patch current tab
+    watchConversation(); // keep watching SPA navigation
 }
 
 /* ------------------------------------------------------------------ */
 /*  Main patch routine                                                */
 /* ------------------------------------------------------------------ */
-function ensureChrome() {
-    const chrome = document.querySelector(SEL.editorChrome);
-    const wrap   = document.querySelector(SEL.editorWrapper); // same element
+function ensureChrome(): void {
+    const chrome = document.querySelector<HTMLElement>(SEL.editorChrome);
+    const wrap   = document.querySelector<HTMLElement>(SEL.editorWrapper);
 
-    /* Wait until the reply area exists */
-    if (!chrome || !wrap) { requestAnimationFrame(ensureChrome); return; }
+    // Wait until the reply area exists
+    if (!chrome || !wrap) {
+        requestAnimationFrame(ensureChrome);
+        return;
+    }
 
-    /* Already patched? */
-    if (chrome.dataset.resizerSetup === 'true' ||
-        chrome.querySelector(`.${BAR_CLASS}`)) return;
+    // Already patched?
+    if (
+        chrome.dataset.resizerSetup === 'true' ||
+        chrome.querySelector(`.${BAR_CLASS}`)
+    ) {
+        return;
+    }
 
     chrome.dataset.resizerSetup = 'true';
     injectBar(chrome);
@@ -47,7 +51,7 @@ function ensureChrome() {
 /* ------------------------------------------------------------------ */
 /*  Inject a slim overlay bar                                         */
 /* ------------------------------------------------------------------ */
-function injectBar(chrome) {
+function injectBar(chrome: HTMLElement): void {
     chrome.style.position = 'relative';
 
     const bar = document.createElement('div');
@@ -57,31 +61,30 @@ function injectBar(chrome) {
         'cursor:ns-resize;z-index:10;';
     chrome.prepend(bar);
 
-    attachDrag(bar);          // wire up drag behaviour
+    attachDrag(bar);
 }
 
 /* ------------------------------------------------------------------ */
 /*  Drag behaviour                                                    */
 /* ------------------------------------------------------------------ */
-function attachDrag(bar) {
-    bar.addEventListener('mousedown', e => {
+function attachDrag(bar: HTMLElement): void {
+    bar.addEventListener('mousedown', (e: MouseEvent) => {
         e.preventDefault();
 
-        /* Re-query live elements **right now**, so we never hold a stale
-           `.fr-element` reference that Froala may swap out later.      */
-        const wrap   = document.querySelector(SEL.editorWrapper);
-        if (!wrap) return;                       // safety guard
+        // Re-query live elements so we never hold a stale reference
+        const wrap = document.querySelector<HTMLElement>(SEL.editorWrapper);
+        if (!wrap) return;
 
-        const startY = e.clientY;
-        const startH = wrap.getBoundingClientRect().height;
+        const startY: number = e.clientY;
+        const startH: number = wrap.getBoundingClientRect().height;
 
-        const onMove = ev => {
-            const dy   = ev.clientY - startY;
+        const onMove = (ev: MouseEvent): void => {
+            const dy = ev.clientY - startY;
             const newH = Math.max(MIN_HEIGHT, startH - dy);
-            applySize(newH);                     // uses live query inside
+            applySize(newH);
         };
 
-        const onUp = () => {
+        const onUp = (): void => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup',   onUp);
             stored[currentConvId() ?? 'global'] = getCurrentHeight();
@@ -95,38 +98,40 @@ function attachDrag(bar) {
 /* ------------------------------------------------------------------ */
 /*  Height helpers                                                    */
 /* ------------------------------------------------------------------ */
-function applySize(px) {
-    /* Always hit the current nodes to avoid “ghost” elements */
-    const wrap  = document.querySelector(SEL.editorWrapper);
-    const inner = wrap?.querySelector(SEL.replyInner);
+function applySize(px: number): void {
+    const wrap  = document.querySelector<HTMLElement>(SEL.editorWrapper);
+    const inner = wrap?.querySelector<HTMLElement>(SEL.replyInner);
     if (!wrap) return;
 
-    wrap .style.maxHeight = `${px}px`;
-    wrap .style.minHeight = `${px}px`;
+    wrap.style.maxHeight = `${px}px`;
+    wrap.style.minHeight = `${px}px`;
     if (inner) {
         inner.style.minHeight = `${px}px`;
         inner.style.maxHeight = `${px}px`;
     }
 }
 
-function getCurrentHeight() {
-    const wrap = document.querySelector(SEL.editorWrapper);
-    return wrap ? parseInt(getComputedStyle(wrap).maxHeight, 10) : DEFAULT_MAX;
+function getCurrentHeight(): number {
+    const wrap = document.querySelector<HTMLElement>(SEL.editorWrapper);
+    return wrap
+        ? parseInt(getComputedStyle(wrap).maxHeight, 10)
+        : DEFAULT_MAX;
 }
 
-function applyInitialSize() {
-    const h = stored[currentConvId() ?? 'global'] ?? DEFAULT_MAX;
+function applyInitialSize(): void {
+    const key = currentConvId() ?? 'global';
+    const h   = stored[key] ?? DEFAULT_MAX;
     applySize(h);
 }
 
 /* ------------------------------------------------------------------ */
 /*  Watch SPA route changes                                           */
 /* ------------------------------------------------------------------ */
-function watchConversation() {
+function watchConversation(): void {
     const id = currentConvId() ?? 'global';
     if (id !== currentConv) {
         currentConv = id;
-        setTimeout(ensureChrome, 100);          // DOM settles, then patch
+        setTimeout(ensureChrome, 100); // DOM settles, then patch
     }
     requestAnimationFrame(watchConversation);
 }
