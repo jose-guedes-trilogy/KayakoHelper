@@ -2,10 +2,10 @@
    – Bootstraps individual features; contains no feature code itself
 */
 
-import { bootCopyChatButton }  from './modules/copyChatButton.js';
-import { bootAtlasHighlighter } from './modules/atlasHighlighter.js';
-import { bootLightboxEnhancer } from './modules/lightboxEnhancer.js';
-import { bootReplyResizer }    from './modules/replyResizer.js';
+import { bootCopyChatButton }  from './modules/copyChatButton';
+import { bootAtlasHighlighter } from './modules/atlasHighlighter';
+import { bootLightboxEnhancer } from './modules/lightboxEnhancer';
+import { bootReplyResizer }    from './modules/replyResizer';
 
 bootCopyChatButton();   // Only copies when URL is a conversation
 bootAtlasHighlighter();
