@@ -1,6 +1,6 @@
 // modules/atlasHighlighter.ts
 
-import { SEL }               from '@/selectors';        // <- path changed
+import { KAYAKO_SELECTORS }               from '@/selectors';        // <- path changed
 import { currentConvId }     from '@/utils/location';   // <- new util
 
 /* ------------------------------------------------------------------ */
@@ -43,11 +43,11 @@ function checkUrl(): void {
 /*  Wait until at least ONE .message-or-note element exists           */
 /* ------------------------------------------------------------------ */
 function waitForFirstPost(): void {
-    const first = document.querySelector<HTMLElement>(SEL.messageOrNote);
+    const first = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.messageOrNote);
     if (first) {
         initPostObserver();
         // Process any already-rendered posts immediately
-        document.querySelectorAll<HTMLElement>(SEL.messageOrNote).forEach(processPost);
+        document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.messageOrNote).forEach(processPost);
         return;
     }
     // Still loading — try again shortly
@@ -63,7 +63,7 @@ function initPostObserver(): void {
             record.addedNodes.forEach(node => {
                 if (
                     node.nodeType === Node.ELEMENT_NODE &&
-                    (node as Element).matches?.(SEL.messageOrNote)
+                    (node as Element).matches?.(KAYAKO_SELECTORS.messageOrNote)
                 ) {
                     processPost(node as Element);
                 }
@@ -92,21 +92,21 @@ function processPost(el: Element): void {
 
 /* ---------- once-per-conversation: find the visitor name ---------- */
 function tryDiscoverVisitor(postEl: Element): void {
-    const creator = postEl.querySelector<HTMLElement>(SEL.creatorLabel);
-    if (!creator || creator.textContent?.trim() !== SEL.atlasName) {
+    const creator = postEl.querySelector<HTMLElement>(KAYAKO_SELECTORS.creatorLabel);
+    if (!creator || creator.textContent?.trim() !== KAYAKO_SELECTORS.atlasName) {
         return;
     }
 
-    const content = postEl.querySelector<HTMLElement>(SEL.contentBody);
+    const content = postEl.querySelector<HTMLElement>(KAYAKO_SELECTORS.contentBody);
     if (!content) return;
 
-    const m = content.textContent?.match(SEL.greetingRegex);
+    const m = content.textContent?.match(KAYAKO_SELECTORS.greetingRegex);
     if (!m) return;
 
     visitor = m[1].trim();
 
     // Now that we know the visitor name, repaint all existing posts
-    document.querySelectorAll<HTMLElement>(SEL.messageOrNote).forEach(paintLines);
+    document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.messageOrNote).forEach(paintLines);
 }
 
 /* ---------- highlight every paragraph from that visitor ---------- */

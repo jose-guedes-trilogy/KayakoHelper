@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Kayako Helper</title>
+    <style>
+        body { font-family: sans-serif; padding: 10px; }
+        .section { margin-bottom: 1em; }
+    </style>
+</head>
+<body>
+<div class="section">
+    <label>
+        <input type="checkbox" id="trainingModeCheckbox" />
+        Training mode (warn before sending public replies)
+    </label>
+</div>
+<div class="section">
+    <h4>This ticket:</h4>
+    <div>Subject: <span id="subject">-</span></div>
+    <div>Requester: <span id="requesterName">-</span> &lt;<span id="requesterEmail">-</span>&gt;</div>
+    <div>Replies sent: <span id="replyCount">0</span></div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>

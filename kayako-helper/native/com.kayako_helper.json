@@ -1,0 +1,9 @@
+{
+  "name": "com.kayako_helper",
+  "description": "Kayako Helper Native Host",
+  "path": "C:\\Users\\Zé\\WebstormProjects\\Trilogy\\kayako-helper\\native\\kayako_helper.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://iploindakgdgkggagmphmndnbaahbhcl/"
+  ]
+}

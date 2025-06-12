@@ -1,0 +1,4 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\SOFTWARE\Google\Chrome\NativeMessagingHosts\com.kayako_helper]
+@="C:\Users\Zé\WebstormProjects\Trilogy\kayako-helper\com.kayako_helper.json"

@@ -1,6 +1,6 @@
 // modules/lightboxEnhancer.ts
 
-import { SEL } from '@/selectors';
+import { KAYAKO_SELECTORS } from '@/selectors';
 
 const BTN_CLASS = 'ktx-lightbox-btn';
 
@@ -13,7 +13,7 @@ export function bootLightboxEnhancer(): void {
             r.addedNodes.forEach(node => {
                 if (
                     node.nodeType === Node.ELEMENT_NODE &&
-                    (node as Element).matches?.(SEL.lightboxModal)
+                    (node as Element).matches?.(KAYAKO_SELECTORS.lightboxModal)
                 ) {
                     addButtonsWhenReady(node as Element);
                 }
@@ -44,10 +44,10 @@ function addButtonsWhenReady(modalEl: Element): void {
  * fall back to CSS background-image URL.
  */
 function extractImageUrl(modalEl: Element): string | null {
-    const img = modalEl.querySelector<HTMLImageElement>(SEL.hiddenImg);
+    const img = modalEl.querySelector<HTMLImageElement>(KAYAKO_SELECTORS.hiddenImg);
     if (img?.src) return img.src;
 
-    const div = modalEl.querySelector<HTMLElement>(SEL.lightboxImage);
+    const div = modalEl.querySelector<HTMLElement>(KAYAKO_SELECTORS.lightboxImage);
     if (div) {
         const bg = getComputedStyle(div).backgroundImage;
         const m = bg.match(/url\(["']?(.+?)["']?\)/);
@@ -129,7 +129,7 @@ function injectButtons(modalEl: Element, url: string): void {
         return b;
     };
 
-    const imgEl = modalEl.querySelector<HTMLImageElement>(SEL.hiddenImg);
+    const imgEl = modalEl.querySelector<HTMLImageElement>(KAYAKO_SELECTORS.hiddenImg);
 
     const copyImgBtn = mkBtn('Copy image', async btn => {
         try {
@@ -155,7 +155,7 @@ function injectButtons(modalEl: Element, url: string): void {
 
     // remove when no more light-boxes
     const closePoll = window.setInterval(() => {
-        if (!document.querySelector(SEL.lightboxModal)) {
+        if (!document.querySelector(KAYAKO_SELECTORS.lightboxModal)) {
             wrap.remove();
             clearInterval(closePoll);
         }

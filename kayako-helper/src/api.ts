@@ -1,6 +1,6 @@
 // utils/api.ts
 
-import { cleanConversation, Post } from './modules/exportChat/cleanConversation.ts';
+import { cleanConversation, Post } from '@/modules/copy-chat/cleanConversation.ts';
 import { currentConvId }           from './utils/location.ts';
 
 /** Shape of the Kayako API response for posts */

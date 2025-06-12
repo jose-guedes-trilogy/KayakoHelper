@@ -20,11 +20,20 @@
     }
   ],
 
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+
   "host_permissions": [
     "https://*.kayako.com/*"
   ],
 
-  "permissions": ["clipboardWrite"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "clipboardWrite",
+    "nativeMessaging"
+  ],
 
   "web_accessible_resources": [
     {

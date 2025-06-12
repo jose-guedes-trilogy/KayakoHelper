@@ -1,118 +1,87 @@
-// modules/replyResizer.ts
-
-import { SEL }           from '@/selectors';
+import { KAYAKO_SELECTORS } from '@/selectors';
 import { currentConvId } from '@/utils/location';
 
-/* ------------------------------------------------------------------ */
-/*  Config / State                                                    */
-/* ------------------------------------------------------------------ */
-const BAR_H       = 6;        // bar thickness
-const DEFAULT_MAX = 350;      // px if nothing stored yet
-const MIN_HEIGHT  = 44;       // don’t collapse completely
-const BAR_CLASS   = 'ktx-resize-bar';
+/* Config / State */
+const BAR_H = 6;
+const DEFAULT_MAX = 350;
+const MIN_HEIGHT = 44;
+const BAR_CLASS = 'ktx-resize-bar';
+let stored: Record<string, number> = {};
+let currentConv: string | null = null;
 
-let stored: Record<string, number> = {};  // { convId | "global" : px }
-let currentConv: string | null     = null;
-
-/* ------------------------------------------------------------------ */
-/*  Public bootstrap                                                  */
-/* ------------------------------------------------------------------ */
+/* Public bootstrap */
 export function bootReplyResizer(): void {
-    ensureChrome();      // patch current tab
-    watchConversation(); // keep watching SPA navigation
+    ensureChrome();
+    watchConversation();
+    attachCollapseOnSend();
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main patch routine                                                */
-/* ------------------------------------------------------------------ */
+/* Main patch */
 function ensureChrome(): void {
-    const chrome = document.querySelector<HTMLElement>(SEL.editorChrome);
-    const wrap   = document.querySelector<HTMLElement>(SEL.editorWrapper);
-
-    // Wait until the reply area exists
-    if (!chrome || !wrap) {
+    const chromeEl = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorChrome);
+    const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    if (!chromeEl || !wrap) {
         requestAnimationFrame(ensureChrome);
         return;
     }
 
-    // Already patched?
     if (
-        chrome.dataset.resizerSetup === 'true' ||
-        chrome.querySelector(`.${BAR_CLASS}`)
-    ) {
-        return;
-    }
+        chromeEl.dataset.resizerSetup === 'true' ||
+        chromeEl.querySelector(`.${BAR_CLASS}`)
+    ) return;
 
-    chrome.dataset.resizerSetup = 'true';
-    injectBar(chrome);
+    chromeEl.dataset.resizerSetup = 'true';
+    injectBar(chromeEl);
     applyInitialSize();
 }
 
-/* ------------------------------------------------------------------ */
-/*  Inject a slim overlay bar                                         */
-/* ------------------------------------------------------------------ */
-function injectBar(chrome: HTMLElement): void {
-    chrome.style.position = 'relative';
-
+function injectBar(chromeEl: HTMLElement): void {
+    chromeEl.style.position = 'relative';
     const bar = document.createElement('div');
     bar.className = BAR_CLASS;
     bar.style.cssText =
         `position:absolute;left:0;top:0;width:100%;height:${BAR_H}px;` +
         'cursor:ns-resize;z-index:10;';
-    chrome.prepend(bar);
-
+    chromeEl.prepend(bar);
     attachDrag(bar);
 }
 
-/* ------------------------------------------------------------------ */
-/*  Drag behaviour                                                    */
-/* ------------------------------------------------------------------ */
 function attachDrag(bar: HTMLElement): void {
-    bar.addEventListener('mousedown', (e: MouseEvent) => {
+    bar.addEventListener('mousedown', e => {
         e.preventDefault();
-
-        // Re-query live elements so we never hold a stale reference
-        const wrap = document.querySelector<HTMLElement>(SEL.editorWrapper);
+        const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
         if (!wrap) return;
-
-        const startY: number = e.clientY;
-        const startH: number = wrap.getBoundingClientRect().height;
-
-        const onMove = (ev: MouseEvent): void => {
-            const dy = ev.clientY - startY;
-            const newH = Math.max(MIN_HEIGHT, startH - dy);
+        const startY = e.clientY;
+        const startH = wrap.getBoundingClientRect().height;
+        const onMove = (ev: MouseEvent) => {
+            const newH = Math.max(MIN_HEIGHT, startH - (ev.clientY - startY));
             applySize(newH);
         };
-
-        const onUp = (): void => {
+        const onUp = () => {
             document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup',   onUp);
+            document.removeEventListener('mouseup', onUp);
             stored[currentConvId() ?? 'global'] = getCurrentHeight();
         };
-
         document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup',   onUp);
+        document.addEventListener('mouseup', onUp);
     });
 }
 
-/* ------------------------------------------------------------------ */
-/*  Height helpers                                                    */
-/* ------------------------------------------------------------------ */
+/* Height helpers */
 function applySize(px: number): void {
-    const wrap  = document.querySelector<HTMLElement>(SEL.editorWrapper);
-    const inner = wrap?.querySelector<HTMLElement>(SEL.replyInner);
+    const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyInner);
     if (!wrap) return;
-
     wrap.style.maxHeight = `${px}px`;
     wrap.style.minHeight = `${px}px`;
     if (inner) {
-        inner.style.minHeight = `${px}px`;
         inner.style.maxHeight = `${px}px`;
+        inner.style.minHeight = `${px}px`;
     }
 }
 
 function getCurrentHeight(): number {
-    const wrap = document.querySelector<HTMLElement>(SEL.editorWrapper);
+    const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
     return wrap
         ? parseInt(getComputedStyle(wrap).maxHeight, 10)
         : DEFAULT_MAX;
@@ -120,18 +89,23 @@ function getCurrentHeight(): number {
 
 function applyInitialSize(): void {
     const key = currentConvId() ?? 'global';
-    const h   = stored[key] ?? DEFAULT_MAX;
-    applySize(h);
+    applySize(stored[key] ?? DEFAULT_MAX);
 }
 
-/* ------------------------------------------------------------------ */
-/*  Watch SPA route changes                                           */
-/* ------------------------------------------------------------------ */
 function watchConversation(): void {
     const id = currentConvId() ?? 'global';
     if (id !== currentConv) {
         currentConv = id;
-        setTimeout(ensureChrome, 100); // DOM settles, then patch
+        setTimeout(ensureChrome, 100);
     }
     requestAnimationFrame(watchConversation);
+}
+
+/* Collapse after send */
+function attachCollapseOnSend(): void {
+    document.addEventListener('click', e => {
+        const btn = (e.target as Element).closest(KAYAKO_SELECTORS.sendReplyButtonBaseSelector) as Element | null;
+        if (!btn) return;
+        setTimeout(() => applySize(MIN_HEIGHT), 50);
+    }, true);
 }
