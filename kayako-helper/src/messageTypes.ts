@@ -1,3 +1,6 @@
+/* messageTypes.ts
+    - Types for messages sent between content-script and background-script */
+
 export type ToBackground =
     | { action: 'createFolder'; ticketId: string; location: 'V' | 'DOWNLOADS' }
     | { action: 'saveMetadata'; ticketId: string; name: string; email: string; subject: string }
@@ -5,7 +8,9 @@ export type ToBackground =
     | { action: 'setTrainingMode'; enabled: boolean }
     | { action: 'getStats'; ticketId: string }
     | { action: 'getTrainingMode' }
-    ;
+    | { action: 'setStyleEnabled'; styleId: 'compactStyles'; enabled: boolean }
+    | { action: 'setAllStylesEnabled'; enabled: boolean };
+
 
 export type FromBackground =
     | { action: 'createFolderResult'; success: boolean; alreadyExisted?: boolean; path?: string; error?: string }

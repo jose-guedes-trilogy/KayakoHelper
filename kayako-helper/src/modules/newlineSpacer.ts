@@ -15,9 +15,12 @@
  *  • Re-clicking never produces duplicates (fully idempotent).
  */
 
-import { KAYAKO_SELECTORS } from '@/selectors';
+import {
+    KAYAKO_SELECTORS,
+    EXTENSION_SELECTORS,
+} from '@/generated/selectors';
 
-const BTN_CLASS          = 'kayako-newlines-btn';
+const BTN_ID             = EXTENSION_SELECTORS.newLinesButton;
 const BLOCK_SELECTOR     = 'DIV,OL,UL';
 const HEADER_SELECTOR    = 'H1,H2,H3';
 const SPACER_INNER_HTML  = '<div class="br-wrapper br-wrapper--multiple"><br></div>';
@@ -152,13 +155,13 @@ export default bootNewlineSpacer;
 
 function attachAllButtons(): void {
     document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.headerSelector).forEach(header => {
-        if (header.querySelector(`.${BTN_CLASS}`)) return;
+        if (header.querySelector(BTN_ID)) return;
 
         const btnDiv = document.createElement('div');
         const btn = buildButton();
 
         btnDiv.appendChild(btn);
-        btnDiv.style.cssText = 'padding: 4px 0;';
+        btnDiv.style.cssText = 'display:flex;align-items:center;';
 
         header.children.length
             ? header.insertBefore(btnDiv, header.children[1]) // 2nd child
@@ -172,10 +175,7 @@ function buildButton(): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = 'Add newlines';
-    btn.className = BTN_CLASS;
-    btn.style.cssText =
-        'background-color:#fdfdfd;border-radius:4px;border:1px solid hsl(47 8% 76% / 1);' +
-        'padding:0 6px;height:100%;cursor:pointer;';
+    btn.id = BTN_ID.replace(/^#/, '');
 
     btn.addEventListener('click', e => {
         const header = (e.currentTarget as HTMLElement).closest(KAYAKO_SELECTORS.headerSelector);

@@ -1,4 +1,6 @@
-import { KAYAKO_SELECTORS } from '@/selectors';
+import {
+    KAYAKO_SELECTORS,
+} from '@/generated/selectors';
 import { currentConvId } from '@/utils/location';
 import type { ToBackground } from '@/messageTypes';
 

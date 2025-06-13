@@ -1,0 +1,72 @@
+{
+  "kayako": {
+    "tabStrip": "[class^=ko-tab-strip__tabs_]",
+    "timeline": "[class^=ko-agent-content_layout__timeline__]",
+    "creatorLabel": "[class*=creator]",
+    "contentBody": "[class*=list_item__content]",
+    "AIName": "ATLAS",
+    "greetingRegex": "Hi,[\\s\\xa0]*([^!]+?)\\s*!",
+    "lightboxModal": "[class*=ko-lightbox__modal]",
+    "lightboxImage": "[class*=ko-lightbox__lightbox-image]",
+    "hiddenImg": "img[class*=ko-lightbox__hidden-image]",
+    "editorChrome": "[class*=ko-agent-content_layout__reply-area_]",
+    "editorWrapper": ".fr-wrapper",
+    "replyInner": ".fr-element",
+    "headerSelector": "[class*=ko-text-editor__header_]",
+    "editorSelector": ".fr-element.fr-view",
+    "sendReplyButtonBaseSelector": "[class*=ko-button__primary-with-options_]",
+    "sendReplyButtonAsNote": "[class*=ko-button__note_]",
+    "requesterName": "[class*=ko-editable-text__emphasizedText]",
+    "requesterEmail": "[class*=ko-identities_identity_trigger__name_]",
+    "ticketSubject": "[class*=ko-tabs_case__subject_]",
+
+    "messageOrNote": ".message-or-note",
+
+    "timelineItemNote": "[class*=ko-timeline-2_list_item__note]",
+
+    "modeSelectorContainer": "[class*=ko-text-editor__group_]",
+
+    "noteModeSelectorOn": "[class*=ko-text-editor_mode-selector__active_]",
+    "noteModeSelectorOff": "[class*=ko-text-editor_mode-selector__root_]",
+    "replyModeSelectorContainer": "[class*=ko-channel-selector__channel-selector_]",
+    "replyModeSelectorOn": "[class*=ko-channel-selector__trigger--active_]",
+    "replyModeSelectorOff": "[class*=ko-channel-selector__trigger_]",
+
+    "textEditorContainer": "[class*=ko-text-editor__container_]",
+    "textEditorHeader": "[class*=ko-text-editor__header_]",
+    "textEditorIsNote": "[class*=ko-text-editor__is-note_]",
+    "textEditorNoteModeContainerFocused": "[class*=ko-text-editor__note-container_][class*=ko-text-editor__has-focus_]",
+    "textEditorReplyModeContainerFocused": "[class*=ko-text-editor__has-focus_]:not([class*=ko-text-editor__note-container_])",
+    "textEditorNoteModeAfter": "[class*=ko-text-editor_mode-selector__active_]:after",
+    "textEditorReplyModeAfter": "[class*=ko-channel-selector__trigger]:after",
+
+    "channelSelectorMessengerAfter": "[class*=channel-type--messenger] [class*=ko-channel-selector__trigger--active_]:after",
+
+    "ccedEmailContainer": "[class*=ko-case-content_cc__option-item-membrane_]",
+    "ccedEmail": "[class*=ko-case-content_cc__option-item-title_]",
+
+    "replyingToBarPrefix": "[class*=ko-case-content__in-reply-to-header_]",
+
+    "infoBarItemContainerKREEdited": "[class*=ko-info-bar_item__containerKREEdited_]",
+    "timelineJumpBar": "[class*=ko-timeline-2_jump-bar__jump-bar_]",
+    "timelineJumpArrowPath": "[class*=ko-timeline-2_jump-bar__jump-arrow_] svg path",
+
+    "daySeparatorText": "[class*=ko-timeline-2_list_days__day-separator__text_]",
+    "daySeparatorBorder": "[class*=ko-timeline-2_list_days__day-separator_]::before",
+
+    "agentDropdownTrigger": "[class*=ko-agent-dropdown__trigger_]",
+    "agentDropdownIconSquare": "[class*=ko-agent-dropdown__iconSquare_]",
+    "agentDropdownIconSvg": "[class*=ko-agent-dropdown__icon_] > svg > path",
+    "agentDropdownTriggerLabel": "[class*=ko-agent-dropdown__dropdown-trigger-label_]",
+
+    "statusPill": "[class*=ko-status-pill__status-]",
+    "selectedTabLink": ".ko-tabs_tab__link_oqn505.active:not(.ember-transitioning-out), .ko-tabs_tab__link_oqn505.ember-transitioning-in"
+  },
+  "extension": {
+    "tabStripCustomButtonArea": "#tab-strip-custom-btn-area",
+    "tabStripButtonClass": ".tab-strip-btn",
+    "createFolderButton": "#kh-create-folder-btn",
+    "copyChatButton": "#kh-copy-chat-btn",
+    "newLinesButton": "#kh-newlines-btn"
+  }
+}

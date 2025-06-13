@@ -107,7 +107,7 @@ function applyTagDiff(postEl: HTMLElement, actions: Action[]) {
     if (!diff.added.length && !diff.removed.length) return;
 
     // Hide noisy original lines
-    Array.from(textContainer.querySelectorAll("span")).forEach(span => {
+    Array.from(textContainer.querySelectorAlspan).forEach(span => {
         if (/tags/i.test(span.textContent ?? "")) (span as HTMLElement).style.display = "none";
     });
 

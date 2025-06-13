@@ -1,4 +1,6 @@
-import { KAYAKO_SELECTORS } from '@/selectors';
+import {
+    KAYAKO_SELECTORS,
+} from '@/generated/selectors';
 
 const STORAGE_KEY = 'trainingMode';
 let enabled = true;

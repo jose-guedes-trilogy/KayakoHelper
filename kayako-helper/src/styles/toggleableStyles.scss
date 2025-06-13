@@ -1,0 +1,203 @@
+@use '@/generated/_selectors.scss' as sel;
+@use '@/styles/mixinsAndFunctions' as *;
+
+#{sel.$messageOrNote} {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+#{sel.$ccedEmailContainer} {
+  gap: 3px;
+}
+
+#{sel.$ccedEmail} {
+  background-color: hsl(103deg 72.17% 95%);
+  padding: 0 !important;
+}
+
+#{sel.$replyingToBarPrefix} {
+  font-weight: 600;
+  color: #676767;
+}
+
+/* REPLY MODE SELECTORS */
+
+#{sel.$modeSelectorContainer} {
+  margin: 0;
+  gap: 6px;
+}
+
+#{sel.$noteModeSelectorOff}, #{sel.$replyModeSelectorOff} {
+  padding: 0 8px !important;
+  margin: 0;
+
+  border-left: 1px solid transparent !important;
+  border-right: 1px solid transparent !important;
+}
+
+#{sel.$noteModeSelectorOn}, #{sel.$replyModeSelectorOn} {
+  background-color: hsl(103, 10%, 98%);
+  padding: 0 8px !important;
+  border-left: 1px solid hsl(103, 30%, 84%) !important;
+  border-right: 1px solid hsl(103, 30%, 84%) !important;
+  box-shadow: inset 0px 0px 6px 0 hsl(0 0% 94% / 1);
+  margin: 0;
+}
+
+#{sel.$replyModeSelectorContainer} {
+  margin-right: 0;
+}
+
+/* END REPLY MODE SELECTORS */
+
+/* ----- INTERNAL NOTES ----- */
+
+#{sel.$textEditorContainer} {
+  box-shadow:
+          0 2px 9px 2px hsl(203 29% 92% / 0.75),
+          0 0 3px 0 hsl(203 10% 85% / 1),
+          0 0 1px 0 hsl(203 10% 40% / 1);
+
+  border: none !important;
+}
+
+/* Internal notes in the ticket's timeline */
+#{sel.$timelineItemNote} {
+  background: hsl(203 76% 99% / 1);
+  border-color: hsl(203 29% 60% / 1);
+  border-width: 5px;
+  border-top: 1px solid hsl(203 43% 98% / 1);
+  border-bottom: 1px solid hsl(203 43% 98% / 1);
+  border-radius: 4px;
+  box-shadow: 0 0 4px 0 hsl(203 43% 96% / 1);
+}
+
+/* ----- END INTERNAL NOTES ----- */
+
+/* ----- REPLY BOX ----- */
+
+/* Reply box – Writing an internal note */
+#{sel.$textEditorIsNote} {
+  background: hsl(203deg 100% 98.28%);
+}
+
+/* Reply box – Writing an internal note – FOCUSED */
+#{sel.$textEditorNoteModeContainerFocused} {
+  box-shadow: 0 0 4px 1px hsl(203deg 76.21% 87%), 0 0 0 2px hsl(203deg 55.45% 77.35%) !important;
+  border: none !important;
+}
+
+/* END Reply box – Writing an internal note – FOCUSED */
+
+/* Reply box – Writing a public reply – FOCUSED */
+#{sel.$textEditorReplyModeContainerFocused} {
+  box-shadow: 0 0 4px hsl(133.2deg 75.76% 87.06% / 85%), 0 0 0 2px hsl(132.86deg 28% 60.78% / 60%) !important;
+  border: none !important;
+
+  /* Reply box header */
+  #{sel.$textEditorHeader} {
+
+  }
+}
+/* Channel selector underline - MESSENGER */
+#{sel.$channelSelectorMessengerAfter} {
+  background-color: hsl(38.08deg 71.67% 69.95%);
+}
+
+/* END Reply box – Writing a public reply – FOCUSED */
+
+/* Mode-selector underline - NOTE */
+#{sel.$textEditorNoteModeAfter} {
+  background-color: hsl(203 46% 55% / 1);
+}
+
+/* Mode-selector underline - REPLY */
+#{sel.$textEditorReplyModeAfter} {
+  background-color: hsl(133 45% 55% / 1);
+}
+
+/* ----- END REPLY BOX ----- */
+
+
+/* ----- RIGHT SIDE MENU ----- */
+
+/* Highlights edited fields */
+#{sel.$infoBarItemContainerKREEdited} {
+  box-shadow: inset 5px 0 0 0 hsl(152 30% 74% / 1);
+}
+
+/* ----- JUMP TO BOTTOM ----- */
+
+/* Jump-bar container */
+#{sel.$timelineJumpBar} {
+  color: hsl(152deg 32.12% 49.58%);
+  background-color: hsl(152deg 65.49% 91.3%);
+
+  &:hover {
+    background-color: hsl(152 55% 87% / 1);
+  }
+}
+
+/* Jump-arrow icon */
+#{sel.$timelineJumpArrowPath} {
+  /* the selector already includes “svg path” */
+  fill: hsl(152deg 32.12% 49.58%);
+}
+
+/* ----- INTER-POST DATE SEPARATOR ----- */
+
+/* Date-text container */
+#{sel.$daySeparatorText} {
+  padding: 4px 16px;
+  border-radius: 18px;
+  border: 1px solid hsl(203 21% 84% / 1);
+}
+
+/* Horizontal line */
+#{sel.$daySeparatorBorder} {
+  /* the selector already includes ::before */
+  height: 2px;
+}
+
+/* ----- CREATE TICKET BUTTON ----- */
+
+/* Create-ticket dropdown trigger */
+#{sel.$agentDropdownTrigger} {
+  height: 100%;
+}
+
+/* Create-ticket button itself */
+#{sel.$agentDropdownIconSquare} {
+  background-color: hsl(203 59% 97% / 1);
+  border: 1px solid hsl(203deg 68% 45.46%);
+  padding: 16px 12px;
+  border-radius: 6px;
+  box-shadow: 0 0 9px 1px hsl(203deg 100% 86.43% / 14%);
+}
+
+/* Create-ticket plus icon */
+#{sel.$agentDropdownIconSvg} {
+  /* includes the “> svg” in the selector */
+  fill: hsl(203deg 73.41% 41.41%);
+}
+
+/* Create-ticket label text (if you ever style it) */
+#{sel.$agentDropdownTriggerLabel} {
+  color: hsl(203deg 44.92% 47.37%);
+  font-size: 15px;
+}
+
+/* ----- STATUS PILL ----- */
+
+#{sel.$statusPill} {
+  border-radius: 6px;
+  margin-left: 3px;
+  margin-right: 3px;
+  border-bottom: none !important;
+}
+
+/* ----- SELECTED TAB LINK ----- */
+
+#{sel.$selectedTabLink} {
+  /* override or highlight the active tab as desired */
+}

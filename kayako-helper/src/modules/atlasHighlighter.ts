@@ -1,6 +1,8 @@
 // modules/atlasHighlighter.ts
 
-import { KAYAKO_SELECTORS }               from '@/selectors';        // <- path changed
+import {
+    KAYAKO_SELECTORS,
+} from '@/generated/selectors';
 import { currentConvId }     from '@/utils/location';   // <- new util
 
 /* ------------------------------------------------------------------ */
@@ -93,7 +95,7 @@ function processPost(el: Element): void {
 /* ---------- once-per-conversation: find the visitor name ---------- */
 function tryDiscoverVisitor(postEl: Element): void {
     const creator = postEl.querySelector<HTMLElement>(KAYAKO_SELECTORS.creatorLabel);
-    if (!creator || creator.textContent?.trim() !== KAYAKO_SELECTORS.atlasName) {
+    if (!creator || creator.textContent?.trim() !== KAYAKO_SELECTORS.AIName) {
         return;
     }
 

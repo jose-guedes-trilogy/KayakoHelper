@@ -1,6 +1,8 @@
 // modules/lightboxEnhancer.ts
 
-import { KAYAKO_SELECTORS } from '@/selectors';
+import {
+    KAYAKO_SELECTORS,
+} from '@/generated/selectors';
 
 const BTN_CLASS = 'ktx-lightbox-btn';
 

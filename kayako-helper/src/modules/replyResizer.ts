@@ -1,8 +1,11 @@
-import { KAYAKO_SELECTORS } from '@/selectors';
+import {
+    KAYAKO_SELECTORS,
+} from '@/generated/selectors';
+
 import { currentConvId } from '@/utils/location';
 
 /* Config / State */
-const BAR_H = 6;
+const BAR_H = 14;
 const DEFAULT_MAX = 350;
 const MIN_HEIGHT = 44;
 const BAR_CLASS = 'ktx-resize-bar';

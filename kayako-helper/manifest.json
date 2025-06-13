@@ -8,7 +8,10 @@
     "16": "icons/icon16.png"
   },
 
-  "action": { "default_title": "Kayako Helper" },
+  "action": {
+    "default_title": "Kayako Helper",
+    "default_popup": "dist/popup.html"
+    },
 
   "content_scripts": [
     {
@@ -16,6 +19,7 @@
         "https://*.kayako.com/*"
       ],
       "js": ["dist/content.js"],
+      "css": ["dist/content.css"],
       "run_at": "document_idle"
     }
   ],
