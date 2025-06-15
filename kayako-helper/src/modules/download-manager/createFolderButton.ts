@@ -12,7 +12,7 @@ import { registerTabButton }   from '@/utils/tabButtonManager';
 export function bootCreateFolderButton(): void {
     registerTabButton({
         id   : EXTENSION_SELECTORS.createFolderButton.replace(/^#/, ''),
-        label: () => 'Create folder',
+        label: () => '📁 Create folder',
         routeTest: () => !!currentConvId(),   // only on ticket pages
 
         onClick(_btn) {

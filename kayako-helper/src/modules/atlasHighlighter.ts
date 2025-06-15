@@ -121,10 +121,10 @@ function paintLines(root: Element): void {
         const div = p?.nextElementSibling;
 
         if (p) {
-            p.style.cssText = 'background:#91e797;border-radius:4px 4px 0 0;padding-left:10px;padding-right:10px;';
+            p.classList.add('kh-atlas-highlight-header');
         }
         if (div && div.tagName === 'DIV') {
-            (div as HTMLElement).style.cssText = 'background:#baf7be;border-radius:0 0 4px 4px;padding-left:10px;padding-right:10px;';
+            (div as HTMLElement).classList.add('kh-atlas-highlight-body');
         }
     });
 }

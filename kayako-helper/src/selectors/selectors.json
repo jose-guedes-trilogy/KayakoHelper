@@ -12,7 +12,6 @@
     "editorChrome": "[class*=ko-agent-content_layout__reply-area_]",
     "editorWrapper": ".fr-wrapper",
     "replyInner": ".fr-element",
-    "headerSelector": "[class*=ko-text-editor__header_]",
     "editorSelector": ".fr-element.fr-view",
     "sendReplyButtonBaseSelector": "[class*=ko-button__primary-with-options_]",
     "sendReplyButtonAsNote": "[class*=ko-button__note_]",
@@ -20,11 +19,22 @@
     "requesterEmail": "[class*=ko-identities_identity_trigger__name_]",
     "ticketSubject": "[class*=ko-tabs_case__subject_]",
 
+    "conversationWindowHeader": "[class*=ko-agent-content_layout__heading_]",
+    "conversationWindowHeaderInner": "[class*=ko-tabs__tabs_]",
+    "conversationWindowHeaderTab": "[class*=ko-tabs_tab__item_]",
+    "conversationWindowHeaderSelectedTab": "[class*=ko-tabs_tab__item--shrink_]",
+
     "messageOrNote": ".message-or-note",
+
+    "timelineItem": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_], [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_] .attachment-container-flap-hide",
+    "timelineItemInner": "[class*=ko-timeline-2_list_item__item_]",
+    "timelineItemHover": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover, [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover .attachment-container-flap-hide",
 
     "timelineItemNote": "[class*=ko-timeline-2_list_item__note]",
 
     "modeSelectorContainer": "[class*=ko-text-editor__group_]",
+
+    "tag": "[class*=ko-select_multiple_pill__pill_]",
 
     "noteModeSelectorOn": "[class*=ko-text-editor_mode-selector__active_]",
     "noteModeSelectorOff": "[class*=ko-text-editor_mode-selector__root_]",
@@ -37,6 +47,7 @@
     "textEditorIsNote": "[class*=ko-text-editor__is-note_]",
     "textEditorNoteModeContainerFocused": "[class*=ko-text-editor__note-container_][class*=ko-text-editor__has-focus_]",
     "textEditorReplyModeContainerFocused": "[class*=ko-text-editor__has-focus_]:not([class*=ko-text-editor__note-container_])",
+    "textEditorFooterFocused": "[class*=ko-text-editor__footer_]",
     "textEditorNoteModeAfter": "[class*=ko-text-editor_mode-selector__active_]:after",
     "textEditorReplyModeAfter": "[class*=ko-channel-selector__trigger]:after",
 
@@ -49,7 +60,11 @@
 
     "infoBarItemContainerKREEdited": "[class*=ko-info-bar_item__containerKREEdited_]",
     "timelineJumpBar": "[class*=ko-timeline-2_jump-bar__jump-bar_]",
+    "timelineJumpArrow": "[class*=ko-timeline-2_jump-bar__jump-arrow_]",
     "timelineJumpArrowPath": "[class*=ko-timeline-2_jump-bar__jump-arrow_] svg path",
+    "timelineJumpOuterContainer": "[class*=ko-timeline-2_jump-bar__jump_]",
+    "timelineJumpCloseButtonContainer": "[class*=ko-timeline-2_jump-bar__mark-as-seen_]",
+    "timelineJumpCloseButton": "[class*=ko-timeline-2_jump-bar__mark-as-seen-action_]",
 
     "daySeparatorText": "[class*=ko-timeline-2_list_days__day-separator__text_]",
     "daySeparatorBorder": "[class*=ko-timeline-2_list_days__day-separator_]::before",
@@ -60,13 +75,25 @@
     "agentDropdownTriggerLabel": "[class*=ko-agent-dropdown__dropdown-trigger-label_]",
 
     "statusPill": "[class*=ko-status-pill__status-]",
-    "selectedTabLink": ".ko-tabs_tab__link_oqn505.active:not(.ember-transitioning-out), .ko-tabs_tab__link_oqn505.ember-transitioning-in"
+    "selectedTab": "[class*=ko-tabs_tab__link_].active:not(.ember-transitioning-out), [class*=ko-tabs_tab__link_].ember-transitioning-in",
+    "inactiveTab": "[class*=ko-tab-strip_tab__inactive-tab_]",
+
+    "ticketCount": "[class*=session__case-count-pill_]",
+
+    "fromEmailSelector": "[class*=ember-power-select-options]",
+
+    "slaGoalMissed": "[class*=ko-timeline-2_list_activity_large__breach_]",
+
+    "tooltipContainer": "[class*=ko-tooltip__tooltip_] [class*=tooltipster-box]",
+    "tooltipContent": ".tooltipster-sidetip.tooltipster-content"
   },
   "extension": {
-    "tabStripCustomButtonArea": "#tab-strip-custom-btn-area",
-    "tabStripButtonClass": ".tab-strip-btn",
+    "tabStripCustomButtonArea": "#kh-tab-strip-custom-btn-area",
+    "tabStripButtonClass": ".kh-tab-strip-btn",
     "createFolderButton": "#kh-create-folder-btn",
     "copyChatButton": "#kh-copy-chat-btn",
-    "newLinesButton": "#kh-newlines-btn"
+    "newLinesButton": "#kh-newlines-btn",
+    "atlasHighlightHeader": ".kh-atlas-highlight-header",
+    "atlasHighlightBody": ".kh-atlas-highlight-body"
   }
 }

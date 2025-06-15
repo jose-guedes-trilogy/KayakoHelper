@@ -7,26 +7,57 @@
 }
 
 #{sel.$tabStripButtonClass} {
-  padding: 0 12px;
+  background: linear-gradient(180deg, hsl(0 0% 99% / 1), hsl(0 0% 96% / 1));
+  padding: 8px 12px;
   font-size: 14px;
   cursor: pointer;
-  height: 100%;
   border-radius: 8px;
   border: none;
+
+  @keyframes hover-animation {
+    from { background: linear-gradient(180deg, hsl(0 0% 99% / 1), hsl(0 0% 96% / 1)); }
+    to { background: linear-gradient(180deg, hsl(0 0% 94% / 1), hsl(0 0% 88% / 1)); }
+  }
+
+  &:hover {
+    animation-name: hover-animation;
+    animation-duration: 0.15s;
+    animation-fill-mode: forwards;
+
+  }
+
+  &:active {
+    background: linear-gradient(180deg, hsl(0 0% 90% / 1), hsl(0 0% 82% / 1));
+  }
 }
 
 #{sel.$newLinesButton} {
-  background-color:#fdfdfd;
+  background: linear-gradient(180deg, hsl(0 0% 100% / 1), hsl(0 0% 97% / 1));
   border-radius:4px;
   border:1px solid hsl(47 8% 82% / 1);
   padding:5px 8px;
   cursor:pointer;
+  margin-left: 5px;
 }
 
 #{sel.$tabStripCustomButtonArea}
 {
-  padding:6px 0;
   display:flex;
   align-items:center;
   gap:10px;
+}
+
+#{sel.$atlasHighlightHeader} {
+  background: hsl(124 66% 80%);
+  border-radius:4px 4px 0 0;
+  padding-left:14px !important;
+  padding-right:14px !important;
+
+  margin-top: 10px;
+}
+
+#{sel.$atlasHighlightBody} {
+  background:hsl(124 76% 90% / 1);
+  border-radius:0 0 4px 4px;
+  padding: 4px 14px !important;
 }

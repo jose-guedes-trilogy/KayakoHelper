@@ -2,7 +2,7 @@
  * Kayako Extension – Newline Spacer v6
  * ------------------------------------
  *  • Injects an “Add newlines” button (class BTN_CLASS) as the 2nd child of every
- *    editor header given by SEL.headerSelector.
+ *    editor header given by SEL.textEditorHeader.
  *  • When clicked it now:
  *      1. Inserts a Froala-native spacer block
  *         <div><div class="br-wrapper br-wrapper--multiple"><br></div></div>
@@ -154,7 +154,7 @@ export default bootNewlineSpacer;
 /* ------------------------------------------------------------------ */
 
 function attachAllButtons(): void {
-    document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.headerSelector).forEach(header => {
+    document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.textEditorHeader).forEach(header => {
         if (header.querySelector(BTN_ID)) return;
 
         const btnDiv = document.createElement('div');
@@ -178,7 +178,7 @@ function buildButton(): HTMLButtonElement {
     btn.id = BTN_ID.replace(/^#/, '');
 
     btn.addEventListener('click', e => {
-        const header = (e.currentTarget as HTMLElement).closest(KAYAKO_SELECTORS.headerSelector);
+        const header = (e.currentTarget as HTMLElement).closest(KAYAKO_SELECTORS.textEditorHeader);
         const editor = header?.parentElement?.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorSelector);
         if (!editor) {
             console.warn('[newlineSpacer] editor area not found');

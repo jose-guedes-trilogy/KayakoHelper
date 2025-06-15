@@ -4,6 +4,11 @@
 #{sel.$messageOrNote} {
     margin-top: 5px;
     margin-bottom: 5px;
+
+  /* Images in posts */
+  img {
+    border: 1px solid hsl(0 0% 90% / 1);
+  }
 }
 
 #{sel.$ccedEmailContainer} {
@@ -18,6 +23,26 @@
 #{sel.$replyingToBarPrefix} {
   font-weight: 600;
   color: #676767;
+}
+
+#{sel.$conversationWindowHeader} {
+  border-bottom: 1px solid #D1D5D7;
+}
+
+#{sel.$conversationWindowHeaderInner} {
+  border-bottom: none !important;
+}
+
+#{sel.$conversationWindowHeaderTab} {
+  padding: 0 6px;
+
+  &:hover:not(#{sel.$conversationWindowHeaderSelectedTab}) {
+    background: hsl(103deg 30% 20% / 4%);
+  }
+}
+
+#{sel.$conversationWindowHeaderSelectedTab} {
+
 }
 
 /* REPLY MODE SELECTORS */
@@ -38,9 +63,9 @@
 #{sel.$noteModeSelectorOn}, #{sel.$replyModeSelectorOn} {
   background-color: hsl(103, 10%, 98%);
   padding: 0 8px !important;
-  border-left: 1px solid hsl(103, 30%, 84%) !important;
-  border-right: 1px solid hsl(103, 30%, 84%) !important;
-  box-shadow: inset 0px 0px 6px 0 hsl(0 0% 94% / 1);
+  border-left: 1px solid hsl(203, 20%, 88%) !important;
+  border-right: 1px solid hsl(203, 20%, 88%) !important;
+  box-shadow: inset 0px 0px 6px 1px hsl(0 0% 94% / 1);
   margin: 0;
 }
 
@@ -50,24 +75,35 @@
 
 /* END REPLY MODE SELECTORS */
 
-/* ----- INTERNAL NOTES ----- */
+/* TIMELINE */
 
-#{sel.$textEditorContainer} {
-  box-shadow:
-          0 2px 9px 2px hsl(203 29% 92% / 0.75),
-          0 0 3px 0 hsl(203 10% 85% / 1),
-          0 0 1px 0 hsl(203 10% 40% / 1);
+#{sel.$timelineItem} {
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
 
-  border: none !important;
+  padding-bottom: 20px;
 }
+
+#{sel.$timelineItemInner} {
+  padding: 24px 9px 24px 18px;
+}
+
+#{sel.$timelineItemHover} {
+  background: hsl(203, 30%, 99%);
+  box-shadow: 0 0 6px 0 hsl(203, 20%, 94%);
+  border-top: 1px solid hsl(203, 30%, 90%);
+  border-bottom: 1px solid hsl(203, 30%, 90%);
+}
+
+/* ----- INTERNAL NOTES ----- */
 
 /* Internal notes in the ticket's timeline */
 #{sel.$timelineItemNote} {
   background: hsl(203 76% 99% / 1);
   border-color: hsl(203 29% 60% / 1);
   border-width: 5px;
-  border-top: 1px solid hsl(203 43% 98% / 1);
-  border-bottom: 1px solid hsl(203 43% 98% / 1);
+  border-top: 1px solid hsl(203 43% 94% / 1);
+  border-bottom: 1px solid hsl(203 43% 94% / 1);
   border-radius: 4px;
   box-shadow: 0 0 4px 0 hsl(203 43% 96% / 1);
 }
@@ -76,6 +112,16 @@
 
 /* ----- REPLY BOX ----- */
 
+/* Container for the reply box */
+#{sel.$textEditorContainer} {
+  box-shadow:
+          0 2px 9px 2px hsl(203 29% 92% / 0.75),
+          0 0 3px 0 hsl(203 10% 85% / 1),
+          0 0 0 1px hsl(204 10% 78% / 1);
+
+  border: none !important;
+}
+
 /* Reply box – Writing an internal note */
 #{sel.$textEditorIsNote} {
   background: hsl(203deg 100% 98.28%);
@@ -83,25 +129,31 @@
 
 /* Reply box – Writing an internal note – FOCUSED */
 #{sel.$textEditorNoteModeContainerFocused} {
-  box-shadow: 0 0 4px 1px hsl(203deg 76.21% 87%), 0 0 0 2px hsl(203deg 55.45% 77.35%) !important;
+  box-shadow: 0 0 10px 1px hsl(202.8deg 75.76% 87.06% / 25%), 0 0 4px 1px hsl(202.8deg 75.76% 87.06%), 0 0 0 2px hsl(202.5deg 55.17% 77.25%) !important;
   border: none !important;
+
 }
 
 /* END Reply box – Writing an internal note – FOCUSED */
 
 /* Reply box – Writing a public reply – FOCUSED */
 #{sel.$textEditorReplyModeContainerFocused} {
-  box-shadow: 0 0 4px hsl(133.2deg 75.76% 87.06% / 85%), 0 0 0 2px hsl(132.86deg 28% 60.78% / 60%) !important;
+  box-shadow: 0 0 10px hsl(133.2deg 75.76% 87.06% / 5%), 0 0 4px hsl(133.2deg 75.76% 87.06% / 85.1%), 0 0 0 2px hsl(132.86deg 28% 60.78% / 60%) !important;
   border: none !important;
 
   /* Reply box header */
   #{sel.$textEditorHeader} {
-
+    background-color: hsl(132.82deg 70% 98%);
   }
 }
 /* Channel selector underline - MESSENGER */
 #{sel.$channelSelectorMessengerAfter} {
   background-color: hsl(38.08deg 71.67% 69.95%);
+}
+
+/* "From" email selector */
+#{sel.$fromEmailSelector} svg path {
+  fill: hsl(132.82deg 44.98% 55.1%);
 }
 
 /* END Reply box – Writing a public reply – FOCUSED */
@@ -126,16 +178,46 @@
   box-shadow: inset 5px 0 0 0 hsl(152 30% 74% / 1);
 }
 
+/* Highlights edited fields */
+#{sel.$tag} {
+  border: 1px solid hsl(203 14% 86% / 1) !important;
+  box-shadow: 1px 1px 3px #EBEEF0 !important;
+  border-radius: 5px !important;
+
+  &:hover {
+    color: hsl(203 11% 30% / 1) !important;
+    border-color: hsl(200 7% 77% / 1) !important;
+    box-shadow: 1px 1px 3px hsl(204 14% 76% / 1) !important;
+  };
+}
+
+/* ----- RIGHT SIDE MENU ----- */
 /* ----- JUMP TO BOTTOM ----- */
 
-/* Jump-bar container */
+/* Jump-bar outer container */
+#{sel.$timelineJumpOuterContainer} {
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+}
+
+/* Jump-bar inner container */
 #{sel.$timelineJumpBar} {
-  color: hsl(152deg 32.12% 49.58%);
-  background-color: hsl(152deg 65.49% 91.3%);
+  color: hsl(151.85deg 32.02% 49.61%);
+  background-color: hsl(153 64% 98% / 1);
+  border: 1px solid hsl(151.85deg 48.66% 68.08%);
 
   &:hover {
     background-color: hsl(152 55% 87% / 1);
   }
+}
+
+/* Jump-bar arrow */
+#{sel.$timelineJumpArrow} {
+  fill: hsl(152deg 32.12% 49.58% / 1);
+
+  padding: 0 9px;
 }
 
 /* Jump-arrow icon */
@@ -144,11 +226,28 @@
   fill: hsl(152deg 32.12% 49.58%);
 }
 
+/* Jump-bar close button container */
+#{sel.$timelineJumpCloseButtonContainer} {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 34px;
+}
+
+/* Jump-bar close button */
+#{sel.$timelineJumpCloseButton} {
+  color: hsl(151.85deg 32.02% 49.61%);
+  position: static;
+}
+
+/* ----- END JUMP TO BOTTOM ----- */
+
 /* ----- INTER-POST DATE SEPARATOR ----- */
 
 /* Date-text container */
 #{sel.$daySeparatorText} {
-  padding: 4px 16px;
+  padding: 3px 16px;
   border-radius: 18px;
   border: 1px solid hsl(203 21% 84% / 1);
 }
@@ -173,6 +272,8 @@
   padding: 16px 12px;
   border-radius: 6px;
   box-shadow: 0 0 9px 1px hsl(203deg 100% 86.43% / 14%);
+
+  margin-right: 60px;
 }
 
 /* Create-ticket plus icon */
@@ -196,8 +297,42 @@
   border-bottom: none !important;
 }
 
-/* ----- SELECTED TAB LINK ----- */
+/* ----- TABS ----- */
 
-#{sel.$selectedTabLink} {
-  /* override or highlight the active tab as desired */
+#{sel.$selectedTab} {
+  padding: 0 4px;
+}
+
+#{sel.$inactiveTab} {
+  background-color: hsl(203 20% 96% / 1);
+
+  animation: 0.1s;
+
+  &:hover {
+    background-color: hsl(203 8% 91% / 1);
+  }
+}
+
+
+#{sel.$ticketCount} {
+  background-color: hsl(5 48% 50% / 1);
+}
+
+
+/* SLA Goal Missed */
+#{sel.$slaGoalMissed} {
+  background-color: hsl(8 50% 98% / 1);
+}
+
+/* Tooltip */
+#{sel.$tooltipContainer} {
+  background: hsl(266 30% 99% / 1);
+  border: 1px solid hsl(266deg 6.42% 74.07%);
+  border-radius: 5px;
+  box-shadow: 0 4px 9px 0 rgba(0,0,0,.08),0 1px 3px 0 rgba(45,49,56,.10);
+}
+
+/* Tooltip */
+#{sel.$tooltipContent} {
+  color: #575757;
 }
