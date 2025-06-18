@@ -21,7 +21,7 @@ export function bootReplyResizer(): void {
 
 /* Main patch */
 function ensureChrome(): void {
-    const chromeEl = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorChrome);
+    const chromeEl = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorContainerRoot);
     const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
     if (!chromeEl || !wrap) {
         requestAnimationFrame(ensureChrome);
@@ -43,7 +43,7 @@ function injectBar(chromeEl: HTMLElement): void {
     const bar = document.createElement('div');
     bar.className = BAR_CLASS;
     bar.style.cssText =
-        `position:absolute;left:0;top:0;width:100%;height:${BAR_H}px;` +
+        `position:absolute;left:0;top:-${BAR_H}px;width:100%;height:${BAR_H}px;` +
         'cursor:ns-resize;z-index:10;';
     chromeEl.prepend(bar);
     attachDrag(bar);
@@ -71,7 +71,7 @@ function attachDrag(bar: HTMLElement): void {
 }
 
 /* Height helpers */
-function applySize(px: number): void {
+export function applySize(px: number): void {
     const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
     const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyInner);
     if (!wrap) return;
@@ -107,7 +107,7 @@ function watchConversation(): void {
 /* Collapse after send */
 function attachCollapseOnSend(): void {
     document.addEventListener('click', e => {
-        const btn = (e.target as Element).closest(KAYAKO_SELECTORS.sendReplyButtonBaseSelector) as Element | null;
+        const btn = (e.target as Element).closest(KAYAKO_SELECTORS.sendButtonReply) as Element | null;
         if (!btn) return;
         setTimeout(() => applySize(MIN_HEIGHT), 50);
     }, true);

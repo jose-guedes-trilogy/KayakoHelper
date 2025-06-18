@@ -3,5 +3,11 @@
    One-liner wrapper to keep existing import paths working. */
 
 import { bootCreateFolderButton } from '@/modules/download-manager/createFolderButton';
+import {bootKayakoAttachments} from "@/modules/download-manager/kayakoAttachments";
 
-export const bootDownloadManager = bootCreateFolderButton;
+export function  bootDownloadManager() {
+    bootCreateFolderButton();
+
+    /* Transfer Kayako attachments to Gemini */
+    bootKayakoAttachments();
+}

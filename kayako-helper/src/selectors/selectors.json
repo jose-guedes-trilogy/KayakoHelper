@@ -12,9 +12,7 @@
     "editorChrome": "[class*=ko-agent-content_layout__reply-area_]",
     "editorWrapper": ".fr-wrapper",
     "replyInner": ".fr-element",
-    "editorSelector": ".fr-element.fr-view",
-    "sendReplyButtonBaseSelector": "[class*=ko-button__primary-with-options_]",
-    "sendReplyButtonAsNote": "[class*=ko-button__note_]",
+
     "requesterName": "[class*=ko-editable-text__emphasizedText]",
     "requesterEmail": "[class*=ko-identities_identity_trigger__name_]",
     "ticketSubject": "[class*=ko-tabs_case__subject_]",
@@ -27,10 +25,15 @@
     "messageOrNote": ".message-or-note",
 
     "timelineItem": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_], [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_] .attachment-container-flap-hide",
+    "timelineItemDate": "[class*=ko-timeline-2_list_item__side-time_]",
     "timelineItemInner": "[class*=ko-timeline-2_list_item__item_]",
     "timelineItemHover": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover, [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover .attachment-container-flap-hide",
 
     "timelineItemNote": "[class*=ko-timeline-2_list_item__note]",
+
+    "timelineItemAttachment": "[class*=ko-timeline-2_list_item_attachment__attachment_]",
+
+    "timelineItemAttachmentNoteFlap": "[class*=ko-timeline-2_list_item__note_] .attachment-container-flap-hide",
 
     "modeSelectorContainer": "[class*=ko-text-editor__group_]",
 
@@ -42,14 +45,28 @@
     "replyModeSelectorOn": "[class*=ko-channel-selector__trigger--active_]",
     "replyModeSelectorOff": "[class*=ko-channel-selector__trigger_]",
 
+    "activateNoteModeButton": "[class*=ko-text-editor_mode-selector__root_]",
+
+    "textEditorReplyArea": "[class*=ko-agent-content_layout__reply-area_] .fr-element.fr-view",
+    "textEditorContainerRoot": "[class*=ko-text-editor__root_]",
     "textEditorContainer": "[class*=ko-text-editor__container_]",
     "textEditorHeader": "[class*=ko-text-editor__header_]",
+    "textEditorHeaderReplyMode": "[class*=ko-text-editor__container_]:not([class*=ko-text-editor__note-container_]) [class*=ko-text-editor__header_]",
     "textEditorIsNote": "[class*=ko-text-editor__is-note_]",
     "textEditorNoteModeContainerFocused": "[class*=ko-text-editor__note-container_][class*=ko-text-editor__has-focus_]",
     "textEditorReplyModeContainerFocused": "[class*=ko-text-editor__has-focus_]:not([class*=ko-text-editor__note-container_])",
     "textEditorFooterFocused": "[class*=ko-text-editor__footer_]",
     "textEditorNoteModeAfter": "[class*=ko-text-editor_mode-selector__active_]:after",
     "textEditorReplyModeAfter": "[class*=ko-channel-selector__trigger]:after",
+
+    "sendButtonReply": "[class*=ko-button__primary-with-options_]",
+    "sendButtonReplyRightSection": "[class*=ko-case-content__send-and-set-trigger_]",
+
+    "sendButtonNote": "[class*=ko-button__primary-with-options_][class*=ko-button__note_]",
+    "sendButtonNoteRightSection": "[class*=ko-case-content__send-and-set-trigger_][class*=ko-case-content__note-trigger_]",
+
+    "customFieldContainer": "[class*=ko-info-bar_field_select_trigger__header_]",
+    "fieldContainer": "[class*=ko-info-bar_item__container_]",
 
     "channelSelectorMessengerAfter": "[class*=channel-type--messenger] [class*=ko-channel-selector__trigger--active_]:after",
 
@@ -69,31 +86,72 @@
     "daySeparatorText": "[class*=ko-timeline-2_list_days__day-separator__text_]",
     "daySeparatorBorder": "[class*=ko-timeline-2_list_days__day-separator_]::before",
 
-    "agentDropdownTrigger": "[class*=ko-agent-dropdown__trigger_]",
-    "agentDropdownIconSquare": "[class*=ko-agent-dropdown__iconSquare_]",
-    "agentDropdownIconSvg": "[class*=ko-agent-dropdown__icon_] > svg > path",
-    "agentDropdownTriggerLabel": "[class*=ko-agent-dropdown__dropdown-trigger-label_]",
+    "createTicketButtonContainer": "[class*=ko-agent-dropdown__trigger_]",
+    "createTicketButton": "[class*=ko-agent-dropdown__iconSquare_]",
+    "createTicketButtonIconSvg": "[class*=ko-agent-dropdown__icon_] > svg > path",
+    "createTicketButtonText": "[class*=ko-agent-dropdown__dropdown-trigger-label_]",
 
     "statusPill": "[class*=ko-status-pill__status-]",
     "selectedTab": "[class*=ko-tabs_tab__link_].active:not(.ember-transitioning-out), [class*=ko-tabs_tab__link_].ember-transitioning-in",
+    "activeTab": "[class*=ko-tab-strip_tab__active-tab_]",
     "inactiveTab": "[class*=ko-tab-strip_tab__inactive-tab_]",
 
-    "ticketCount": "[class*=session__case-count-pill_]",
+    "inboxTicketCountLeftMenu": "[class*=session__case-count-pill_]",
+    "inboxTicketCountConversationsView": "[class*=ko-cases-list_sidebar_item__inbox_]",
+    "inboxTicketCountConversationsViewAllViews": "[class*=ko-cases-list_sidebar_item__counter_]",
 
     "fromEmailSelector": "[class*=ember-power-select-options]",
 
     "slaGoalMissed": "[class*=ko-timeline-2_list_activity_large__breach_]",
+    "ticketCompleted": "[class*=ko-timeline-2_list_activity_large__completed_]",
 
     "tooltipContainer": "[class*=ko-tooltip__tooltip_] [class*=tooltipster-box]",
-    "tooltipContent": ".tooltipster-sidetip.tooltipster-content"
+    "tooltipContent": "[class*=ko-tooltip__tooltip_] .tooltipster-content",
+
+    "updateBar": "[class*=app-version-notifier__app-version-notifier_]",
+    "updateBarButton": "[class*=app-version-notifier__button_]",
+
+    "downloadAllButton": "[class*=ko-attachments__download-all_]",
+
+    "submitPropertiesButtonContainer": "[class*=ko-case-content__submit-properties_]",
+    "submitPropertiesButton": "[class*=ko-case-content__submit-properties_] [class*=ko-button__primary_]",
+
+    "cancelPropertiesButton": "[class*=ko-case-content__cancel-property-changes_]",
+
+    "completeTicketButton": "[class*=ko-case-content__complete_]",
+    "trashTicketButton": "[class*=ko-case-content__trash_]",
+
+    "unifiedSearchLowerContainer": "[class*=ko-universal-search__content-absolute_]",
+    "unifiedSearchOriginalInput": "[class*=ko-universal-search__input_][type=search]",
+    "unifiedSearchResultsList": "[class*=ko-universal-search__results-list_]"
   },
+
+
   "extension": {
+    "defaultButtonClass": ".kh-default-button",
+
     "tabStripCustomButtonArea": "#kh-tab-strip-custom-btn-area",
-    "tabStripButtonClass": ".kh-tab-strip-btn",
+
     "createFolderButton": "#kh-create-folder-btn",
     "copyChatButton": "#kh-copy-chat-btn",
     "newLinesButton": "#kh-newlines-btn",
+    "sendToQcButton": "#kh-send-to-qc-btn",
+
     "atlasHighlightHeader": ".kh-atlas-highlight-header",
-    "atlasHighlightBody": ".kh-atlas-highlight-body"
+    "atlasHighlightBody": ".kh-atlas-highlight-body",
+    "atlasHighlightHeaderFileUploaded": ".kh-atlas-highlight-header-file-uploaded",
+    "atlasHighlightBodyFileUploaded": ".kh-atlas-highlight-body-file-uploaded",
+
+    "unifiedSearchQueryInputId": "#kh-query-only-input",
+    "unifiedSearchElementsParentId": "#kh-enhanced-search-ui-elements",
+
+    "searchQueryInput"           : ".kh-enhanced-search-query-input",
+    "searchControls"             : ".kh-enhanced-search-controls",
+    "searchField"                : ".kh-enhanced-search-field",
+    "searchLabel"                : ".kh-enhanced-search-label",
+    "searchTextInput"            : ".kh-enhanced-search-text-input",
+    "searchDropTrigger"          : ".kh-enhanced-search-drop-trigger",
+    "searchDropdown"             : ".kh-enhanced-search-dropdown",
+    "searchDropdownCloseButton"  : ".kh-enhanced-search-close-btn"
   }
 }

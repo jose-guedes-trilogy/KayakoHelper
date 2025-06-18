@@ -6,38 +6,17 @@
   height: unset !important;
 }
 
-#{sel.$tabStripButtonClass} {
-  background: linear-gradient(180deg, hsl(0 0% 99% / 1), hsl(0 0% 96% / 1));
-  padding: 8px 12px;
-  font-size: 14px;
-  cursor: pointer;
-  border-radius: 8px;
-  border: none;
-
-  @keyframes hover-animation {
-    from { background: linear-gradient(180deg, hsl(0 0% 99% / 1), hsl(0 0% 96% / 1)); }
-    to { background: linear-gradient(180deg, hsl(0 0% 94% / 1), hsl(0 0% 88% / 1)); }
-  }
-
-  &:hover {
-    animation-name: hover-animation;
-    animation-duration: 0.15s;
-    animation-fill-mode: forwards;
-
-  }
-
-  &:active {
-    background: linear-gradient(180deg, hsl(0 0% 90% / 1), hsl(0 0% 82% / 1));
-  }
-}
-
-#{sel.$newLinesButton} {
+#{sel.$defaultButtonClass} {
   background: linear-gradient(180deg, hsl(0 0% 100% / 1), hsl(0 0% 97% / 1));
   border-radius:4px;
   border:1px solid hsl(47 8% 82% / 1);
   padding:5px 8px;
   cursor:pointer;
   margin-left: 5px;
+
+  &:hover {
+    background: linear-gradient(180deg, hsl(0 0% 97% / 1), hsl(0 0% 93% / 1));
+  }
 }
 
 #{sel.$tabStripCustomButtonArea}
@@ -45,6 +24,7 @@
   display:flex;
   align-items:center;
   gap:10px;
+  margin-left: 60px;
 }
 
 #{sel.$atlasHighlightHeader} {
@@ -61,3 +41,134 @@
   border-radius:0 0 4px 4px;
   padding: 4px 14px !important;
 }
+
+
+#{sel.$atlasHighlightHeaderFileUploaded} {
+  background: hsl(8 66% 80%);
+  border-radius:4px 4px 0 0;
+  padding-left:14px !important;
+  padding-right:14px !important;
+
+  margin-top: 10px;
+}
+
+#{sel.$atlasHighlightBodyFileUploaded} {
+  background:hsl(8 76% 90% / 1);
+  border-radius:0 0 4px 4px;
+  padding: 4px 14px !important;
+}
+
+
+/* SEARCH ENHANCER */
+
+#{sel.$unifiedSearchLowerContainer} {
+  min-height: 580px;
+}
+
+#{sel.$unifiedSearchElementsParentId} {
+  padding: 6px 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* keyword box */
+#{sel.$searchQueryInput} {
+  width: 100%;
+  border: 1px solid #d0d3d6;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+
+  padding: 8px 12px;
+}
+
+/* toolbar row */
+#{sel.$searchControls} {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@mixin searchFieldMixin {
+  box-shadow: inset 0 0 4px 0 hsl(203 20% 94% / 1);
+  border: 1px solid hsl(203 7% 76% / 1);
+  background: hsl(203 10% 98% / 1);
+}
+
+/* individual field */
+#{sel.$searchField} {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  position: relative;
+
+  input {
+    @include searchFieldMixin();
+  }
+}
+
+#{sel.$searchLabel} {
+  color: #494949;
+  font-weight: 600;
+}
+
+#{sel.$searchTextInput} {
+  border: 1px solid #d0d3d6;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+#{sel.$searchDropTrigger} {
+  border-radius: 4px;
+  cursor: pointer;
+
+  padding: 2px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(0 0% 58% / 1);
+  font-style: italic;
+
+  @include searchFieldMixin();
+
+  > span {
+    font-size: 7px;
+    margin-left: 5px;
+    transform: scaleY(0.5);
+    display: inline-block;
+
+    color: #535353;
+  }
+}
+
+/* dropdown */
+#{sel.$searchDropdown} {
+  display: none;
+  position: absolute;
+  top: 24px;
+  left: 0;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #d0d3d6;
+  border-radius: 4px;
+  padding: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+  min-width: 160px;
+
+  &.open { display: block; }
+  div    { white-space: nowrap; }
+}
+
+/* close button inside dropdown */
+#{sel.$searchDropdownCloseButton} {
+  margin-top: 4px;
+  width: 100%;
+  border: 1px solid #d0d3d6;
+  background: #f0f2f4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* END SEARCH ENHANCER */

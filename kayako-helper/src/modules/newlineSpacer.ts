@@ -176,15 +176,16 @@ function buildButton(): HTMLButtonElement {
     btn.type = 'button';
     btn.textContent = 'Add newlines';
     btn.id = BTN_ID.replace(/^#/, '');
+    btn.className = EXTENSION_SELECTORS.defaultButtonClass.replace(/^./, '');
 
     btn.addEventListener('click', e => {
         const header = (e.currentTarget as HTMLElement).closest(KAYAKO_SELECTORS.textEditorHeader);
-        const editor = header?.parentElement?.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorSelector);
+        const editor = header?.parentElement?.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
         if (!editor) {
             console.warn('[newlineSpacer] editor area not found');
             return;
         }
-        addSpacing(editor);
+        addNewlines(editor);
     });
 
     return btn;
@@ -194,10 +195,10 @@ function buildButton(): HTMLButtonElement {
 /* Formatting logic                                                   */
 /* ------------------------------------------------------------------ */
 
-function addSpacing(root: HTMLElement): void {
+export function addNewlines(root: HTMLElement): void {
     console.group('[newlineSpacer] formatting', root);
 
-    /* 1.  Top-level block & heading separation -------------------------- */
+    /* 1.  Top-level block & heading separation -------------------------- */
     const topChildren = Array.from(root.children) as HTMLElement[];
     let prevBlock: HTMLElement | null = null;
 
@@ -226,14 +227,38 @@ function addSpacing(root: HTMLElement): void {
         prevBlock = child.matches(BLOCK_SELECTOR) ? child : null;
     });
 
-    /* 2.  Duplicate single <br> inside every normal <div> --------------- */
+    /* 2.  Duplicate single <br> inside every normal <div> --------------- */
     root.querySelectorAll<HTMLElement>('div').forEach(ensureDoubleBreaksInDiv);
 
-    /* 3.  Nested-list final-item breaks --------------------------------- */
+    /* 3.  Nested-list final-item breaks --------------------------------- */
     root.querySelectorAll<HTMLElement>('li > ul, li > ol').forEach(list => {
         const lastLi = list.querySelector<HTMLElement>('li:last-child');
         if (lastLi) ensureTrailingBreaks(lastLi);
     });
 
     console.groupEnd();
+
+    // 🔔 Make Froala treat the change as real user input
+    signalFroalaChanged(root);
+}
+
+
+/* --------------------------------------------------------- */
+/* Tell Froala that the document really changed              */
+/* --------------------------------------------------------- */
+function signalFroalaChanged(root: HTMLElement): void {
+    /* 1 · Native event ─────────────────────────────────────── */
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+
+    /* 2 · Direct Froala API (if jQuery is around) ──────────── */
+    // Kayako bundles jQuery + Froala, so this is usually defined.
+    // Casts keep TS happy without an extra @types dependency.
+    const $ = (window as any).jQuery as JQueryStatic | undefined;
+    if ($) {
+        const inst = $(root).closest('.fr-box').data('froala.editor');
+        if (inst) {
+            inst.events.trigger('contentChanged'); // mark dirty
+            inst.undo.saveStep();                  // add undo checkpoint
+        }
+    }
 }

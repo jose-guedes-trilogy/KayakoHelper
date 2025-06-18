@@ -1,6 +1,8 @@
 @use '@/generated/_selectors.scss' as sel;
 @use '@/styles/mixinsAndFunctions' as *;
 
+$noteBackgroundColor: hsl(203 76% 99% / 1);
+
 #{sel.$messageOrNote} {
     margin-top: 5px;
     margin-bottom: 5px;
@@ -8,6 +10,7 @@
   /* Images in posts */
   img {
     border: 1px solid hsl(0 0% 90% / 1);
+    border-radius: 5px;
   }
 }
 
@@ -27,6 +30,8 @@
 
 #{sel.$conversationWindowHeader} {
   border-bottom: 1px solid #D1D5D7;
+
+  box-shadow: 0 0 3px 1px hsl(203 10% 96% / 1);
 }
 
 #{sel.$conversationWindowHeaderInner} {
@@ -53,24 +58,38 @@
 }
 
 #{sel.$noteModeSelectorOff}, #{sel.$replyModeSelectorOff} {
-  padding: 0 8px !important;
+  padding: 0 5px !important;
   margin: 0;
 
-  border-left: 1px solid transparent !important;
-  border-right: 1px solid transparent !important;
+  //border-left: 1px solid transparent !important;
+  //border-right: 1px solid transparent !important;
 }
 
 #{sel.$noteModeSelectorOn}, #{sel.$replyModeSelectorOn} {
-  background-color: hsl(103, 10%, 98%);
-  padding: 0 8px !important;
-  border-left: 1px solid hsl(203, 20%, 88%) !important;
-  border-right: 1px solid hsl(203, 20%, 88%) !important;
-  box-shadow: inset 0px 0px 6px 1px hsl(0 0% 94% / 1);
+
   margin: 0;
 }
 
+#{sel.$replyModeSelectorOn} {
+  background-color: hsl(103, 10%, 99%) !important;
+  padding: 0 0 0 4px !important;
+
+  //border-left: 1px solid hsl(203, 20%, 87%) !important;
+  //border-right: 1px solid hsl(203, 20%, 87%) !important;
+  //box-shadow: inset 0 0 6px 1px hsl(0 0% 94% / 1);
+}
+
+#{sel.$noteModeSelectorOn} {
+  background-color: hsl(60, 10%, 99%) !important;
+  padding: 0 4px !important;
+
+  //border-left: 1px solid hsl(203, 0%, 89%) !important;
+  //border-right: 1px solid hsl(203, 0%, 89%) !important;
+  //box-shadow: inset 0 0 6px 1px hsl(0 0% 94% / 1);
+}
+
 #{sel.$replyModeSelectorContainer} {
-  margin-right: 0;
+  margin-right: 6px;
 }
 
 /* END REPLY MODE SELECTORS */
@@ -89,18 +108,31 @@
 }
 
 #{sel.$timelineItemHover} {
-  background: hsl(203, 30%, 99%);
-  box-shadow: 0 0 6px 0 hsl(203, 20%, 94%);
-  border-top: 1px solid hsl(203, 30%, 90%);
-  border-bottom: 1px solid hsl(203, 30%, 90%);
+  background: hsl(203 30% 98% / 1);
+  box-shadow: 0 0 8px hsl(210 10% 98% / 1);
+  border-top: 1px solid hsl(203, 20%, 88%);
+  border-bottom: 1px solid hsl(203, 20%, 88%);
 }
+
+#{sel.$timelineItemDate} {
+  font-weight: bold;
+}
+
+#{sel.$timelineItemAttachment} {
+  border: 1px solid hsl(203 20% 88% / 1) !important;
+}
+
+#{sel.$timelineItemAttachmentNoteFlap} {
+  background: $noteBackgroundColor !important;
+}
+
 
 /* ----- INTERNAL NOTES ----- */
 
 /* Internal notes in the ticket's timeline */
 #{sel.$timelineItemNote} {
-  background: hsl(203 76% 99% / 1);
-  border-color: hsl(203 29% 60% / 1);
+  background: $noteBackgroundColor;
+  border-color: hsl(203 32% 60% / 1);
   border-width: 5px;
   border-top: 1px solid hsl(203 43% 94% / 1);
   border-bottom: 1px solid hsl(203 43% 94% / 1);
@@ -110,26 +142,69 @@
 
 /* ----- END INTERNAL NOTES ----- */
 
+/* ----- SUBMIT BUTTON ----- */
+
+#{sel.$sendButtonReply} {
+  background: linear-gradient(-180deg, hsl(198 61% 60% / 1) 4%, hsl(200 67% 44% / 1) 96%) !important;
+
+  &:hover {
+    background: linear-gradient(-180deg, hsl(200 61% 57% / 1) 4%, hsl(200 67% 41% / 1) 96%) !important;
+  }
+}
+
+#{sel.$sendButtonReplyRightSection} {
+  background: linear-gradient(-180deg, hsl(200 59% 56% / 1) 4%, hsl(200 67% 42% / 1) 96%) !important;
+
+  &:hover {
+    background: linear-gradient(-180deg, hsl(200 59% 52% / 1) 4%, hsl(200 67% 38% / 1) 96%) !important;
+  }
+}
+
+#{sel.$sendButtonNote} {
+  background: linear-gradient(-180deg, hsl(49deg 77.02% 55%) 4%, hsl(45deg 78.67% 41%) 96%) !important;
+
+  &:hover {
+    background: linear-gradient(-180deg, hsl(49deg 77.02% 51%) 4%, hsl(45deg 78.67% 37%) 96%) !important;
+  }
+}
+
+#{sel.$sendButtonNoteRightSection} {
+  background: linear-gradient(-180deg, hsl(49deg 77.14% 56%) 4%, hsl(46deg 79.44% 38%) 96%) !important;
+
+  &:hover {
+    background: linear-gradient(-180deg, hsl(49deg 77.14% 52%) 4%, hsl(46deg 79.44% 34%) 96%) !important;
+  }
+}
+
 /* ----- REPLY BOX ----- */
 
 /* Container for the reply box */
 #{sel.$textEditorContainer} {
-  box-shadow:
-          0 2px 9px 2px hsl(203 29% 92% / 0.75),
-          0 0 3px 0 hsl(203 10% 85% / 1),
-          0 0 0 1px hsl(204 10% 78% / 1);
+  box-shadow: 0 2px 9px 2px hsl(203 29% 92% / 0.75),
+  0 0 3px 0 hsl(203 10% 85% / 1),
+  0 0 0 1px hsl(204 10% 78% / 1);
 
   border: none !important;
+
+}
+
+/* Reply box header */
+#{sel.$textEditorHeaderReplyMode} {
+  background: hsl(0deg 0% 99%);
 }
 
 /* Reply box – Writing an internal note */
 #{sel.$textEditorIsNote} {
-  background: hsl(203deg 100% 98.28%);
+  background: hsl(47 100% 98% / 1);
 }
 
 /* Reply box – Writing an internal note – FOCUSED */
 #{sel.$textEditorNoteModeContainerFocused} {
-  box-shadow: 0 0 10px 1px hsl(202.8deg 75.76% 87.06% / 25%), 0 0 4px 1px hsl(202.8deg 75.76% 87.06%), 0 0 0 2px hsl(202.5deg 55.17% 77.25%) !important;
+  box-shadow:
+          0 0 10px 1px hsl(47deg 68% 84% / 22%),
+          0 0 4px 1px hsl(47 68% 87% / 0.9),
+          0 0 0 2px hsl(47 53% 72% / 1) !important;
+
   border: none !important;
 
 }
@@ -160,7 +235,7 @@
 
 /* Mode-selector underline - NOTE */
 #{sel.$textEditorNoteModeAfter} {
-  background-color: hsl(203 46% 55% / 1);
+  background-color: hsl(43.85deg 66% 66%);
 }
 
 /* Mode-selector underline - REPLY */
@@ -172,6 +247,31 @@
 
 
 /* ----- RIGHT SIDE MENU ----- */
+
+/* Submit property changes button - CONTAINER*/
+#{sel.$submitPropertiesButtonContainer} {
+  background: hsl(210deg 14.29% 97.25%);
+}
+
+/* Submit property changes button */
+#{sel.$submitPropertiesButton} {
+  background-color: hsl(120 50% 59% / 1);
+  box-shadow: hsl(133 47% 31% / 1) 0px -18px 40px -20px inset, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px !important;
+
+  &:hover {
+    background-color: hsl(120deg 41.87% 54.2%);
+  }
+
+  > span {
+    text-shadow: 0 0 9px hsl(0deg 0% 56.29% / 1%), 0 0 2px hsl(0deg 0% 20.24% / 55%);
+  }
+}
+
+#{sel.$cancelPropertiesButton} {
+  font-weight: 600 !important;
+
+  margin-top: 6px !important;
+}
 
 /* Highlights edited fields */
 #{sel.$infoBarItemContainerKREEdited} {
@@ -189,6 +289,10 @@
     border-color: hsl(200 7% 77% / 1) !important;
     box-shadow: 1px 1px 3px hsl(204 14% 76% / 1) !important;
   };
+}
+
+#{sel.$fieldContainer} {
+  transition: .075s background-color,.1s box-shadow !important;
 }
 
 /* ----- RIGHT SIDE MENU ----- */
@@ -209,15 +313,15 @@
   border: 1px solid hsl(151.85deg 48.66% 68.08%);
 
   &:hover {
-    background-color: hsl(152 55% 87% / 1);
+    background-color: hsl(152 41% 92% / 1);
   }
 }
 
 /* Jump-bar arrow */
 #{sel.$timelineJumpArrow} {
-  fill: hsl(152deg 32.12% 49.58% / 1);
-
-  padding: 0 9px;
+  fill: hsl(152deg 32.12% 49.58% / 1) !important;
+  padding: 0 9px !important;
+  margin: 0 !important;
 }
 
 /* Jump-arrow icon */
@@ -237,8 +341,9 @@
 
 /* Jump-bar close button */
 #{sel.$timelineJumpCloseButton} {
-  color: hsl(151.85deg 32.02% 49.61%);
-  position: static;
+  color: hsl(151.85deg 32.02% 49.61%) !important;
+  position: static !important;
+  margin: 0 !important;
 }
 
 /* ----- END JUMP TO BOTTOM ----- */
@@ -261,40 +366,43 @@
 /* ----- CREATE TICKET BUTTON ----- */
 
 /* Create-ticket dropdown trigger */
-#{sel.$agentDropdownTrigger} {
+#{sel.$createTicketButtonContainer} {
   height: 100%;
 }
 
 /* Create-ticket button itself */
-#{sel.$agentDropdownIconSquare} {
-  background-color: hsl(203 59% 97% / 1);
-  border: 1px solid hsl(203deg 68% 45.46%);
-  padding: 16px 12px;
-  border-radius: 6px;
-  box-shadow: 0 0 9px 1px hsl(203deg 100% 86.43% / 14%);
+#{sel.$createTicketButton} {
+  background: linear-gradient(-180deg, hsl(215 77% 58% / 1) 4%, hsl(214.81deg 69.23% 47%) 96%);
 
-  margin-right: 60px;
+  transition: background 0.075s ease;
+
+  &:hover {
+    background: linear-gradient(-180deg, hsl(214.97deg 77.05% 51%) 4%, hsl(215 69% 40% / 1) 96%);
+  }
 }
 
-/* Create-ticket plus icon */
-#{sel.$agentDropdownIconSvg} {
-  /* includes the “> svg” in the selector */
-  fill: hsl(203deg 73.41% 41.41%);
-}
-
-/* Create-ticket label text (if you ever style it) */
-#{sel.$agentDropdownTriggerLabel} {
-  color: hsl(203deg 44.92% 47.37%);
-  font-size: 15px;
-}
+//
+///* Create-ticket plus icon */
+//#{sel.$createTicketButtonIconSvg} {
+//  /* includes the “> svg” in the selector */
+//  fill: hsl(203deg 73.41% 41.41%);
+//}
+//
+///* Create-ticket label text (if you ever style it) */
+//#{sel.$createTicketButtonText} {
+//  color: hsl(203deg 44.92% 47.37%);
+//  font-size: 15px;
+//}
 
 /* ----- STATUS PILL ----- */
 
 #{sel.$statusPill} {
-  border-radius: 6px;
+  border-radius: 10px;
   margin-left: 3px;
   margin-right: 3px;
   border-bottom: none !important;
+
+  padding: 1px 5px !important;
 }
 
 /* ----- TABS ----- */
@@ -303,10 +411,22 @@
   padding: 0 4px;
 }
 
+#{sel.$activeTab} {
+  margin-top: -1px !important;
+  position: relative !important;
+  top: 1px !important;
+
+  border-bottom: 1px solid #fff;
+
+}
+
 #{sel.$inactiveTab} {
   background-color: hsl(203 20% 96% / 1);
 
-  animation: 0.1s;
+  animation: 0.075s !important;
+
+  border-bottom: 1px solid hsl(203 7% 87% / 1) !important;
+  box-shadow: inset 0 -1px 3px 0 rgba(0, 0, 0, .03) !important;
 
   &:hover {
     background-color: hsl(203 8% 91% / 1);
@@ -314,8 +434,19 @@
 }
 
 
-#{sel.$ticketCount} {
-  background-color: hsl(5 48% 50% / 1);
+#{sel.$inboxTicketCountLeftMenu} {
+  background-color: hsl(5 48% 50% / 1) !important;
+}
+
+#{sel.$inboxTicketCountConversationsView} {
+  background-color: hsl(103 40% 62% / 1) !important;
+  border-radius: 5px;
+  color: white !important;
+}
+
+#{sel.$inboxTicketCountConversationsViewAllViews} {
+  position: relative;
+  right: -4px;
 }
 
 
@@ -324,15 +455,38 @@
   background-color: hsl(8 50% 98% / 1);
 }
 
+/* Ticket completed */
+#{sel.$ticketCompleted} {
+  border-color: hsl(131 35% 85% / 1) !important;
+  background: hsl(131 50% 98% / 1) !important;
+}
+
 /* Tooltip */
 #{sel.$tooltipContainer} {
   background: hsl(266 30% 99% / 1);
-  border: 1px solid hsl(266deg 6.42% 74.07%);
+  border: 1px solid hsl(203 26% 75% / 1);
   border-radius: 5px;
-  box-shadow: 0 4px 9px 0 rgba(0,0,0,.08),0 1px 3px 0 rgba(45,49,56,.10);
+  box-shadow: 0 4px 9px hsl(0deg 0% 0% / 18%), 0 1px 3px hsl(311deg 0% 20% / 20%);
 }
 
 /* Tooltip */
 #{sel.$tooltipContent} {
-  color: #575757;
+  color: hsl(0 0% 22% / 1) !important;
+}
+
+/* Tooltip */
+#{sel.$updateBar} {
+  background: linear-gradient(180deg, hsl(0deg 0% 100%), hsl(0deg 0% 96%));
+
+  color: #535353;
+  border-bottom: 2px solid hsl(203, 60%, 60%);
+
+}
+
+/* Tooltip */
+#{sel.$updateBarButton} {
+  border: 2px solid hsl(203, 60%, 60%);
+  border-radius: 5px !important;
+
+  color: hsl(0 0% 23% / 1) !important;
 }

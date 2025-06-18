@@ -1,78 +1,108 @@
 /* modules/copy-chat/copyChatButton.ts
    ──────────────────────────────────────────────────────────
-   Adds “Copy chat” when on a conversation page – using
-   the generic tabButtonManager for easy future scalability. */
+   Adds a “Copy chat” button on conversation pages.
+   Now uses an explicit UI-state machine so the tabButtonManager’s
+   re-labels never overwrite our “⏳ / ✅ / ❌” feedback. */
 
-import {
-    EXTENSION_SELECTORS,
-} from '@/generated/selectors';
-
-import { fetchTranscript }        from '@/api.js';
+import { EXTENSION_SELECTORS }   from '@/generated/selectors';
+import { fetchTranscript }       from '@/api.js';
 import { isConvPage, currentConvId } from '@/utils/location.js';
-import { registerTabButton }       from '@/utils/tabButtonManager';
+import { registerTabButton }     from '@/utils/tabButtonManager';
 
-const BTN_ID  = EXTENSION_SELECTORS.copyChatButton.replace(/^#/, '');
+/* ------------------------------------------------------------------ */
+/* Constants & Types                                                  */
+/* ------------------------------------------------------------------ */
 
-/* ------------ UI text & timings ------------ */
-const ICON     = { idle: '📄', work: '⏳', ok: '✅', err: '❌' } as const;
-const RESET_MS = 2000;
+const BTN_ID = EXTENSION_SELECTORS.copyChatButton.replace(/^#/, '');
+
+const ICON = { idle: '📄', work: '⏳', ok: '✅', err: '❌' } as const;
+type UiState = keyof typeof ICON;
+
+const RESET_MS = 2_000;               // reset back to idle after success / error
+const DEFAULT_LIMIT = 100;            // messages to fetch when not overridden
+
+/* ------------------------------------------------------------------ */
+/* Boot function                                                      */
+/* ------------------------------------------------------------------ */
 
 export function bootCopyChatButton(): void {
-    /* ------------- State ------------- */
-    let currentLimit = 100;
-    let currentConv:  string | null = null;
+    /* ---------- Runtime state ---------- */
+    let currentLimit = DEFAULT_LIMIT;
+    let currentConv  : string | null = null;
+    let uiState: UiState = 'idle';    // <-- single source of truth!
 
-    /* ------------- Helpers ------------- */
-    const label = () =>
-        `${ICON.idle} Copy chat${currentLimit !== 100 ? ` (${currentLimit} messages)` : ''}`;
+    /* ---------- Helpers ---------- */
+    const buildLabel = (): string => {
+        switch (uiState) {
+            case 'idle':
+                return `${ICON.idle} Copy chat${currentLimit !== DEFAULT_LIMIT
+                    ? ` (${currentLimit} messages)` : ''}`;
+            case 'work':
+                return `${ICON.work} Copying…`;
+            case 'ok':
+                return `${ICON.ok} Copied!`;
+            case 'err':
+                return `${ICON.err} Failed`;
+        }
+    };
 
-    const setIdle = (el: HTMLButtonElement) => void (el.textContent = label());
-    const setWork = (el: HTMLButtonElement) => void (el.textContent = `${ICON.work} Copying…`);
-    const setOk   = (el: HTMLButtonElement) => void (el.textContent = `${ICON.ok} Copied!`);
-    const setErr  = (el: HTMLButtonElement) => void (el.textContent = `${ICON.err} Failed`);
+    const setState = (state: UiState, btn?: HTMLButtonElement): void => {
+        uiState = state;
+        // `btn` is passed when we already have it; otherwise grab it fresh.
+        const target = btn ?? (document.getElementById(BTN_ID) as HTMLButtonElement | null);
+        if (target) target.textContent = buildLabel();
+    };
 
-    /* ------------- Feature ------------- */
+    /* ---------- Feature wiring ---------- */
     registerTabButton({
         id: BTN_ID,
-        label,
-        routeTest : isConvPage,
-        onClick   : exportChat,
+        label: buildLabel,
+        routeTest: isConvPage,
+        onClick: exportChat,
         onContextMenu: (_ev, _btn) => {
             const v = prompt('Fetch how many posts?', String(currentLimit));
             if (v) {
                 const n = parseInt(v, 10);
-                if (n > 0) currentLimit = n;
+                if (n > 0) {
+                    currentLimit = n;
+                    setState('idle');          // refresh label immediately
+                }
             }
         },
         onRouteChange(btn) {
             /* Reset per-ticket */
-            if (!btn) return; // hidden
+            if (!btn) return;                  // button hidden
             const id = currentConvId();
             if (id !== currentConv) {
-                currentConv = id;
-                currentLimit = 100;
-                setIdle(btn);
+                currentConv  = id;
+                currentLimit = DEFAULT_LIMIT;
+                setState('idle', btn);
             }
         },
     });
 
+    /* ------------------------------------------------------------------ */
+    /* Copy-chat logic                                                    */
+    /* ------------------------------------------------------------------ */
+
     function exportChat(btn?: HTMLButtonElement): void {
-        /* `btn` comes from onClick, but we fall back just in case. */
         const el = btn ?? document.getElementById(BTN_ID) as HTMLButtonElement;
         if (!el) return;
 
-        setWork(el);
+        setState('work', el);
+
         fetchTranscript(currentLimit)
             .then(txt => navigator.clipboard.writeText(txt))
             .then(() => {
-                setOk(el);
-                setTimeout(() => setIdle(el), RESET_MS);
+                setState('ok', el);
+                setTimeout(() => setState('idle'), RESET_MS);
             })
             .catch(err => {
-                console.error(err);
-                setErr(el);
-                setTimeout(() => setIdle(el), RESET_MS);
-                alert(`MAKE SURE TO WAIT BEFORE ALT TABBING! Export failed: ${err.message}`);
+                console.error('[copyChat] export failed', err);
+                setState('err', el);
+                setTimeout(() => setState('idle'), RESET_MS);
+
+                alert(`MAKE SURE TO WAIT BEFORE ALT-TABBING!\nExport failed: ${err.message}`);
             });
     }
 }

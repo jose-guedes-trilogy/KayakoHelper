@@ -2,8 +2,11 @@
 
 /* turn Kayako “post” array ➜ readable chat transcript
    – chronological (oldest → newest)
+   – includes Product name extracted from the info‑bar
    – each line: timestamp, author, role, kind (Reply / Note)
    – posts separated by a clear divider                               */
+
+import {KAYAKO_SELECTORS} from "@/generated/selectors";
 
 const SEPARATOR = '\n[——— Post separator ———]\n';
 
@@ -47,7 +50,50 @@ function kindLabel(post: Post): 'NOTE' | 'REPLY' {
 }
 
 /* ------------------------------------------------------------------ */
+/** Attempt to read the “Product” field that lives in the info‑bar */
+function detectProduct(): string {
+    try {
+        // Each trigger container holds the header + placeholder/input
+        const triggers = Array.from(
+            document.querySelectorAll<HTMLElement>('[class*="ko-info-bar_field_select_trigger__trigger_"]')
+        );
+
+        for (const trigger of triggers) {
+            // 1) Locate the header span inside this trigger
+            const header = trigger.querySelector<HTMLElement>(
+                '[class*="ko-info-bar_field_select_trigger__header_"]'
+            );
+            if (!header) continue;
+
+            if (header.textContent?.trim() !== 'Product') {
+                continue; // not the Product field
+            }
+
+            // 2) Fetch the placeholder span (shows the selected value)
+            const placeholder = trigger.querySelector<HTMLElement>(
+                '[class*="ko-info-bar_field_select_trigger__placeholder_"]'
+            );
+            if (!placeholder) return 'Unknown product';
+
+            // The visible text may be inside nested spans or only in the title attr
+            const textContent = placeholder.textContent?.trim();
+            const title = placeholder.getAttribute('title')?.trim();
+
+            const value = (textContent?.length ? textContent : title) ?? '';
+            return value || 'Unknown product';
+        }
+
+        return 'Unknown product';
+    } catch (err) {
+        console.error('[cleanConversation] detectProduct failed', err);
+        return 'Unknown product';
+    }
+}
+
+/* ------------------------------------------------------------------ */
 export function cleanConversation(posts: Post[]): string {
+    const productLine = `Product: ${detectProduct()}`;
+
     const lines = posts
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .map((p) => {
@@ -64,5 +110,5 @@ export function cleanConversation(posts: Post[]): string {
             return `[${ts}] ${who} (${role}, ${kind}):\n${body}`;
         });
 
-    return lines.join(SEPARATOR);
+    return [productLine, ...lines].join(SEPARATOR);
 }

@@ -3,7 +3,7 @@
    Sets up the “Create folder” button – now via tabButtonManager. */
 
 import {
-    EXTENSION_SELECTORS,
+    EXTENSION_SELECTORS, KAYAKO_SELECTORS,
 } from '@/generated/selectors';
 
 import { currentConvId }       from '@/utils/location';
@@ -18,15 +18,24 @@ export function bootCreateFolderButton(): void {
         onClick(_btn) {
             const ticketId = currentConvId();
             if (!ticketId) return;
-            chrome.runtime.sendMessage({ action: 'createFolder',
-                ticketId, location: 'V' });
+
+            const requesterEmail = document.querySelector(KAYAKO_SELECTORS.requesterEmail)?.textContent?.trim();
+
+            chrome.runtime.sendMessage({
+                action: 'createFolder',
+                ticketId: `${requesterEmail} - ${ticketId}`,
+                location: 'V'
+            });
         },
 
         onContextMenu(_ev, _btn) {
             const ticketId = currentConvId();
             if (!ticketId) return;
+
+            const requesterEmail = document.querySelector(KAYAKO_SELECTORS.requesterEmail)?.textContent?.trim();
+
             chrome.runtime.sendMessage({ action: 'createFolder',
-                ticketId, location: 'DOWNLOADS' });
+                ticketId: `${requesterEmail} - ${ticketId}`, location: 'DOWNLOADS' });
         },
     });
 

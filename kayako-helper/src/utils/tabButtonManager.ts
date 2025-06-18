@@ -15,7 +15,7 @@ import {
     KAYAKO_SELECTORS,
 } from '@/generated/selectors';
 
-const AGENT_TRIGGER_SEL = '[class*="ko-agent-dropdown__trigger_"]';
+const AGENT_TRIGGER_SEL = KAYAKO_SELECTORS.createTicketButtonContainer;
 const ensureCallbacks: Array<() => void> = [];
 
 /* ---------- Global DOM observer ---------- */
@@ -94,8 +94,7 @@ export interface TabButtonConfig {
 function createButton(cfg: TabButtonConfig): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.id = cfg.id;
-    btn.className = EXTENSION_SELECTORS
-        .tabStripButtonClass.replace(/^./, '');
+    btn.className = EXTENSION_SELECTORS.defaultButtonClass.replace(/^./, '');
     btn.addEventListener('click', () => cfg.onClick(btn));
     if (cfg.onContextMenu) {
         btn.addEventListener('contextmenu', ev => {

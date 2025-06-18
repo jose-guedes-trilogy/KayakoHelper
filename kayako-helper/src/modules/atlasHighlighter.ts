@@ -2,6 +2,7 @@
 
 import {
     KAYAKO_SELECTORS,
+    EXTENSION_SELECTORS,
 } from '@/generated/selectors';
 import { currentConvId }     from '@/utils/location';   // <- new util
 
@@ -120,11 +121,24 @@ function paintLines(root: Element): void {
         const p   = strong.parentElement;
         const div = p?.nextElementSibling;
 
-        if (p) {
-            p.classList.add('kh-atlas-highlight-header');
+        /* Check if this is a file upload completion message */
+        if (div && div.tagName === 'DIV' && div.textContent?.trim() === "✅ I'm done uploading") {
+            if (p) {
+                p.classList.add(EXTENSION_SELECTORS.atlasHighlightHeaderFileUploaded.replace(/^./, ''));
+            }
+
+            (div as HTMLElement).classList.add(EXTENSION_SELECTORS.atlasHighlightBodyFileUploaded.replace(/^./, ''));
         }
-        if (div && div.tagName === 'DIV') {
-            (div as HTMLElement).classList.add('kh-atlas-highlight-body');
+
+        /* If not a file upload completion message, it's a normal message */
+        else {
+            if (p) {
+                p.classList.add(EXTENSION_SELECTORS.atlasHighlightHeader.replace(/^./, ''));
+            }
+
+            if (div && div.tagName === 'DIV') {
+                (div as HTMLElement).classList.add(EXTENSION_SELECTORS.atlasHighlightBody.replace(/^./, ''));
+            }
         }
     });
 }

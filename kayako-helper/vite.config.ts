@@ -6,7 +6,6 @@
 import { defineConfig, UserConfig } from 'vite';
 import path from 'path';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import webExtension from "vite-plugin-web-extension";
 
 export default defineConfig({
     plugins: [
@@ -37,15 +36,22 @@ export default defineConfig({
         rollupOptions: {
             // our three entry points
             input: {
-                content:    path.resolve(__dirname, 'src/contentScript.ts'),
-                background: path.resolve(__dirname, 'src/backgroundScript.ts'),
-                popup:       path.resolve(__dirname, 'src/popup/popup.ts'),
+                contentKayako:      path.resolve(__dirname, 'src/contentScriptKayako.ts'),
+                contentGemini:      path.resolve(__dirname, 'src/contentScriptGemini.ts'),
+                background:         path.resolve(__dirname, 'src/backgroundScript.ts'),
+                popup:              path.resolve(__dirname, 'src/popup/popup.ts'),
             },
             output: {
                 // content.js + other named JS, plus content.css
                 entryFileNames: ({ name }) =>
-                    name === 'content' ? 'content.js' : '[name].js',
+                    name === 'contentKayako'  ? 'contentKayako.js'
+                        : name === 'contentGemini'  ? 'contentGemini.js'
+                            : name === 'background'     ? 'background.js'
+                                :                             '[name].js',
+
+
                 chunkFileNames: '[name].js',
+
                 assetFileNames: (info) =>
                     info.name && info.name.endsWith('.css')
                         ? 'content.css'
