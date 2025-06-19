@@ -5,7 +5,7 @@
    re-labels never overwrite our “⏳ / ✅ / ❌” feedback. */
 
 import { EXTENSION_SELECTORS }   from '@/generated/selectors';
-import { fetchTranscript }       from '@/api.js';
+import { fetchTranscript }       from '@/utils/api.js';
 import { isConvPage, currentConvId } from '@/utils/location.js';
 import { registerTabButton }     from '@/utils/tabButtonManager';
 

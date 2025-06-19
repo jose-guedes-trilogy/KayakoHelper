@@ -24,7 +24,7 @@
   display:flex;
   align-items:center;
   gap:10px;
-  margin-left: 60px;
+  margin-left: 120px;
 }
 
 #{sel.$atlasHighlightHeader} {
@@ -61,80 +61,141 @@
 
 /* SEARCH ENHANCER */
 
+
+#{sel.$unifiedSearchOuterContainer} {
+  height: 100vh;
+}
+
 #{sel.$unifiedSearchLowerContainer} {
-  min-height: 580px;
+  min-height: 700px;
 }
 
 #{sel.$unifiedSearchElementsParentId} {
-  padding: 6px 14px;
+  padding: 10px 14px 22px;
 
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+}
+
+#{sel.$unifiedSearchResultsList} {
+  overflow-y: scroll;
 }
 
 /* keyword box */
 #{sel.$searchQueryInput} {
   width: 100%;
-  border: 1px solid #d0d3d6;
+  border: 1px solid hsl(210 7% 74% / 1);
   border-radius: 4px;
   font-size: 14px;
   box-sizing: border-box;
 
-  padding: 8px 12px;
+  padding: 6px 10px;
+
+  &::placeholder {
+    font-style: italic;
+  }
 }
 
 /* toolbar row */
 #{sel.$searchControls} {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px 40px;
 }
 @mixin searchFieldMixin {
-  box-shadow: inset 0 0 4px 0 hsl(203 20% 94% / 1);
+  box-shadow: inset 0 0 2px 0 hsl(203 20% 96% / 1);
   border: 1px solid hsl(203 7% 76% / 1);
-  background: hsl(203 10% 98% / 1);
+  background: hsl(203 10% 99% / 1);
+
+  border-radius: 4px;
+
+  height: 26px;
+
+  padding: 2px 8px;
 }
 
 /* individual field */
 #{sel.$searchField} {
-  display: flex;
-  align-items: center;
   gap: 8px;
+
+  flex:1 1 220px;
+
+  display: grid;
+  grid-template-columns: max-content 1fr;   /* label | input(s)           */
+  column-gap: 8px;                          /* keep old gap               */
+  align-items: center;                      /* vertical alignment         */
   font-size: 13px;
   position: relative;
 
+  > :nth-child(n + 3) {
+    grid-column: 2;        /* force into the value column */
+    width: 100%;
+    min-width: 0;          /* allow them to shrink inside the grid */
+  }
+
   input {
     @include searchFieldMixin();
+
+    &::placeholder {
+      font-style: italic;
+    }
+  }
+
+  select {
+    @include searchFieldMixin();
+
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+
+    cursor: pointer;
+  }
+
+  > input, > select, > textarea {
+    width: 100%;
+    min-width: 0;
+  }
+
+  &.kh-field-dropdown::after {
+    content: '▼';
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%) scaleY(0.5); /* Vertically center and squish */
+    pointer-events: none; /* Allows clicks to pass through to the select element */
+    color: rgb(83, 83, 83);
+    font-size: 12px;
+    transition: transform 0.2s ease;
   }
 }
 
 #{sel.$searchLabel} {
   color: #494949;
   font-weight: 600;
+
+  min-width: 80px;
 }
 
 #{sel.$searchTextInput} {
   border: 1px solid #d0d3d6;
   border-radius: 4px;
-  padding: 2px 6px;
 }
 
 #{sel.$searchDropTrigger} {
   border-radius: 4px;
   cursor: pointer;
 
-  padding: 2px 8px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   color: hsl(0 0% 58% / 1);
   font-style: italic;
 
   @include searchFieldMixin();
 
   > span {
-    font-size: 7px;
+    font-size: 12px;
     margin-left: 5px;
     transform: scaleY(0.5);
     display: inline-block;
@@ -158,7 +219,13 @@
   min-width: 160px;
 
   &.open { display: block; }
-  div    { white-space: nowrap; }
+
+  div    {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
 }
 
 /* close button inside dropdown */

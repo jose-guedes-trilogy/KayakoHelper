@@ -1,3 +1,5 @@
+/* src/modules/newlineSpacer.ts */
+
 /**
  * Kayako Extension – Newline Spacer v6
  * ------------------------------------

@@ -1,10 +1,10 @@
-/* contentScriptKayako.ts
+/* src/contentScriptKayako.ts
    – Bootstraps individual features; contains no feature code itself
 */
 import '@/styles/global.scss';
 import '@/modules/styleManager'
 
-import { setUpUI }             from '@/setUpUI';
+import { setUpUI }             from '@/utils/setUpUI';
 
 import { bootCopyChatButton }  from '@/modules/copy-chat/copyChatButton.ts';
 import { bootAtlasHighlighter } from '@/modules/atlasHighlighter.js';

@@ -1,6 +1,6 @@
-/* background/createFolder.ts */
+/* src/background/createFolder.ts */
 
-import type { ToBackground, FromBackground } from '@/messageTypes';
+import type { ToBackground, FromBackground } from '@/utils/messageTypes';
 
 chrome.runtime.onMessage.addListener((msg: ToBackground, _sender, sendResponse) => {
     switch (msg.action) {

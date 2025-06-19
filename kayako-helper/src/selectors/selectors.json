@@ -100,6 +100,8 @@
     "inboxTicketCountConversationsView": "[class*=ko-cases-list_sidebar_item__inbox_]",
     "inboxTicketCountConversationsViewAllViews": "[class*=ko-cases-list_sidebar_item__counter_]",
 
+    "leftMenuSVGs": "[class*=session__left-navigation-section_] a > svg",
+
     "fromEmailSelector": "[class*=ember-power-select-options]",
 
     "slaGoalMissed": "[class*=ko-timeline-2_list_activity_large__breach_]",
@@ -121,9 +123,19 @@
     "completeTicketButton": "[class*=ko-case-content__complete_]",
     "trashTicketButton": "[class*=ko-case-content__trash_]",
 
+    "unifiedSearchOuterContainer": "[class*=ko-universal-search__containerAbsolute_]",
     "unifiedSearchLowerContainer": "[class*=ko-universal-search__content-absolute_]",
     "unifiedSearchOriginalInput": "[class*=ko-universal-search__input_][type=search]",
-    "unifiedSearchResultsList": "[class*=ko-universal-search__results-list_]"
+    "unifiedSearchResultsList": "[class*=ko-universal-search__results-list_]",
+
+    "ticketsListHeader": "[class*=ko-cases-list__heading_]",
+    "ticketsTable": "[class*=ko-cases-list__container_] table",
+    "ticketsTableHeader": "[class*=ko-cases-list__container_] table thead",
+    "ticketsTableBody": "[class*=ko-cases-list__container_] table tbody",
+
+    "reloadIcon": "[class*=ko-cases-list_sidebar_item_reload-icon__reload-icon_]"
+
+
   },
 
 

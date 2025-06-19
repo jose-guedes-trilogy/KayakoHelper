@@ -263,7 +263,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   }
 
   > span {
-    text-shadow: 0 0 9px hsl(0deg 0% 56.29% / 1%), 0 0 2px hsl(0deg 0% 20.24% / 55%);
+    text-shadow: 0 0 9px hsl(0deg 0% 56.29% / 50%), 0 0 2px hsl(0deg 0% 20.24% / 35%);
   }
 }
 
@@ -275,7 +275,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 
 /* Highlights edited fields */
 #{sel.$infoBarItemContainerKREEdited} {
-  box-shadow: inset 5px 0 0 0 hsl(152 30% 74% / 1);
+  box-shadow: inset 5px 0 0 0 hsl(133 32% 70% / 1);
 }
 
 /* Highlights edited fields */
@@ -376,6 +376,8 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 
   transition: background 0.075s ease;
 
+  text-shadow: 0 0 9px hsl(0deg 0% 56.29% / 50%), 0 0 2px hsl(0deg 0% 20.24% / 35%);
+
   &:hover {
     background: linear-gradient(-180deg, hsl(214.97deg 77.05% 51%) 4%, hsl(215 69% 40% / 1) 96%);
   }
@@ -402,7 +404,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   margin-right: 3px;
   border-bottom: none !important;
 
-  padding: 1px 5px !important;
+  padding: 1px 6px !important;
 }
 
 /* ----- TABS ----- */
@@ -490,3 +492,80 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 
   color: hsl(0 0% 23% / 1) !important;
 }
+
+
+/* TICKETS LIST */
+
+// List header
+
+#{sel.$ticketsListHeader} {
+  font-weight: 600 !important;
+  color: #454545 !important;
+}
+
+// Table Header
+#{sel.$ticketsTableHeader} th:not(:first-child):not(:nth-child(2)) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+// Table Contents
+#{sel.$ticketsTableBody} tr td:not(:first-child):not(:nth-child(2)), #{sel.$ticketsTableBody} tr td:not(:first-child):not(:nth-child(2)) > div {
+  text-align: center;
+  padding: 0 !important;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
+/* END TICKETS TABLE */
+
+/* LEFT MENU */
+
+@mixin forwardAnimation {
+  transition: transform .2s cubic-bezier(.4,0,.2,1);
+  transform-origin: 50% 50%;
+  padding: 5px;
+  box-sizing: content-box;
+}
+
+@mixin backwardAnimation($amount, $duration: 0.065s) {
+  transform: rotate($amount);
+
+  transition-duration: $duration;
+}
+
+// Animate SVGs
+#{sel.$leftMenuSVGs}, #{sel.$reloadIcon} > svg {
+  @include forwardAnimation;
+
+  &:hover {
+    @include backwardAnimation(45deg);
+  }
+}
+
+
+.ko-notification-badge {
+  svg {
+    @include forwardAnimation;
+  }
+
+  &:hover svg {
+    @include backwardAnimation(45deg);
+  }
+}
+
+
+// Animate SVGs
+#{sel.$reloadIcon} > svg {
+  @include forwardAnimation;
+
+  &:hover {
+    @include backwardAnimation(180deg, 0.2s);
+  }
+}
+
+

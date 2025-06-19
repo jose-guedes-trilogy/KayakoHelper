@@ -1,4 +1,4 @@
-// modules/atlasHighlighter.ts
+// src/modules/atlasHighlighter.ts
 
 import {
     KAYAKO_SELECTORS,

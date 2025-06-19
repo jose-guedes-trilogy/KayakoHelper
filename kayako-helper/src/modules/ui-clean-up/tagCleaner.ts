@@ -1,3 +1,5 @@
+/* src/modules/ui-clean-up/tagCleaner.ts */
+
 /**
  * Kayako Tag-Diff Cleaner – v1.1
  * Logs are verbose – filter the console on “KTC:” to follow the flow.

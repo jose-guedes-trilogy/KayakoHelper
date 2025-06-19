@@ -1,3 +1,5 @@
+/* src/modules/trainingMode.ts */
+
 import {
     KAYAKO_SELECTORS,
 } from '@/generated/selectors';

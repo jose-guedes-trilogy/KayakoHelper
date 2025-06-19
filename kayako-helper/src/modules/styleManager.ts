@@ -1,4 +1,5 @@
-/* styleManager.ts – manages always-on + toggleable blocks */
+/* src/modules/styleManager.ts – manages always-on + toggleable blocks */
+
 import { injectStyles } from '@/utils/dom';
 import compactCss from '@/styles/toggleableStyles.scss?inline';
 

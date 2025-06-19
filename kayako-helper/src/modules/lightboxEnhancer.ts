@@ -1,4 +1,4 @@
-// modules/lightboxEnhancer.ts
+// src/modules/lightboxEnhancer.ts
 
 import {
     KAYAKO_SELECTORS,

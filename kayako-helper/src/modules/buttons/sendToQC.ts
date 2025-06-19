@@ -1,4 +1,6 @@
 /* ===========================================================================
+ * src/modules/buttons/sendToQC.ts
+ *
  *  Kayako Helper – “Send to QC” Button (v1.1)
  * ---------------------------------------------------------------------------
  *  • Adds a tab-strip button that automates the full “QC pending” workflow:

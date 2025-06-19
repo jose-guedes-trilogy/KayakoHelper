@@ -1,4 +1,4 @@
-// utils/dom.ts
+// src/utils/dom.ts
 /**
  * Tiny DOM helpers
  */

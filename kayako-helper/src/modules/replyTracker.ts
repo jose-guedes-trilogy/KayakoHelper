@@ -1,8 +1,10 @@
+/* src/modules/replyTracker.ts */
+
 import {
     KAYAKO_SELECTORS,
 } from '@/generated/selectors';
 import { currentConvId } from '@/utils/location';
-import type { ToBackground } from '@/messageTypes';
+import type { ToBackground } from '@/utils/messageTypes';
 
 export function bootReplyTracker() {
     const ALLOWED_HOSTNAME = 'central-supportdesk.kayako.com';

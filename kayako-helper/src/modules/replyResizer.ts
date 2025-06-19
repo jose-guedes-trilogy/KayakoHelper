@@ -1,3 +1,5 @@
+/* src/modules/replyResizer.ts */
+
 import {
     KAYAKO_SELECTORS,
 } from '@/generated/selectors';

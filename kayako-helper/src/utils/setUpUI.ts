@@ -1,4 +1,4 @@
-/* src/setUpUI.ts
+/* src/utils/setUpUI.ts
    ──────────────────────────────────────────────────────────
    Creates (once) the extension’s custom button container.
    If the header strip isn’t in the DOM yet, we watch until

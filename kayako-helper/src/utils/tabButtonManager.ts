@@ -1,4 +1,4 @@
-/* utils/tabButtonManager.ts
+/* src/utils/tabButtonManager.ts
    Robust tab-strip button manager that:
    • Survives all Kayako header re-renders
    • Never duplicates or flickers the buttons

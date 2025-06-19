@@ -1,4 +1,4 @@
-/* backgroundScript.ts */
+/* src/backgroundScript.ts */
 
 import './background/settings';
 import './background/createFolder';

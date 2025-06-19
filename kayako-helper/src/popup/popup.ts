@@ -1,4 +1,6 @@
-import type { ToBackground } from '@/messageTypes';
+// src/popup/popup.ts
+
+import type { ToBackground } from '@/utils/messageTypes';
 
 document.addEventListener('DOMContentLoaded', () => {
     const chkTraining  = document.getElementById('trainingModeCheckbox')  as HTMLInputElement;

@@ -1,3 +1,5 @@
+/* src/modules/copyTicketURL.ts */
+
 /**
  * caseIdCopy.ts
  *

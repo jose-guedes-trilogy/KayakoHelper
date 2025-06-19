@@ -1,4 +1,4 @@
-/* messageTypes.ts
+/* src/utils/messageTypes.ts
     - Types for messages sent between content-script and background-script */
 
 export type ToBackground =

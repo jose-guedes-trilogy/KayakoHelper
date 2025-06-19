@@ -1,6 +1,8 @@
 /* ============================================================================
- * Kayako Helper – Search UI Enhancement (v2.5)
- *   • v2.5 – UI labels updated (no colons)
+ * src/modules/searchEnhancer.ts
+ *
+ * Kayako Helper – Search UI Enhancement
+ *
  * ========================================================================== */
 
 import { EXTENSION_SELECTORS, KAYAKO_SELECTORS } from '@/generated/selectors';
@@ -27,22 +29,40 @@ const UI_PARENT_ID            = EXTENSION_SELECTORS
     .replace(/^#/, '');
 
 /* ----------  TYPES  ------------------------------------------------------ */
-type ModKey = 'in' | 'assignee' | 'tag' | 'created' | 'updated';
+type ModKey =
+    | 'in' | 'assignee' | 'team' | 'tag' | 'status' | 'subject' | 'body'
+    | 'name' | 'creator' | 'organization' | 'priority'
+    | 'custom_key' | 'custom_val'
+    | 'created' | 'updated';
+
 interface ParsedQuery {
     in?: string[];
     assignee?: string;
+    team?: string;
     tag?: string;
+    status?: string;
+    subject?: string;
+    body?: string;
+    name?: string;
+    creator?: string;
+    organization?: string;
+    priority?: string;
+    custom_key?: string;
+    custom_val?: string;
     created?: string;
     updated?: string;
 }
 
 /* ----------  METADATA  --------------------------------------------------- */
-const IN_VALUES = ['conversations', 'users', 'organizations', 'articles'] as const;
+const IN_VALUES = ['Conversations', 'Users', 'Organizations', 'Articles'] as const;
 const OP_VALUES = [
     { label: 'on',     op: ':' },
     { label: 'after',  op: '>' },
     { label: 'before', op: '<' }
 ] as const;
+
+const STATUS_VALUES   = ['Open', 'Pending', 'Completed', 'Hold'] as const;
+const PRIORITY_VALUES = ['Low', 'Normal', 'High', 'Urgent']   as const;
 
 /* ----------  STATE  ------------------------------------------------------ */
 let originalInput : HTMLInputElement | null = null;
@@ -63,15 +83,24 @@ function injectUI(): void {
     /* keyword box */
     const queryLi      = document.createElement('div');
     queryLi.innerHTML  =
-        `<input id="${QUERY_INPUT_ID}" class="${CL_QUERY_INPUT}" type="text" placeholder="Search keywords…">`;
+        `<input id="${QUERY_INPUT_ID}" class="${CL_QUERY_INPUT}" type="text" placeholder="Enter ONLY the keywords you'd like to search for">`;
 
     /* controls row */
     const controlsLi   = document.createElement('div');
     controlsLi.className = CL_CONTROLS;
     controlsLi.append(
         buildMultiIn(),
-        buildText('assignee'),
-        buildText('tag'),
+        buildText('assignee', 'Assignee'),
+        buildText('team', 'Team'),
+        buildText('tag', 'Tag'),
+        buildDropdown('status', 'Status', STATUS_VALUES),
+        buildText('subject', 'Subject'),
+        buildText('body', 'Body'),
+        buildText('name', 'Name'),
+        buildText('creator', 'Creator'),
+        buildText('organization', 'Organization'),
+        buildDropdown('priority', 'Priority', PRIORITY_VALUES),
+        buildCustomField(),
         buildDate('created'),
         buildDate('updated')
     );
@@ -79,7 +108,7 @@ function injectUI(): void {
     /* container for our elements */
     const uiWrap = document.createElement('div');
     uiWrap.id = UI_PARENT_ID;
-    uiWrap.append(controlsLi, queryLi);
+    uiWrap.append(queryLi, controlsLi);
 
     host.prepend(uiWrap);
 
@@ -121,7 +150,7 @@ function buildMultiIn(): HTMLElement {
     wrap.appendChild(buildLabel('Search in'));
 
     const trig = document.createElement('button');
-    trig.innerHTML = '<span style="font-size: 5px">▼</span> Search locations';
+    trig.innerHTML = 'Search locations <span>▼</span> ';
     trig.className   = CL_DROP_TRIGGER;
     wrap.appendChild(trig);
 
@@ -158,21 +187,66 @@ function buildMultiIn(): HTMLElement {
     return wrap;
 }
 
-function buildText(key: 'assignee' | 'tag') {
+function buildText(key: Exclude<ModKey, 'in' | 'status' | 'priority' | 'custom_key' | 'custom_val' | 'created' | 'updated'>,
+                   label?: string): HTMLElement {
     const w = document.createElement('div');
     w.className = CL_FIELD;
 
-    const label = key === 'assignee' ? 'Assignee' : 'Tag';
-    w.append(buildLabel(label));
+    w.append(buildLabel(label ?? key[0].toUpperCase() + key.slice(1)));
 
     const inp = document.createElement('input');
     inp.type        = 'text';
-    inp.placeholder = `${key} value`;
+    inp.placeholder = `${key.charAt(0).toUpperCase() + key.slice(1)} to search for`;
     inp.className   = CL_TEXT_INPUT;
     inp.addEventListener('input', syncToOriginal);
     w.append(inp);
 
     refs[key] = inp;
+    return w;
+}
+
+function buildDropdown(
+    key: 'status' | 'priority',
+    label: string,
+    options: readonly string[]
+): HTMLElement {
+    const w = document.createElement('div');
+    w.classList.add(CL_FIELD, 'kh-field-dropdown');
+
+    w.append(buildLabel(label));
+
+    const sel = document.createElement('select');
+    sel.append(new Option('', ''));     // empty default
+    options.forEach(o => sel.append(new Option(o, o)));
+    sel.addEventListener('change', syncToOriginal);
+    w.append(sel);
+
+    refs[key] = sel;
+    return w;
+}
+
+function buildCustomField(): HTMLElement {
+    const w = document.createElement('div');
+    w.className = CL_FIELD;
+
+    w.append(buildLabel('Custom field'));
+
+    const keyInp = document.createElement('input');
+    keyInp.type = 'text';
+    keyInp.placeholder = `Custom field's API key`;
+    keyInp.className = CL_TEXT_INPUT;
+    keyInp.addEventListener('input', syncToOriginal);
+
+    const valInp = document.createElement('input');
+    valInp.type = 'text';
+    valInp.placeholder = `Custom field's value`;
+    valInp.className = CL_TEXT_INPUT;
+    valInp.addEventListener('input', syncToOriginal);
+
+    refs.custom_key = keyInp;
+    refs.custom_val = valInp;
+
+    w.append(keyInp, valInp);
     return w;
 }
 
@@ -220,11 +294,23 @@ function syncToOriginal(): void {
         parts.push('(' + chosen.map(v => `in:${v}`).join(' OR ') + ')');
     }
 
-    /* assignee, tag */
-    (['assignee', 'tag'] as const).forEach(k => {
-        const val = (refs[k] as HTMLInputElement).value.trim();
-        if (val) parts.push(`${k}:"${val}"`);
+    /* simple text fields */
+    (['assignee','team','tag','subject','body','name','creator','organization'] as const)
+        .forEach(k => {
+            const val = (refs[k] as HTMLInputElement).value.trim();
+            if (val) parts.push(`${k}:"${val}"`);
+        });
+
+    /* dropdowns */
+    (['status','priority'] as const).forEach(k => {
+        const val = (refs[k] as HTMLSelectElement).value;
+        if (val) parts.push(`${k}:${val}`);
     });
+
+    /* custom field */
+    const cfKey = (refs.custom_key as HTMLInputElement).value.trim();
+    const cfVal = (refs.custom_val as HTMLInputElement).value.trim();
+    if (cfKey && cfVal) parts.push(`${cfKey}:"${cfVal}"`);
 
     /* dates */
     (['created', 'updated'] as const).forEach(k => {
@@ -244,11 +330,33 @@ function syncFromOriginal(): void {
     const raw = originalInput.value;
 
     const parsed: ParsedQuery = {};
+
+    /* in */
     parsed.in = [...raw.matchAll(/\bin:([^\s()]+)/gi)].map(m => m[1]);
 
-    [...raw.matchAll(/\b(assignee|tag):"([^"]*)"/gi)]
-        .forEach(m => parsed[m[1] as 'assignee' | 'tag'] = m[2]);
+    /* simple text */
+    (['assignee','team','tag','subject','body','name','creator','organization'] as const)
+        .forEach(k => {
+            const m = raw.match(new RegExp(`\\b${k}:"([^"]*)"`, 'i'));
+            if (m) parsed[k] = m[1];
+        });
 
+    /* dropdowns */
+    (['status','priority'] as const).forEach(k => {
+        const m = raw.match(new RegExp(`\\b${k}:([^\\s]+)`, 'i'));
+        if (m) parsed[k] = m[1];
+    });
+
+    /* custom field – pick the first key:"value" pair that is NOT a built-in key */
+    for (const m of raw.matchAll(/(\w+):"([^"]+)"/g)) {
+        if (!(['assignee','team','tag','subject','body','name','creator','organization','status','priority'] as readonly string[]).includes(m[1])) {
+            parsed.custom_key = m[1];
+            parsed.custom_val = m[2];
+            break;
+        }
+    }
+
+    /* dates */
     [...raw.matchAll(/\b(created|updated)([:<>])(\d{4}-\d{2}-\d{2})/gi)]
         .forEach(m => parsed[m[1] as 'created' | 'updated'] = `${m[2]}${m[3]}`);
 
@@ -256,8 +364,18 @@ function syncFromOriginal(): void {
     const qBox = document.getElementById(QUERY_INPUT_ID)! as HTMLInputElement;
     let kw = raw
         .replace(/\bin:[^\s()]+/gi, '')
-        .replace(/\b(assignee|tag):"[^"]*"/gi, '')
-        .replace(/\b(created|updated)([:<>])\d{4}-\d{2}-\d{2}/gi, '')
+        .replace(/\b(?:assignee|team|tag|subject|body|name|creator|organization):"[^"]*"/gi, '')
+        .replace(/\b(?:status|priority):[^\s"]+/gi, '')
+        .replace(/\b(?:created|updated)(?:[:<>])\d{4}-\d{2}-\d{2}/gi, '');
+
+    /* --------- NEW: strip current custom-field pair from kw ---------------- */
+    if (parsed.custom_key) {
+        const esc = parsed.custom_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        kw = kw.replace(new RegExp(`\\b${esc}:"[^"]*"`, 'gi'), '');
+    }
+    /* ---------------------------------------------------------------------- */
+
+    kw = kw
         .replace(/\s+OR\s+/gi, ' ')
         .replace(/[()]/g, ' ')
         .replace(/\s{2,}/g, ' ')
@@ -266,21 +384,34 @@ function syncFromOriginal(): void {
     if (/^(?:OR\s*)+$/i.test(kw)) kw = '';
     qBox.value = kw;
 
-    /* update helpers */
+    /* update helpers ------------------------------------------------------ */
     refs.in!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
         .forEach(cb => cb.checked = parsed.in?.includes(cb.value) ?? false);
 
-    (['assignee', 'tag'] as const).forEach(k => {
-        (refs[k] as HTMLInputElement).value = parsed[k] ?? '';
+    (['assignee','team','tag','subject','body','name','creator','organization'] as const)
+        .forEach(k => {
+            (refs[k] as HTMLInputElement).value = parsed[k] ?? '';
+        });
+
+    (['status','priority'] as const).forEach(k => {
+        (refs[k] as HTMLSelectElement).value = parsed[k] ?? '';
     });
 
+    if (parsed.custom_key)  (refs.custom_key as HTMLInputElement).value = parsed.custom_key;
+    if (parsed.custom_val)  (refs.custom_val as HTMLInputElement).value = parsed.custom_val;
+
+    /* dates */
     (['created', 'updated'] as const).forEach(k => {
         const w   = refs[k]!;
         const sel = w.querySelector('select') as HTMLSelectElement;
         const inp = w.querySelector('input[type="date"]') as HTMLInputElement;
 
-        if (!parsed[k]) { sel.value = ':'; inp.value = ''; return; }
-        sel.value  = parsed[k]![0];
-        inp.value  = parsed[k]!.slice(1);
+        if (parsed[k]) {
+            sel.value = parsed[k]![0];           // ':' | '>' | '<'
+            inp.value = parsed[k]!.slice(1);     // yyyy-mm-dd
+        } else {
+            /* keep the operator as-is so the user can pick it first without losing it */
+            inp.value = '';
+        }
     });
 }

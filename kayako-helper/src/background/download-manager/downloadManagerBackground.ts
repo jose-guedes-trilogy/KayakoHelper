@@ -8,6 +8,7 @@
         • attachments.getFiles   (Gemini → SW)
   – Notifies all open Gemini tabs when a fresh ticket arrives
 \*───────────────────────────────────────────────────────────*/
+/* src/background/download-manager/downloadManagerBackground.ts */
 
 import JSZip from 'jszip';
 

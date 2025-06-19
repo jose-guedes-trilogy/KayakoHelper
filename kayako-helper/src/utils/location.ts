@@ -1,4 +1,4 @@
-// utils/location.ts
+// src/utils/location.ts
 /**
  * Return the numeric conversation id from URLs like
  * “…/agent/conversations/123456”. If we’re not on a conversation
