@@ -4,16 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build-selectors": "node ./src/selectors/build-selectors.mjs",
-    "watch-selectors": "nodemon --watch src/selectors/selectors.json --exec \"npm run build-selectors\" -q",
+    "build-selectors": "node src/selectors/build-selectors.mjs ",
+    "watch-selectors": "nodemon --watch src/selectors/selectors.jsonc --exec \"npm run build-selectors\" -q",
     "vite-dev": "vite dev",
     "dev": "npm-run-all --parallel watch-selectors vite-dev",
-    "build": "npm run build-selectors && vite build",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --fix"
+    "build": "node src/selectors/build-selectors.mjs && vite build",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "build:debug": "node src/selectors/build-selectors.mjs && vite build --mode debug"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.326",
     "@types/node": "^22.15.30",
+    "json5": "^2.2.3",
     "nodemon": "^3.1.10",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.1",

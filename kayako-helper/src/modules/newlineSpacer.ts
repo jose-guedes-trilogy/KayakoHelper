@@ -54,8 +54,6 @@ const createSpacer = (): HTMLDivElement => {
 
 /** Ensure the given <li> ends with exactly two <br> elements */
 const ensureTrailingBreaks = (li: HTMLElement): void => {
-    console.log('[newlineSpacer] ensureTrailingBreaks', li);
-
     let trailingBrs = 0;
     for (let n = li.lastChild; n; n = n.previousSibling) {
         if (n.nodeType === Node.TEXT_NODE && !n.textContent?.trim()) continue;
@@ -68,10 +66,8 @@ const ensureTrailingBreaks = (li: HTMLElement): void => {
 
     if (trailingBrs < 2) {
         for (let i = 0; i < 2 - trailingBrs; i++) li.appendChild(document.createElement('br'));
-        console.log('[newlineSpacer]   added <br>×%d to', 2 - trailingBrs, li);
     } else if (trailingBrs > 2) {
         while (trailingBrs-- > 2) li.removeChild(li.lastChild!);
-        console.log('[newlineSpacer]   trimmed extra <br> from', li);
     }
 };
 
@@ -139,7 +135,6 @@ const ensureDoubleBreaksInDiv = (div: HTMLElement): void => {
 /* ------------------------------------------------------------------ */
 
 export function bootNewlineSpacer(): void {
-    console.log('[newlineSpacer] boot');
     attachAllButtons();
 
     // Kayako is an SPA—editors appear/destroy dynamically.
@@ -169,7 +164,6 @@ function attachAllButtons(): void {
             ? header.insertBefore(btnDiv, header.children[1]) // 2nd child
             : header.appendChild(btnDiv);
 
-        console.log('[newlineSpacer] button added', header, btn);
     });
 }
 
@@ -212,10 +206,8 @@ export function addNewlines(root: HTMLElement): void {
 
         // Ensure spacer immediately *before* H1/H2/H3
         if (child.matches(HEADER_SELECTOR)) {
-            console.log('[newlineSpacer] TESTING if spacer should be inserted before HEADING', child);
             if (!child.previousElementSibling || !isSpacerDiv(child.previousElementSibling)) {
                 root.insertBefore(createSpacer(), child);
-                console.log('[newlineSpacer] spacer inserted before HEADING', child);
             }
             prevBlock = null;
             return;

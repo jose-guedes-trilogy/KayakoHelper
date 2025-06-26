@@ -1,11 +1,14 @@
 {
-  "name": "Kayako Support Agent Helper",
-  "description": "Makes providing support a breeze.",
+  "name": "Kayako Helper",
+  "description": "Every Kayako Agent's best friend.",
   "version": "1.0.0",
   "manifest_version": 3,
 
   "icons": {
-    "16": "icons/icon16.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "64": "icons/icon64.png",
+    "128": "icons/icon128.png"
   },
 
   "action": {
@@ -15,9 +18,12 @@
 
   "content_scripts": [
     {
-      "matches": [
-        "https://*.kayako.com/*"
-      ],
+      "matches": ["https://*.kayako.com/*"],
+      "js": ["dist/tagCleanerInjector.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://*.kayako.com/*"],
       "js": ["dist/contentKayako.js"],
       "css": ["dist/content.css"],
       "run_at": "document_idle"
@@ -25,6 +31,23 @@
     {
       "matches": ["https://gemini.google.com/*"],
       "js": ["dist/contentGemini.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": ["dist/contentChatGPT.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://ephor.ai/*",
+        "https://*.ephor.ai/*"
+      ],
+      "js": ["dist/contentEphor.js"],
       "run_at": "document_idle"
     }
   ],
@@ -36,22 +59,33 @@
 
   "host_permissions": [
     "https://*.kayako.com/*",
+    "https://*.chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
     "https://push.clients6.google.com/*",
     "https://content-push.googleapis.com/upload/",
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://ephor.ai/*",
+    "https://*.ephor.ai/*"
   ],
 
   "permissions": [
-    "storage",
     "tabs",
-    "clipboardWrite",
-    "nativeMessaging"
+    "scripting",
+    "storage",
+    "activeTab",
+    "clipboardWrite"
   ],
 
   "web_accessible_resources": [
     {
       "resources": ["dist/*"],
-      "matches": ["https://*.kayako.com/*"]
+      "matches": [
+        "https://*.kayako.com/*",
+        "https://*.chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://gemini.google.com/*"]
     }
   ]
 }

@@ -31,7 +31,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 #{sel.$conversationWindowHeader} {
   border-bottom: 1px solid #D1D5D7;
 
-  box-shadow: 0 0 3px 1px hsl(203 10% 96% / 1);
+  box-shadow: 0 0 3px 1px hsl(203 10% 94% / 1);
 }
 
 #{sel.$conversationWindowHeaderInner} {
@@ -81,7 +81,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 
 #{sel.$noteModeSelectorOn} {
   background-color: hsl(60, 10%, 99%) !important;
-  padding: 0 4px !important;
+  padding: 0 5px !important;
 
   //border-left: 1px solid hsl(203, 0%, 89%) !important;
   //border-right: 1px solid hsl(203, 0%, 89%) !important;
@@ -101,6 +101,20 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   border-bottom: 1px solid transparent;
 
   padding-bottom: 20px;
+}
+
+#{sel.$timelineItemStatusIcon} {
+  margin-left: 3px;
+}
+
+#{sel.$timelineItemUserRole} {
+  position: relative;
+  top: -1px;
+  margin-right: 8px;
+}
+
+#{sel.$timelineItemUserRole} {
+  margin-left: 4px;
 }
 
 #{sel.$timelineItemInner} {
@@ -166,6 +180,11 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   &:hover {
     background: linear-gradient(-180deg, hsl(49deg 77.02% 51%) 4%, hsl(45deg 78.67% 37%) 96%) !important;
   }
+}
+
+#{sel.$sendButtonNoteLoadingAfter} {
+  background: linear-gradient(to right, rgb(215, 166, 32) 0px, rgba(57, 167, 199, 0) 20%, rgba(57, 167, 199, 0) 80%, rgb(215, 166, 32) 100%);
+
 }
 
 #{sel.$sendButtonNoteRightSection} {
@@ -265,6 +284,10 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   > span {
     text-shadow: 0 0 9px hsl(0deg 0% 56.29% / 50%), 0 0 2px hsl(0deg 0% 20.24% / 35%);
   }
+}
+
+#{sel.$submitPropertiesButtonLoadingAfter} {
+  background: linear-gradient(to right, hsl(133 46% 47% / 1) 0, rgba(57, 167, 199, 0) 20%, rgba(57, 167, 199, 0) 80%, hsl(133 46% 47% / 1) 100%) !important;
 }
 
 #{sel.$cancelPropertiesButton} {
@@ -451,6 +474,12 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   right: -4px;
 }
 
+#{sel.$searchResultsPageSideBarItemCounter} {
+  background-color: hsl(103 40% 62% / 1) !important;
+  border-radius: 5px;
+  color: white !important;
+}
+
 
 /* SLA Goal Missed */
 #{sel.$slaGoalMissed} {
@@ -532,31 +561,50 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   box-sizing: content-box;
 }
 
-@mixin backwardAnimation($amount, $duration: 0.065s) {
+@mixin backwardAnimation($amount, $duration: 0.095s) {
   transform: rotate($amount);
 
   transition-duration: $duration;
 }
 
-// Animate SVGs
-#{sel.$leftMenuSVGs}, #{sel.$reloadIcon} > svg {
-  @include forwardAnimation;
+$left-menu-hover-bg-color: hsl(268 18% 18% / 1);
 
-  &:hover {
-    @include backwardAnimation(45deg);
-  }
-}
+#{sel.$leftMenuNotificationBadge} {
 
-
-.ko-notification-badge {
   svg {
     @include forwardAnimation;
   }
 
-  &:hover svg {
-    @include backwardAnimation(45deg);
+  &:hover {
+    background-color: $left-menu-hover-bg-color;
+
+    transition: background-color .075s;
+
+    svg {
+      @include backwardAnimation(-30deg);
+    }
+ }
+
+}
+
+
+// Left menu links. Skip Kayako logo
+#{sel.$leftMenuLinks}:not(:first-child) {
+
+  svg {
+    @include forwardAnimation;
+  }
+
+  &:hover {
+    background-color: $left-menu-hover-bg-color;
+    transition: background-color .175s;
+
+    svg  {
+      @include backwardAnimation(45deg);
+    }
   }
 }
+
 
 
 // Animate SVGs

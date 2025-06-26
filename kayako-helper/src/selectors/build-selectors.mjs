@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import prettier from 'prettier';
 import { fileURLToPath } from 'url';
+import JSON5 from 'json5';
 
 /* ------------------------------------------------------------------ */
 /*  Path helpers that work everywhere                                 */
@@ -14,16 +15,23 @@ const ROOT       = path.resolve(__dirname, '..', '..');   // project root
 const SRC        = path.join(ROOT, 'src');
 const OUT        = path.join(SRC, 'generated');
 
-const JSON_PATH  = path.join(__dirname, 'selectors.json');      // same dir
+const JSON_PATH  = path.join(__dirname, 'selectors.jsonc');      // same dir
 const SCSS_TMPL  = path.join(__dirname, '_tmpl.scss');          // optional
 const TS_PATH    = path.join(OUT, 'selectors.ts');
 const SCSS_PATH  = path.join(OUT, '_selectors.scss');
 
 /* ------------------------------------------------------------------ */
-/*  Read selectors.json                                               */
+/*  Read selectors.jsonc                                               */
 /* ------------------------------------------------------------------ */
-const raw = await fs.readFile(JSON_PATH, 'utf8');
-const data = JSON.parse(raw);
+const raw  = await fs.readFile(JSON_PATH, 'utf8');
+let data;
+try {
+    data = JSON5.parse(raw);
+} catch (err) {
+    console.error('[build-selectors] ✖ Could not parse selectors.jsonc:', err.message);
+    throw err;      // bail out early → Vite build won’t start
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Build selectors.ts                                                */
@@ -100,5 +108,3 @@ async function buildSCSS() {
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(TS_PATH, await buildTS(), 'utf8');
 await fs.writeFile(SCSS_PATH, await buildSCSS(), 'utf8');
-
-console.log('selectors.ts and _selectors.scss generated ✅');

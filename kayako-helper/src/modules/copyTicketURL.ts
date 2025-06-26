@@ -47,7 +47,7 @@ function findAndAttach(): void {
  * Call this once from your content script.
  * It will keep working when switching between tickets.
  */
-export default function bootCopyTicketURL(): void {
+export function bootCopyTicketURL(): void {
     // Attach immediately if the element is already present
     findAndAttach();
 

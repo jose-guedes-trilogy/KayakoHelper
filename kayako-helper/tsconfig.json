@@ -1,29 +1,60 @@
 {
   "compilerOptions": {
-    "target":            "ES2020",
-    "module":            "ESNext",
-    "moduleResolution":  "Node",
-    "strict":            true,
+    /* ▾ Emit & module system ▾ */
+    "target":            "ES2022",            // modern built-ins like Array#at, class fields
+    "module":            "ESNext",            // native ESM – Vite/ESBuild handle bundling
+    "moduleResolution":  "bundler",           // smartest lookup (works with .ts/.mts/.cts)
+    "lib":               ["DOM", "ESNext"],   // latest JS + browser APIs
+
+    /* ▾ Type-safety ▾ */
+    "strict":                        true,
+    "exactOptionalPropertyTypes":    true,
+    "noUncheckedIndexedAccess":      true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitOverride":            true,
+    "useUnknownInCatchVariables":    true,
+
+    /* ▾ Interop & migration ▾ */
     "esModuleInterop":   true,
-    "skipLibCheck":      true,
+    "allowJs":           true,     // flip off when all .js is gone
+    "checkJs":           false,
     "resolveJsonModule": true,
-    "allowJs":           true,    // for a gradual migration
-    "checkJs":           false,   // disable JS-in-TS checking
-    "isolatedModules":   true,
+    "allowImportingTsExtensions": true,
+
+    /* ▾ Incremental build & DX ▾ */
+    "incremental":       true,
+    "tsBuildInfoFile":   ".tsbuildcache/.tsbuildinfo",
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck":      true,     // drop when deps are on TS ≥5
+
+    /* ▾ JSX & paths ▾ */
     "jsx":               "preserve",
     "baseUrl":           "./src",
     "paths": {
-      "@/*": ["*"]
+      "@/*": ["./*"]
     },
+
+    /* ▾ Global types ▾ */
     "types": [
-      "chrome",              // Chrome extension APIs
-      "vite/client"          // Vite’s import.meta.hot, etc.
-    ]
+      "chrome",          // Chrome extension APIs
+      "vite/client"      // import.meta, HMR, etc.
+    ],
+
+    /* ▾ Misc ▾ */
+    "isolatedModules":   true
   },
+
+  /* ▾ File globs ▾ */
   "include": [
     "src",
     "vite.config.ts",
-    "src/popup",
-    "../../../../../Program Files/JetBrains/WebStorm2023.3/plugins/javascript-impl/jsLanguageServicesImpl/external/lib.es5.d.ts"
+    "dist/contentKayako.js",
+    "dist/contentChatGPT.js",
+    "dist/contentGemini.js",
+    "dist/contentEphor.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
   ]
 }

@@ -1,172 +1,263 @@
-/* src/modules/ui-clean-up/tagCleaner.ts */
-
-/**
- * Kayako Tag-Diff Cleaner – v1.1
- * Logs are verbose – filter the console on “KTC:” to follow the flow.
- */
+/* ============================================================================
+ * src/modules/ui-clean-up/tagCleaner.ts
+ *
+ * Kayako Tag-Diff Cleaner – v3.6  (multi-tab aware, **no request caching**)
+ * – Watches History-API, popstate and a tiny location-poller to detect
+ *   ticket switches reliably even when Kayako patches history after us.
+ * – Always waits for a fresh network response (or falls back to bulk fetch);
+ *   nothing is cached across tab switches.
+ * – Listens for repeated POSTS_JSON messages (first page + limit-100 follow-up).
+ * ========================================================================== */
 
 interface Action {
     id: number;
     action: "CREATED" | "UPDATED" | "DELETED";
-    field: string;
+    field: "tags" | "name";
     old_value: string | null;
     new_value: string | null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
+/* ---------- per-ticket state ------------------------------------------- */
+const actions = new Map<string, Action[]>();
+let currentCaseId: string | null = getCaseId();
+let ready = false;
+const waiters: Array<() => void> = [];
+let fallbackId: number | undefined;
 
-const LOG = (...args: any[]) => console.log("KTC:", ...args);
+/* ---------- helpers ---------------------------------------------------- */
+const LOG = (...a: unknown[]) => console.log("[KTC]", ...a);
+const readyNow = () => {
+    ready = true;
+    waiters.splice(0).forEach(fn => fn());
+};
+const waitReady = () =>
+    ready ? Promise.resolve() : new Promise<void>(r => waiters.push(r));
+const split  = (s: string | null) => [...new Set((s ?? "").split(",").map(t => t.trim()).filter(Boolean))];
+const diff   = (o: string | null, n: string | null) => ({
+    added  : split(n).filter(t => !split(o).includes(t)),
+    removed: split(o).filter(t => !split(n).includes(t)),
+});
+const COLOR_ADD = "hsl(133 54% 34% / 1)";
+const COLOR_REM = "hsl(8 52% 50% / 1)";
+const html = (d: { added: string[]; removed: string[] }) =>
+    [ d.added.length  ? `added tag${d.added.length  > 1 ? "s" : ""} <b style="color:${COLOR_ADD}">${d.added.join(", ")}</b>` : "",
+        d.removed.length? `removed tag${d.removed.length> 1 ? "s" : ""} <b style="color:${COLOR_REM}">${d.removed.join(", ")}</b>` : ""
+    ].filter(Boolean).join("&nbsp;");
 
-/** Split Kayako’s comma-separated tag string into a unique, trimmed array */
-function splitTags(str: string | null): string[] {
-    const out = (str ?? "")
-        .split(",")
-        .map(t => t.trim())
-        .filter(Boolean);
-    return [...new Set(out)];
+const meta      = (n: string) => document.querySelector<HTMLMetaElement>(`meta[name="${n}"]`)?.content ?? null;
+const cookieVal = (k: string) =>
+    decodeURIComponent((document.cookie.match(new RegExp(`(?:^|;\\s*)${k.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")}=([^;]+)`)) ?? [])[1] ?? "");
+const apiToken  = meta("api-token")  ?? meta("x-api-token");
+const csrfToken = meta("csrf-token") ?? meta("x-csrf-token") ?? cookieVal("csrf_token");
+const sessionId = meta("session-id") ?? cookieVal("novo_sessionid");
+
+const POST_SEL = '[class*="ko-timeline-2_list_post__post_"]';
+
+function getCaseId(): string | null {
+    return location.pathname.match(/\/conversations\/(\d+)\b/)?.[1] ?? null;
 }
 
-/** Compute added & removed tags */
-function diffTags(oldVal: string | null, newVal: string | null) {
-    const oldTags = splitTags(oldVal);
-    const newTags = splitTags(newVal);
-    return {
-        added:   newTags.filter(t => !oldTags.includes(t)),
-        removed: oldTags.filter(t => !newTags.includes(t)),
-    };
-}
+/* ---------- ingest(): post → activity → action ------------------------ */
+function ingest(json: any): void {
+    if (!currentCaseId) return;
 
-/** Build innerHTML snippet */
-function renderDiffHtml({ added, removed }: { added: string[]; removed: string[]; }) {
-    const parts: string[] = [];
-    if (added.length)   parts.push(`added <b>${added.join(", ")}</b>`);
-    if (removed.length) parts.push(`removed <b>${removed.join(", ")}</b>`);
-    return parts.join(" &nbsp;"); // keep sentence on one line
-}
+    const acts: Record<string, Action> = json?.resources?.action  ?? json?.resources?.actions ?? {};
+    const avts: Record<string, any>    = json?.resources?.activity ?? {};
+    const posts: any[] = Array.isArray(json?.data) ? json.data : [];
 
-/* ------------------------------------------------------------------ */
-/* Network layer (actions are cached)                                 */
-/* ------------------------------------------------------------------ */
+    let tagCount = 0;
+    for (const post of posts) {
+        const postId = String(post.id);
+        const actId  = post.original?.id;
+        if (!actId) continue;
 
-const ORIGIN = `${location.protocol}//${location.host}`;
-const actionCache = new Map<string, Action[]>();          // postId → actions[]
-const inFlight     = new Map<string, Promise<Action[]>>(); // dedupe concurrent calls
+        const activity = avts[String(actId)];
+        if (!activity || !Array.isArray(activity.actions)) continue;
 
-async function fetchTagActions(postId: string): Promise<Action[]> {
-    if (actionCache.has(postId)) return actionCache.get(postId)!;
+        const tagActs: Action[] = activity.actions
+            .map((ref: any) => acts[String(ref.id)])
+            .filter((a: Action | undefined): a is Action => !!a && (a.field === "tags" || a.field === "name"));
 
-    if (inFlight.has(postId)) return inFlight.get(postId)!;
-
-    const url =
-        `${ORIGIN}/api/v1/cases/posts/${postId}.json` +    // «Retrieve a post» endpoint :contentReference[oaicite:0]{index=0}
-        `?include=action` +
-        `&fields=+action(field,old_value,new_value,id)`;
-
-    const p = (async () => {
-        LOG("fetchTagActions →", postId, url);
-        const res = await fetch(url, { credentials: "include" });
-        if (!res.ok) throw new Error(`Kayako API ${res.status}`);
-
-        const json = await res.json();
-        const actions: Action[] = Object
-            .values<Record<string, unknown>>(json.included ?? json.resources ?? {})
-            .filter((r: any) => r?.resource_type === "action" && r.field === "tags") as Action[];
-
-        LOG("fetchTagActions ✓", postId, actions);
-        actionCache.set(postId, actions);
-        inFlight.delete(postId);
-        return actions;
-    })();
-
-    inFlight.set(postId, p);
-    return p;
-}
-
-/* ------------------------------------------------------------------ */
-/* DOM manipulation                                                   */
-/* ------------------------------------------------------------------ */
-
-function applyTagDiff(postEl: HTMLElement, actions: Action[]) {
-    if (!actions.length) return;
-
-    const textContainer =
-        postEl.querySelector<HTMLElement>(
-            '[class^="ko-timeline-2_list_activity_standard__activity-text_"]'
-        );
-    if (!textContainer) return;
-
-    if (textContainer.dataset.tagCleaned === "true") return; // already done for this node
-
-    // Pick a representative old/new pair
-    const base = actions.reduce<Action>((prev, curr) => ({
-        ...curr,
-        old_value: prev.old_value ?? curr.old_value
-    }), actions[actions.length - 1]);
-
-    const diff = diffTags(base.old_value, base.new_value);
-    if (!diff.added.length && !diff.removed.length) return;
-
-    // Hide noisy original lines
-    Array.from(textContainer.querySelectorAlspan).forEach(span => {
-        if (/tags/i.test(span.textContent ?? "")) (span as HTMLElement).style.display = "none";
-    });
-
-    // Inject our diff
-    const diffSpan = document.createElement("span");
-    diffSpan.className = "ktc-diff";
-    diffSpan.innerHTML = renderDiffHtml(diff);
-    diffSpan.style.whiteSpace = "nowrap";
-
-    textContainer.prepend(diffSpan);
-    textContainer.dataset.tagCleaned = "true";
-
-    LOG("applyTagDiff ✓", { id: postEl.dataset.id, diff });
-}
-
-/* ------------------------------------------------------------------ */
-/* Post processing pipeline                                           */
-/* ------------------------------------------------------------------ */
-
-async function processPostElement(postEl: HTMLElement) {
-    const id = postEl.dataset.id ?? postEl.getAttribute("data-id");
-    if (!id) return;
-    try {
-        const actions = await fetchTagActions(id);
-        applyTagDiff(postEl, actions);
-    } catch (e) {
-        console.error("KTC: failed", id, e);
+        if (tagActs.length) {
+            actions.set(postId, tagActs);
+            tagCount += tagActs.length;
+        }
     }
+    LOG(`🔍 Ingested ${posts.length} posts – ${tagCount} tag-actions (cache now ${actions.size} posts)`);
 }
 
-/* ------------------------------------------------------------------ */
-/* Observer bootstrapping                                             */
-/* ------------------------------------------------------------------ */
+/* ---------- fallback bulk fetch (used when injector JSON never arrives) */
+async function fetchAllPages(): Promise<void> {
+    const caseId = getCaseId();
+    if (!caseId) { readyNow(); return; }
 
+    let url: string | null =
+        `${location.origin}/api/v1/cases/${caseId}/posts` +
+        "?include=attachment,case_message,channel,post,user,identity_phone," +
+        "identity_email,identity_twitter,identity_facebook,note,activity," +
+        "chat_message,facebook_message,twitter_tweet,twitter_message," +
+        "comment,event,action,trigger,monitor,engagement,sla_version," +
+        "activity_object,rating,case_status,activity_actor" +
+        "&fields=%2Boriginal(%2Bobject(%2Boriginal(%2Bform(-fields))))," +
+        "%2Boriginal(%2Bobject(%2Boriginal(-custom_fields)))&filters=all" +
+        "&include=*&limit=50";
+
+    const hdrs: RequestInit = {
+        credentials: "include",
+        headers: {
+            Accept: "application/json",
+            "X-Options": "flat",
+            "X-Requested-With": "XMLHttpRequest",
+            ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+            ...(apiToken ? { "X-API-Token": apiToken } : {}),
+            ...(sessionId ? { "X-Session-Id": sessionId } : {}),
+        },
+    };
+
+    let pages = 0;
+    while (url) {
+        LOG("⏳ GET", url);
+        const res = await fetch(url, hdrs);
+        if (!res.ok) { LOG("❌", res.status, res.statusText); break; }
+        ingest(await res.json());
+        url = res.headers.get("x-next-url") || null;
+        if (url && !url.startsWith("http")) url = location.origin + url;
+        pages++;
+    }
+    LOG(`✅ Bulk fetch complete (${pages} page${pages !== 1 ? "s" : ""}).`);
+    readyNow();
+}
+
+/* ---------- DOM decoration ------------------------------------------- */
+function decorate(post: HTMLElement, acts: Action[]): void {
+    if (!acts.length) return;
+
+    const box = post.querySelector<HTMLElement>('[class*="ko-timeline-2_list_activity_standard__activity-text_"]');
+    if (!box || box.dataset.tagCleaned) return;
+
+    const base  = acts.reduce<Action>((p,c) => ({ ...c, old_value: p.old_value ?? c.old_value }), acts[acts.length - 1]);
+    const delta = diff(base.old_value, base.new_value);
+
+    if (!delta.added.length && !delta.removed.length) return;
+
+    /* hide default text and prepend nicer diff-summary */
+    box.querySelectorAll<HTMLSpanElement>("span").forEach(
+        s => /tags/i.test(s.textContent ?? "") && (s.style.display = "none")
+    );
+
+    const span = document.createElement("span");
+    span.className = "ktc-diff";
+    span.innerHTML = html(delta);
+    span.style.whiteSpace = "wrap";
+    box.prepend(span);
+    box.dataset.tagCleaned = "true";
+}
+
+async function handle(post: HTMLElement): Promise<void> {
+    const id = post.dataset.id ?? post.getAttribute("data-id");
+    if (!id) return;
+    await waitReady();
+    decorate(post, actions.get(id) ?? []);
+}
+
+/* ---------- ticket-switch detection ----------------------------------- */
+/* --- replace resetForCase() with the patched version ------------------- */
+function resetForCase(newId: string | null): void {
+    if (newId === currentCaseId) return;
+
+    LOG(`🔄 Switched case ${currentCaseId ?? "❓"} → ${newId ?? "❓"}`);
+    currentCaseId = newId;
+    ready = false;
+    actions.clear();
+    clearFallbackTimer();
+    startFallbackTimer();
+
+    /* 🆕 re-process posts that are already in the DOM for the (re)opened case */
+    document.querySelectorAll<HTMLElement>(POST_SEL).forEach(handle);
+}
+
+
+/* 1️⃣ History-API / popstate hooks */
+function installUrlWatcher(): void {
+    (["pushState", "replaceState"] as const).forEach(fn => {
+        const orig = history[fn];
+        history[fn] = function (...a: Parameters<typeof history.pushState>) {
+            const rv = orig.apply(this, a);
+            window.dispatchEvent(new Event("ktc:url-change"));
+            return rv;
+        };
+    });
+    window.addEventListener("popstate", () =>
+        window.dispatchEvent(new Event("ktc:url-change"))
+    );
+    window.addEventListener("ktc:url-change", () =>
+        resetForCase(getCaseId())
+    );
+}
+
+/* 2️⃣ 500 ms location-poll fallback */
+function installLocationPoller(): void {
+    let lastPath = location.pathname;
+    setInterval(() => {
+        if (location.pathname !== lastPath) {
+            lastPath = location.pathname;
+            resetForCase(getCaseId());
+        }
+    }, 500);
+}
+
+/* ---------- fallback timer helpers ------------------------------------ */
+function clearFallbackTimer(): void {
+    if (fallbackId !== undefined) { clearTimeout(fallbackId); fallbackId = undefined; }
+}
+function startFallbackTimer(delay = 150 ): void {
+    clearFallbackTimer();
+    fallbackId = window.setTimeout(() => {
+        LOG("⚠️  No JSON captured – running fallback fetch");
+        fetchAllPages().catch(err => console.error("[KTC] bulk fetch failed", err));
+    }, delay);
+}
+
+/* ---------- BOOTSTRAP -------------------------------------------------- */
 export function bootTagCleaner(): void {
-    LOG("bootTagCleaner");
+    LOG("🚀 bootTagCleaner initialising …");
+    installUrlWatcher();
+    installLocationPoller();
 
-    const POST_SELECTOR = '[class*="ko-timeline-2_list_post__post_"]';
+    /* 1️⃣ listen for injector messages */
+    window.addEventListener("message", ev => {
+        if (ev.source !== window || !ev.data || ev.data.source !== "KTC") return;
 
-    // Handle nodes already on screen
-    document.querySelectorAll<HTMLElement>(POST_SELECTOR)
-        .forEach(processPostElement);
+        switch (ev.data.kind) {
+            case "POSTS_FETCH_STARTED":
+                clearFallbackTimer();
+                LOG("⏳ Waiting for page-world JSON …");
+                break;
 
-    // Handle future additions / re-renders
-    const observer = new MutationObserver(muts => {
-        muts.forEach(m => {
-            m.addedNodes.forEach(node => {
-                if (!(node instanceof HTMLElement)) return;
-
-                if (node.matches(POST_SELECTOR)) {
-                    processPostElement(node).then(r => {});
-                } else {
-                    node.querySelectorAll?.(POST_SELECTOR).forEach(el => processPostElement(el as HTMLElement));
-                }
-            });
-        });
+            case "POSTS_JSON":
+                clearFallbackTimer();
+                ingest(ev.data.json);
+                if (!ready) readyNow();
+                break;
+        }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    /* 2️⃣ start fallback timer for the initial ticket */
+    startFallbackTimer();
+
+    /* 3️⃣ decorate existing + future timeline posts */
+    const POST_SEL = '[class*="ko-timeline-2_list_post__post_"]';
+    document.querySelectorAll<HTMLElement>(POST_SEL).forEach(handle);
+    new MutationObserver(muts =>
+        muts.forEach(r =>
+            r.addedNodes.forEach(n => {
+                if (!(n instanceof HTMLElement)) return;
+                n.matches(POST_SEL)
+                    ? handle(n)
+                    : n.querySelectorAll?.<HTMLElement>(POST_SEL).forEach(handle);
+            })
+        )
+    ).observe(document.body, { childList: true, subtree: true });
+
+    LOG("✅ bootTagCleaner ready.");
 }
