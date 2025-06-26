@@ -12,8 +12,6 @@ let enabled = true;
 /* ------------------------------------------------------------------ */
 
 export function bootTrainingMode(): void {
-    console.log('[trainingMode] boot');
-
     // Load initial setting (default: true)
     chrome.storage.sync.get({ [STORAGE_KEY]: true }, items => {
         enabled = items[STORAGE_KEY];

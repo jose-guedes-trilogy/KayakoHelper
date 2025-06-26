@@ -22,7 +22,6 @@ export function bootGeminiUploader(): void {
     (window as any).geminiUploaderHasBooted = true;
 
     if (location.hostname !== 'gemini.google.com') return;
-    console.log('[Kayako Helper] Gemini content-script booted');
 
     waitForWrapper().then(async (wrapper) => {
         if (wrapper.querySelector(`#${BTN_ID}`)) return;   // already injected
@@ -92,7 +91,6 @@ async function startUpload(): Promise<void> {
         for (const f of files) {
             const file = new File([f.buffer], f.name, { type: f.type });
             await uploadFileToGemini(file);
-            console.log('[attachments] Uploaded', f.name);
         }
         button.textContent = `Done ✔ (${files.length})`;
     } catch (e) {
@@ -146,80 +144,95 @@ export async function uploadFileToGemini(file: File): Promise<void> {
     const contrib = (await up.text()).trim();   // /contrib_service/ttl_1d/…
 
     /* 4. Tell Gemini via batchexecute */
-    await registerBlobViaBatch(contrib, feed, file);
+    await registerBlobViaBatch(contrib, file);
 }
 
 /** ───────────────   NEW: batchexecute RPC   ─────────────── */
 
 /** Registers the blob via /data/batchexecute using the LIVE session args */
+
+
 async function registerBlobViaBatch(
-    contrib: string,
-    feed: string,
+    contrib: string, // The "/contrib_service/..." string from the upload
     file: File,
 ): Promise<void> {
-    /* 0. fresh session args pulled from inline JSON */
-    const fSid  = findInDom(/"FdrFJe":"([^"]+)"/) ?? '';
-    const reqId = Number(findInDom(/"jZXiKc":(\d+)/) ?? '0');
+    /* 0. Get fresh session arguments from the page's inline JSON */
+    const fSid = findInDom(/"FdrFJe":"([^"]+)"/);
+    const atToken = findInDom(/"SNlM0e":"([^"]+)"/);
+    const blVersion = findInDom(/"cfb2h":"([^"]+)"/);
+    const reqId = Number(findInDom(/"yFnxrf":(\d+)/) ?? '0');
 
-    if (!fSid) throw new Error('f.sid not found in page source');
+    if (!fSid || !atToken || !blVersion) {
+        throw new Error('Could not find one of the required session tokens (f.sid, at, or bl) in the page source.');
+    }
 
-    const nextReqId = reqId + 100000;
+    const nextReqId = reqId + Math.floor(Math.random() * 100000);
 
-    /* ---------------- constants ---------------- */
-    const RPC_ID = 'akDabf';             // still attachment RPC (update if needed)
-    const bl     = findInDom(/"AmgiJf":"([^"]+)"/) ?? 'boq_bardchatui';
-    const xsrf   = findInDom(/"SNlM0e":"([^"]+)"/) ?? '';
+    // This RPC_ID is used to register uploaded files.
+    const RPC_ID = 'MaZiqc';
 
-    /* 1. query string */
+    /* 1. Construct the query string */
     const qs = new URLSearchParams({
         rpcids: RPC_ID,
         'source-path': '/app',
-        bl,
+        bl: blVersion,
         'f.sid': fSid,
         hl: 'en',
         _reqid: String(nextReqId),
-        'soc-app': '1',
-        'soc-platform': '1',
-        'soc-device': '1',
         rt: 'c',
-        at: xsrf,
     });
 
-    /* 2. f.req body */
+    /* 2. Construct the f.req body */
+    const fReqPayload = [
+        [
+            [
+                contrib,
+                [file.name, file.size, file.type, `C:\\fakepath\\${file.name}`]
+            ]
+        ]
+    ];
+
     const fReq = JSON.stringify([
         [
             [
                 RPC_ID,
-                JSON.stringify([
-                    null,
-                    contrib,
-                    feed,
-                    null,
-                    [file.type, file.size, file.name],
-                ]),
+                JSON.stringify(fReqPayload), // This is the corrected line
                 null,
                 'generic',
             ],
         ],
     ]);
 
-    const body = new URLSearchParams({ 'f.req': fReq });
+    const body = new URLSearchParams({
+        'f.req': fReq,
+        at: atToken,
+    });
 
-    /* 3. POST */
+    /* 3. Make the POST request */
     const res = await fetch(
-        'https://gemini.google.com/_/BardChatUi/data/batchexecute?' + qs,
+        'https://gemini.google.com/_/BardChatUi/data/batchexecute?' + qs.toString(),
         {
             method: 'POST',
             credentials: 'include',
             headers: {
-                'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                'x-same-domain': '1',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'X-Same-Domain': '1',
+                'Origin': 'https://gemini.google.com',
+                'Referer': 'https://gemini.google.com/app',
             },
             body: body.toString(),
         },
     );
 
-    if (!res.ok) throw new Error(`batchexecute ${res.status}`);
+    if (!res.ok) {
+        console.error('batchexecute request failed:', res.status, res.statusText);
+        const errorBody = await res.text();
+        console.error('Error response body:', errorBody);
+        throw new Error(`batchexecute request failed with status ${res.status}`);
+    }
+
+    const responseText = await res.text();
+    console.log('File registered successfully via batchexecute:', responseText);
 }
 
 

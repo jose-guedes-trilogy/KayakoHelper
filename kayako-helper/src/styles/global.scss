@@ -12,20 +12,44 @@
   border:1px solid hsl(47 8% 82% / 1);
   padding:5px 8px;
   cursor:pointer;
-  margin-left: 5px;
 
   &:hover {
     background: linear-gradient(180deg, hsl(0 0% 97% / 1), hsl(0 0% 93% / 1));
   }
 }
 
+#{sel.$twoPartBtnLeftHalf} {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+#{sel.$twoPartBtnRightHalf} {
+  border-radius: 0 4px 4px 0;
+}
+
 #{sel.$tabStripCustomButtonArea}
 {
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:16px;
   margin-left: 120px;
 }
+
+#{sel.$makeTabActiveButton} {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  background: #0a3;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: 13px/1 sans-serif;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+
 
 #{sel.$atlasHighlightHeader} {
   background: hsl(124 66% 80%);
@@ -61,31 +85,96 @@
 
 /* SEARCH ENHANCER */
 
+#{sel.$unifiedSearchInputFocused} {
+  border-color: hsl(193deg 48.76% 60.33%) !important;
+}
+
+#{sel.$unifiedSearchInputInline} {
+  background-color: hsl(204 14% 97% / 1) !important;
+  padding: 0 12px !important;
+}
 
 #{sel.$unifiedSearchOuterContainer} {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 #{sel.$unifiedSearchLowerContainer} {
-  min-height: 700px;
+  flex: 1 1 auto;           /* grow to the remaining height */
+  min-height: 0;            /* critical for Safari / older Chrome flexbugs */
+  display: flex;            /* we want two rows inside: results + “see more” */
 }
 
 #{sel.$unifiedSearchElementsParentId} {
-  padding: 10px 14px 22px;
+  padding: 10px 14px 20px;
 
   display: flex;
   flex-direction: column;
   gap: 12px;
+
+  border-bottom: 1px solid rgb(209, 213, 215);
 }
 
-#{sel.$unifiedSearchResultsList} {
-  overflow-y: scroll;
+/* RESULTS BLOCK (left column) ------------------------------------------- */
+#{sel.$unifiedSearchResultsListContainer} {
+  /* ↳ becomes a flex column with just two children:
+       1) the <ul> of hits   2) the “See more” footer                  */
+  flex: 1 1 auto;
+  min-height: 0;              /* <- critical: lets children shrink */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;           /* hide the fade-out overlay edges */
 }
+
+/* 1 ▸ the <ul> of hits */
+#{sel.$unifiedSearchResultsList} {
+  flex: 1 1 auto;             /* fill the leftover space, *no* fixed height */
+  min-height: 0;              /* flexbox bug-fix (Chrome/Safari)            */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: unset;
+}
+
+#{sel.$unifiedSearchResultsListInner} {
+  flex: 1 1 auto;             /* fill the leftover space, *no* fixed height */
+  min-height: 0;              /* flexbox bug-fix (Chrome/Safari)            */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;       /* keep last item clear of the fade-out strip  */
+}
+
+/* 2 ▸ the “See more in advanced search” bar */
+#{sel.$unifiedSearchResultsSeeMore} {
+  flex: 0 0 auto;             /* fixed-height row */
+  bottom: 0;
+  background: #fff;
+  box-shadow: 0 0 6px -2px rgb(0 0 0 / 18%);
+  z-index: 1;
+
+  border-top: 1px solid hsl(203deg 6.98% 76%);
+
+  > div {
+    height: 50px;
+
+    // button
+    > div {
+      background: white;
+
+      &:hover {
+        background: linear-gradient(-180deg, hsl(0deg 0% 98%) 0px, hsl(0 0% 95% / 1) 100%) hsl(0 0% 92% / 1);
+      }
+    }
+  }
+}
+
 
 /* keyword box */
 #{sel.$searchQueryInput} {
-  width: 100%;
-  border: 1px solid hsl(210 7% 74% / 1);
+  flex-grow: 1;
+  border: 1px solid hsl(203 31% 78% / 1);
   border-radius: 4px;
   font-size: 14px;
   box-sizing: border-box;
@@ -112,7 +201,7 @@
 
   height: 26px;
 
-  padding: 2px 8px;
+  padding: 2px 5px;
 }
 
 /* individual field */
@@ -127,12 +216,6 @@
   align-items: center;                      /* vertical alignment         */
   font-size: 13px;
   position: relative;
-
-  > :nth-child(n + 3) {
-    grid-column: 2;        /* force into the value column */
-    width: 100%;
-    min-width: 0;          /* allow them to shrink inside the grid */
-  }
 
   input {
     @include searchFieldMixin();
@@ -157,7 +240,7 @@
     min-width: 0;
   }
 
-  &.kh-field-dropdown::after {
+  &.kh-field-dropdown::after, .kh-date-select-wrapper::after {
     content: '▼';
     position: absolute;
     top: 50%;
@@ -168,6 +251,10 @@
     font-size: 12px;
     transition: transform 0.2s ease;
   }
+}
+
+.kh-date-select-wrapper {
+  position: relative;
 }
 
 #{sel.$searchLabel} {
@@ -228,6 +315,25 @@
   }
 }
 
+// Custom field
+#{sel.$searchEnhancerCustomField} {
+
+  > span {
+    grid-row-start: 1;
+    grid-row-end: 3;
+  }
+
+  > :nth-child(3) {
+    grid-column: 2;        /* force into the value column */
+    width: 100%;
+    min-width: 0;          /* allow them to shrink inside the grid */
+  }
+}
+
+#{sel.$searchEnhancerDateField} {
+
+}
+
 /* close button inside dropdown */
 #{sel.$searchDropdownCloseButton} {
   margin-top: 4px;
@@ -238,4 +344,173 @@
   cursor: pointer;
 }
 
+
+#{sel.$mergeTicketsModalContent} {
+  flex-grow: 1;
+  height: 100%;
+  margin: 40px 60px;
+}
+
+#{sel.$mergeTicketsModalContentInline} {
+  height: 100%;
+}
+
+#{sel.$mergeTicketsModalMain} {
+  > div {
+    height: 100%;
+  }
+}
+
+#{sel.$mergeTicketsSearchContainerInline} {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* END SEARCH ENHANCER */
+
+
+/* ── scroll-to-top button ──────────────────────────────────────────────── */
+#{sel.$scrollTopButton} {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  background: #fff;
+  border: 1px solid #D1D5D7;
+  border-radius: 4px;
+  cursor: pointer;
+
+  color: #838D94;
+}
+
+#{sel.$scrollTopButton} {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 8px;
+  line-height: 0.5;
+  transform: scaleY(1.15);
+
+  > span {
+    position: relative;
+    top: -1px;
+  }
+
+  &:hover > span {
+    color: #4EAFCB !important;
+  }
+
+}
+
+// Yellow when in a note
+#{sel.$timelineItemNote}  #{sel.$scrollTopButton} {
+  &:hover > span {
+    color: #E0AF2A !important;
+  }
+}
+
+#{sel.$copyPostButton}  {
+  border-left: 1px solid #D1D5D7;
+
+  &:hover {
+    svg {
+      fill: transparent !important;
+
+      path {
+        fill: transparent !important;
+        stroke: #4EAFCB !important;
+      }
+    }
+  }
+
+  svg {
+    pointer-events: none; /* keep tooltip focus behaviour consistent */
+  }
+}
+
+// Yellow when in a note
+#{sel.$timelineItemNote} #{sel.$copyPostButton} {
+  &:hover {
+    path {
+      fill: transparent !important;
+      stroke: #E0AF2A !important;
+    }
+  }
+}
+
+
+
+/* ===== Export Chat – button addons ===== */
+#{sel.$twoPartBtnChevron} {
+  margin-left: .35em;
+  user-select: none;
+}
+
+#{sel.$twoPartBtnDropdown} {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 9_999;
+  background: #fff;
+  border: 1px solid #ddd;
+  min-width: 200px;
+  padding: 4px 0;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+  display: none;          /* opened by TS on hover */
+}
+
+#{sel.$twoPartBtnDropdownItem},
+#{sel.$twoPartBtnDropdownSub} {
+  padding: 4px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover { background: #f2f2f2; }
+}
+
+#{sel.$twoPartBtnDropdownSub} {      /* second-level list */
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  min-width: 200px;
+  padding: 4px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+  display: none;                 /* opened by TS */
+}
+
+/* ===== Settings modal ===== */
+#{sel.$exportSettingsModal} {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, -20%);
+  width: 600px;
+  max-height: 80vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #888;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .20);
+  padding: 16px 20px 24px;
+  z-index: 3;
+  cursor: move;                   /* TS adds the drag listeners */
+}
+
+#{sel.$exportProviderWrapper} {
+  border: 1px solid #ddd;
+  margin-bottom: 12px;
+  padding: 8px;
+}
+
+#{sel.$exportUrlRow} {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+#{sel.$exportLabelInput}   { flex: 0 0 120px; }
+#{sel.$exportUrlInput}     { flex: 1; }

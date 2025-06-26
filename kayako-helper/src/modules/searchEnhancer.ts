@@ -2,8 +2,7 @@
  * src/modules/searchEnhancer.ts
  *
  * Kayako Helper – Search UI Enhancement
- *
- * ========================================================================== */
+ * ========================================================================= */
 
 import { EXTENSION_SELECTORS, KAYAKO_SELECTORS } from '@/generated/selectors';
 
@@ -24,9 +23,7 @@ const CL_DROP_TRIGGER         = EXTENSION_SELECTORS.searchDropTrigger.replace(/^
 const CL_DROPDOWN             = EXTENSION_SELECTORS.searchDropdown.replace(/^\./, '');
 const CL_CLOSE_BTN            = EXTENSION_SELECTORS.searchDropdownCloseButton.replace(/^\./, '');
 
-const UI_PARENT_ID            = EXTENSION_SELECTORS
-    .unifiedSearchElementsParentId
-    .replace(/^#/, '');
+const UI_PARENT_ID            = EXTENSION_SELECTORS.unifiedSearchElementsParentId.replace(/^#/, '');
 
 /* ----------  TYPES  ------------------------------------------------------ */
 type ModKey =
@@ -69,6 +66,10 @@ let originalInput : HTMLInputElement | null = null;
 let openDropdown  : HTMLElement | null      = null;
 const refs: Partial<Record<ModKey, HTMLElement>> = {};
 
+/* Re-entrancy guard – true while syncToOriginal is running,
+   so syncFromOriginal can ignore synthetic events it triggers. */
+let isSyncingToOriginal = false;
+
 /* ----------  ENTRY POINT  ------------------------------------------------ */
 export function bootSearchEnhancer(): void {
     new MutationObserver(injectUI).observe(document.body, { childList: true, subtree: true });
@@ -82,8 +83,15 @@ function injectUI(): void {
 
     /* keyword box */
     const queryLi      = document.createElement('div');
+
+    queryLi.style.display = 'flex';
+    queryLi.style.gap = '8px';
+    queryLi.style.alignItems = 'center';
+    queryLi.style.whiteSpace = 'nowrap';
+    queryLi.style.marginBottom = '4px';
+
     queryLi.innerHTML  =
-        `<input id="${QUERY_INPUT_ID}" class="${CL_QUERY_INPUT}" type="text" placeholder="Enter ONLY the keywords you'd like to search for">`;
+        `<span class="kh-enhanced-search-label">Search terms</span> <input id="${QUERY_INPUT_ID}" class="${CL_QUERY_INPUT}" type="text" placeholder="Enter the terms you'd like to search for">`;
 
     /* controls row */
     const controlsLi   = document.createElement('div');
@@ -227,7 +235,7 @@ function buildDropdown(
 
 function buildCustomField(): HTMLElement {
     const w = document.createElement('div');
-    w.className = CL_FIELD;
+    w.classList.add(CL_FIELD, EXTENSION_SELECTORS.searchEnhancerCustomField.replace(/^./, ''));
 
     w.append(buildLabel('Custom field'));
 
@@ -250,13 +258,27 @@ function buildCustomField(): HTMLElement {
     return w;
 }
 
-function buildDate(key: 'created' | 'updated') {
+function buildDate(key: 'created' | 'updated'): HTMLElement {
+    /* outer field container (same as before) */
     const w = document.createElement('div');
-    w.className = CL_FIELD;
+    w.classList.add(
+        CL_FIELD,
+        EXTENSION_SELECTORS.searchEnhancerDateField.replace(/^./, '')
+    );
 
+    /* label */
     const label = key === 'created' ? 'Creation date' : 'Update date';
     w.append(buildLabel(label));
 
+    /* --- NEW: wrap the two controls so they share the same grid cell ---- */
+    const wrap = document.createElement('div');
+    wrap.className = 'kh-date-wrap';
+    wrap.style.display = 'flex';
+    wrap.style.gap = '6px';
+    wrap.style.flex = '1 1 100%';
+    /* ------------------------------------------------------------------- */
+
+    /* operator select */
     const sel = document.createElement('select');
     OP_VALUES.forEach(o => {
         const opt = document.createElement('option');
@@ -265,11 +287,18 @@ function buildDate(key: 'created' | 'updated') {
         sel.append(opt);
     });
 
+    const selWrapper = document.createElement('div');
+    selWrapper.className = 'kh-date-select-wrapper';
+    selWrapper.append(sel);
+
+    /* date picker */
     const dt = document.createElement('input');
     dt.type = 'date';
 
     [sel, dt].forEach(el => el.addEventListener('change', syncToOriginal));
-    w.append(sel, dt);
+
+    wrap.append(selWrapper, dt);
+    w.append(wrap);
 
     refs[key] = w;
     return w;
@@ -278,6 +307,10 @@ function buildDate(key: 'created' | 'updated') {
 /* ----------  SYNC: helper ------------------------------------------------ */
 function syncToOriginal(): void {
     if (!originalInput) return;
+
+    /* ------------------------------------------------------------------ */
+    isSyncingToOriginal = true;      // <-- RE-ENTRANCY GUARD (begin)
+    /* ------------------------------------------------------------------ */
 
     const parts: string[] = [];
     const qBox = document.getElementById(QUERY_INPUT_ID)! as HTMLInputElement;
@@ -294,11 +327,14 @@ function syncToOriginal(): void {
         parts.push('(' + chosen.map(v => `in:${v}`).join(' OR ') + ')');
     }
 
-    /* simple text fields */
+    /* ---------- simple text fields (quotes omitted when value === "null") ---- */
     (['assignee','team','tag','subject','body','name','creator','organization'] as const)
         .forEach(k => {
             const val = (refs[k] as HTMLInputElement).value.trim();
-            if (val) parts.push(`${k}:"${val}"`);
+            if (val) {
+                const needsQuotes = val.toLowerCase() !== 'null';
+                parts.push(`${k}:${needsQuotes ? `"${val}"` : val}`);
+            }
         });
 
     /* dropdowns */
@@ -323,10 +359,18 @@ function syncToOriginal(): void {
     originalInput.value = parts.join(' ').trim();
     originalInput.dispatchEvent(new Event('input',  { bubbles: true }));
     originalInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ' }));
+
+    /* ------------------------------------------------------------------ */
+    /* Let the events we just dispatched propagate, *then* drop the guard */
+    setTimeout(() => { isSyncingToOriginal = false; }, 0);
+    /* ------------------------------------------------------------------ */
 }
 
 function syncFromOriginal(): void {
-    if (!originalInput) return;
+    /* If this was triggered by syncToOriginal we ignore it,
+       so the user’s caret/spacing isn’t disturbed. */
+    if (isSyncingToOriginal || !originalInput) return;
+
     const raw = originalInput.value;
 
     const parsed: ParsedQuery = {};
@@ -334,11 +378,11 @@ function syncFromOriginal(): void {
     /* in */
     parsed.in = [...raw.matchAll(/\bin:([^\s()]+)/gi)].map(m => m[1]);
 
-    /* simple text */
+    /* -------- simple text (accepts both quoted and un-quoted null) -------- */
     (['assignee','team','tag','subject','body','name','creator','organization'] as const)
         .forEach(k => {
-            const m = raw.match(new RegExp(`\\b${k}:"([^"]*)"`, 'i'));
-            if (m) parsed[k] = m[1];
+            const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|(null))`, 'i'));
+            if (m) parsed[k] = (m[1] ?? m[2])!;
         });
 
     /* dropdowns */
@@ -364,11 +408,11 @@ function syncFromOriginal(): void {
     const qBox = document.getElementById(QUERY_INPUT_ID)! as HTMLInputElement;
     let kw = raw
         .replace(/\bin:[^\s()]+/gi, '')
-        .replace(/\b(?:assignee|team|tag|subject|body|name|creator|organization):"[^"]*"/gi, '')
+        .replace(/\b(?:assignee|team|tag|subject|body|name|creator|organization):(?:"[^"]*"|null)/gi, '')
         .replace(/\b(?:status|priority):[^\s"]+/gi, '')
         .replace(/\b(?:created|updated)(?:[:<>])\d{4}-\d{2}-\d{2}/gi, '');
 
-    /* --------- NEW: strip current custom-field pair from kw ---------------- */
+    /* --------- strip current custom-field pair from kw -------------------- */
     if (parsed.custom_key) {
         const esc = parsed.custom_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         kw = kw.replace(new RegExp(`\\b${esc}:"[^"]*"`, 'gi'), '');

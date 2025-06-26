@@ -1,11 +1,12 @@
 /* ===========================================================================
  * src/modules/buttons/sendToQC.ts
  *
- *  Kayako Helper – “Send to QC” Button (v1.1)
+ *  Kayako Helper – “Send to QC” Button (v1.3)
+ *  – v1.3  Convert h1/h2→h3 and bold all h3
  * ---------------------------------------------------------------------------
  *  • Adds a tab-strip button that automates the full “QC pending” workflow:
  *      1. Reads the clipboard (preferring rich HTML).
- *      2. Normalises <p>→<div> so newline-spacer recognises them.
+ *      2. Normalises <p>→<div>, removes <hr>, converts h1/h2→h3, bolds h3.
  *      3. Wraps it in the required template (preserving formatting).
  *      4. Injects the result into the current reply editor.
  *      5. Runs the “Add newlines” helper.
@@ -22,7 +23,7 @@ import {
 import { registerTabButton } from '@/utils/tabButtonManager';
 import { isConvPage }        from '@/utils/location.js';
 import { addNewlines }       from '@/modules/newlineSpacer';
-import {applySize} from "@/modules/replyResizer";
+import { applySize }         from '@/modules/replyResizer';
 
 /* ------------------------------------------------------------------ */
 /* Constants & UI state                                               */
@@ -76,8 +77,8 @@ export function bootSendToQcButton(): void {
             /* 1 · Grab the clipboard (prefer rich HTML) */
             const clipHtml = await readClipboardHtml();
 
-            /* 2 · Build the template (incl. <p>→<div> normalisation) */
-            const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, " ");
+            /* 2 · Build the template (normalise & clean) */
+            const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, ' ');
 
             /* 3 · Inject into the active Froala editor */
             const editor = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
@@ -140,7 +141,7 @@ async function readClipboardHtml(): Promise<string> {
 /* Template & normalisation                                           */
 /* ------------------------------------------------------------------ */
 
-/** Converts every <p>→<div> inside the fragment (attributes kept). */
+/** Normalises p→div, strips data-* & <hr>, converts h1/h2→h3 and bolds h3. */
 function normalizeParagraphs(fragment: string): string {
     const tmp = document.createElement('div');
     tmp.innerHTML = fragment;
@@ -148,13 +149,10 @@ function normalizeParagraphs(fragment: string): string {
     /* 1 ─ Replace <p> with <div>, but **only if the <p> is not inside an <li>** */
     tmp.querySelectorAll('p').forEach(p => {
         if (p.closest('li')) {
-            /* unwrap so the <li> contains inline flow, not a block */
-            p.replaceWith(...Array.from(p.childNodes));
+            p.replaceWith(...Array.from(p.childNodes));   // unwrap for inline flow
             return;
         }
-
         const div = document.createElement('div');
-        /* copy all attrs except data-* */
         Array.from(p.attributes).forEach(attr => {
             if (!attr.name.startsWith('data-')) div.setAttribute(attr.name, attr.value);
         });
@@ -162,21 +160,37 @@ function normalizeParagraphs(fragment: string): string {
         p.replaceWith(div);
     });
 
-    /* 2 ─ Strip data-* attributes everywhere (unchanged) */
+    /* 1b ─ Convert <h1> & <h2> → <h3> (attrs kept, data-* stripped later) */
+    tmp.querySelectorAll('h1,h2').forEach(h => {
+        const h3 = document.createElement('h3');
+        Array.from(h.attributes).forEach(attr => {
+            if (!attr.name.startsWith('data-')) h3.setAttribute(attr.name, attr.value);
+        });
+        h3.innerHTML = h.innerHTML;
+        h.replaceWith(h3);
+    });
+
+    /* 1c ─ Wrap every <h3> content in <strong> to force bold */
+    tmp.querySelectorAll('h3').forEach(h3 => {
+        h3.innerHTML = `<strong>${h3.innerHTML}</strong>`;
+    });
+
+    /* 2 ─ Strip data-* attributes everywhere */
     tmp.querySelectorAll('*').forEach(el =>
         Array.from(el.attributes).forEach(attr => {
             if (attr.name.startsWith('data-')) el.removeAttribute(attr.name);
         }),
     );
 
-    /* 3 ─ Remove whitespace-only text nodes sitting between elements        */
+    /* 2b ─ Remove all <hr> elements */
+    tmp.querySelectorAll('hr').forEach(hr => hr.remove());
+
+    /* 3 ─ Remove whitespace-only text nodes sitting between elements */
     const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
     const toRemove: Text[] = [];
-
     let node: Text | null;
     while ((node = walker.nextNode() as Text | null)) {
         if (!node.data.trim()) {
-            /* keep meaningful whitespace inside pre|code|textarea */
             const parentName = node.parentElement?.tagName.toLowerCase();
             if (parentName && /^(pre|code|textarea)$/.test(parentName)) continue;
             toRemove.push(node);
@@ -186,9 +200,6 @@ function normalizeParagraphs(fragment: string): string {
 
     return tmp.innerHTML;
 }
-
-
-
 
 function buildTemplate(clip: string): string {
     const body = normalizeParagraphs(clip || '<i>(clipboard empty)</i>');
@@ -242,19 +253,10 @@ async function addTag(tag: string): Promise<void> {
     );
     if (!input) throw new Error('Tag input not found');
 
-    /* 1 • Type the tag text */
     input.focus();
     input.value = tag;
     input.dispatchEvent(new Event('input', { bubbles: true }));
-
-    /* 2 • Wait one frame so Ember sees the value */
     await new Promise(r => requestAnimationFrame(r));
-
-    /* 3 • Simulate a genuine <Enter> key press */
     simulateEnter(input);
-
-    /* 4 • Give Ember a micro-tick to create the pill */
     await new Promise(r => setTimeout(r));
 }
-
-export default bootSendToQcButton;

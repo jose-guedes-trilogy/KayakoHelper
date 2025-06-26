@@ -1,3 +1,5 @@
+// src/selectors/selectors.jsonc
+
 {
   "kayako": {
     "tabStrip": "[class^=ko-tab-strip__tabs_]",
@@ -24,12 +26,17 @@
 
     "messageOrNote": ".message-or-note",
 
+    "timelineItemActionButtonsWrapper": "[class*=ko-timeline-2_list_item__menu-wrapper_]",
+    "feedItemMenu": ".ko-feed_item_menu",
+
     "timelineItem": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_], [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_] .attachment-container-flap-hide",
+    "timelineItemContent": "[class*=ko-timeline-2_list_item__body_]",
     "timelineItemDate": "[class*=ko-timeline-2_list_item__side-time_]",
     "timelineItemInner": "[class*=ko-timeline-2_list_item__item_]",
     "timelineItemHover": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover, [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover .attachment-container-flap-hide",
+    "timelineItemStatusIcon": "[class*=ko-timeline-2_list_item_status__icon_]",
 
-    "timelineItemNote": "[class*=ko-timeline-2_list_item__note]",
+    "timelineItemNote": "[class*=ko-timeline-2_list_item__note_]",
 
     "timelineItemAttachment": "[class*=ko-timeline-2_list_item_attachment__attachment_]",
 
@@ -63,6 +70,7 @@
     "sendButtonReplyRightSection": "[class*=ko-case-content__send-and-set-trigger_]",
 
     "sendButtonNote": "[class*=ko-button__primary-with-options_][class*=ko-button__note_]",
+    "sendButtonNoteLoadingAfter": "[class*=ko-button__note_] [class*=ko-button__loading_]::after",
     "sendButtonNoteRightSection": "[class*=ko-case-content__send-and-set-trigger_][class*=ko-case-content__note-trigger_]",
 
     "customFieldContainer": "[class*=ko-info-bar_field_select_trigger__header_]",
@@ -82,6 +90,8 @@
     "timelineJumpOuterContainer": "[class*=ko-timeline-2_jump-bar__jump_]",
     "timelineJumpCloseButtonContainer": "[class*=ko-timeline-2_jump-bar__mark-as-seen_]",
     "timelineJumpCloseButton": "[class*=ko-timeline-2_jump-bar__mark-as-seen-action_]",
+    "timelineItemUserRole": "[class*=ko-timeline-2_list_item__role_]",
+    "timelineItemEmailInfoChevron": "[class*=ko-timeline-2_list_item_email-info-inline__details-chevron_]",
 
     "daySeparatorText": "[class*=ko-timeline-2_list_days__day-separator__text_]",
     "daySeparatorBorder": "[class*=ko-timeline-2_list_days__day-separator_]::before",
@@ -100,7 +110,10 @@
     "inboxTicketCountConversationsView": "[class*=ko-cases-list_sidebar_item__inbox_]",
     "inboxTicketCountConversationsViewAllViews": "[class*=ko-cases-list_sidebar_item__counter_]",
 
-    "leftMenuSVGs": "[class*=session__left-navigation-section_] a > svg",
+    "searchResultsPageSideBarItemCounter": "[class*=ko-search-sidebar_item__counter_]",
+
+    "leftMenuLinks": "[class*=session__left-navigation-section_] > a",
+    "leftMenuNotificationBadge": "[class*=session__left-navigation-item_]",
 
     "fromEmailSelector": "[class*=ember-power-select-options]",
 
@@ -117,6 +130,7 @@
 
     "submitPropertiesButtonContainer": "[class*=ko-case-content__submit-properties_]",
     "submitPropertiesButton": "[class*=ko-case-content__submit-properties_] [class*=ko-button__primary_]",
+    "submitPropertiesButtonLoadingAfter": "[class*=ko-button__loading_]:not([class*=ko-button__note_]):after",
 
     "cancelPropertiesButton": "[class*=ko-case-content__cancel-property-changes_]",
 
@@ -125,8 +139,20 @@
 
     "unifiedSearchOuterContainer": "[class*=ko-universal-search__containerAbsolute_]",
     "unifiedSearchLowerContainer": "[class*=ko-universal-search__content-absolute_]",
-    "unifiedSearchOriginalInput": "[class*=ko-universal-search__input_][type=search]",
+    "unifiedSearchOriginalInput": "[class*=ko-universal-search__input][type=search]",
+    "unifiedSearchResultsListContainer": "[class*=ko-universal-search__results_]",
     "unifiedSearchResultsList": "[class*=ko-universal-search__results-list_]",
+    "unifiedSearchResultsListInner": "[class*=ko-universal-search__list_]",
+    "unifiedSearchResultsSeeMore": "[class*=ko-universal-search_result-see-more__seeMore_]",
+
+    "unifiedSearchInputInline": "[class*=ko-universal-search__input-inline_]",
+    "unifiedSearchInputFocused": "[class*=ko-universal-search__input-focused_]",
+
+    "mergeTicketsSearchContainerInline": "[class*=ko-universal-search__containerInline_]",
+    "mergeTicketsModalContent": "[class*=ko-modal__content_]",
+    "mergeTicketsModalContentInline": "[class*=ko-universal-search__content-inline_]",
+    "mergeTicketsModalMain": "[class*=ko-modal__main_]",
+
 
     "ticketsListHeader": "[class*=ko-cases-list__heading_]",
     "ticketsTable": "[class*=ko-cases-list__container_] table",
@@ -138,16 +164,28 @@
 
   },
 
-
   "extension": {
     "defaultButtonClass": ".kh-default-button",
 
     "tabStripCustomButtonArea": "#kh-tab-strip-custom-btn-area",
 
+    "makeTabActiveButton": "#kh-make-tab-active-btn",
+
+    "scrollTopButton": ".kh-scroll-top-btn",
+    "copyPostButton": ".kh-copy-post-btn",
+
     "createFolderButton": "#kh-create-folder-btn",
     "copyChatButton": "#kh-copy-chat-btn",
     "newLinesButton": "#kh-newlines-btn",
     "sendToQcButton": "#kh-send-to-qc-btn",
+
+    "twoPartBtnLeftHalf"         : ".kh-two-part-btn-left-half",         // left half of the new split “Export” control
+    "twoPartBtnRightHalf"         : ".kh-two-part-btn-right-half",     // right (▼) half of the new split control
+    "twoPartBtnParentElement"       : ".kh-two-part-btn-parent",          // parent of the ⬅btn + ▾btn,
+    "twoPartBtnChevron"           : ".kh-export-chevron",
+    "twoPartBtnDropdown"          : ".kh-export-dropdown",
+    "twoPartBtnDropdownItem"      : ".kh-export-dropdown-item",
+    "twoPartBtnDropdownSub"       : ".kh-export-dropdown-sub",
 
     "atlasHighlightHeader": ".kh-atlas-highlight-header",
     "atlasHighlightBody": ".kh-atlas-highlight-body",
@@ -164,6 +202,41 @@
     "searchTextInput"            : ".kh-enhanced-search-text-input",
     "searchDropTrigger"          : ".kh-enhanced-search-drop-trigger",
     "searchDropdown"             : ".kh-enhanced-search-dropdown",
-    "searchDropdownCloseButton"  : ".kh-enhanced-search-close-btn"
+    "searchDropdownCloseButton"  : ".kh-enhanced-search-close-btn",
+
+    "searchEnhancerCustomField" : ".kh-search-enhancer-custom-field",
+    "searchEnhancerDateField"    : ".kh-search-enhancer-date-field",
+
+    /* ─ Settings modal ──────────────────────────────────── */
+    "exportSettingsModal"     : "#kh-export-settings-modal",
+    "exportSettingsClose"     : "#kh-exp-close",
+    "exportSettingsContent"   : "#kh-exp-content",
+    "exportAddProviderBtn"    : "#kh-exp-add-prov",
+
+    /* provider block */
+    "exportProviderWrapper"   : ".kh-exp-provider-wrap",
+    "exportAddUrlBtn"         : ".kh-exp-add-url",
+    "exportDelProvBtn"        : ".kh-exp-del-prov",
+    "exportUrlList"           : ".kh-exp-url-list",
+
+    /* URL row */
+    "exportUrlRow"            : ".kh-exp-url-row",
+    "exportLabelInput"        : ".kh-exp-label",
+    "exportUrlInput"          : ".kh-exp-url",
+    "exportPromptInput"       : ".kh-exp-prompt",
+    "exportInserterChk"       : ".kh-exp-ins",
+    "exportDefaultRadio"      : ".kh-exp-def",
+    "exportDelUrlBtn"         : ".kh-exp-del-url",
+
+    /* modal header + footer */
+    "exportSettingsHeader"    : ".kh-exp-header",
+    "exportSettingsFooter"    : ".kh-exp-footer",
+
+    /* per‑URL “make default” button */
+    "exportSetDefaultUrlBtn"  : ".kh-exp-set-default-url",
+
+
+    "exportUrlMode"         : ".kh-exp-mode",            // per‑URL “New / Active tab” selector
+    "noActiveTabNotice"     : ".kh-no-active-tab"        // tiny warning when no active tab exists
   }
 }
