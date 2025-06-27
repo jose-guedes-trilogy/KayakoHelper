@@ -20,7 +20,7 @@
 import {
     KAYAKO_SELECTORS,
     EXTENSION_SELECTORS,
-} from '@/generated/selectors';
+} from '@/generated/selectors.ts';
 
 const BTN_ID             = EXTENSION_SELECTORS.newLinesButton;
 const BLOCK_SELECTOR     = 'DIV,OL,UL';

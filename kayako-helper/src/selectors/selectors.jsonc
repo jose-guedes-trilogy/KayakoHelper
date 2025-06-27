@@ -178,14 +178,16 @@
     "copyChatButton": "#kh-copy-chat-btn",
     "newLinesButton": "#kh-newlines-btn",
     "sendToQcButton": "#kh-send-to-qc-btn",
+    "exportChatButton": "#kh-export-chat-btn",
+    "exportChatButtonRight": "#kh-export-chat-btn-right",
 
     "twoPartBtnLeftHalf"         : ".kh-two-part-btn-left-half",         // left half of the new split “Export” control
     "twoPartBtnRightHalf"         : ".kh-two-part-btn-right-half",     // right (▼) half of the new split control
     "twoPartBtnParentElement"       : ".kh-two-part-btn-parent",          // parent of the ⬅btn + ▾btn,
-    "twoPartBtnChevron"           : ".kh-export-chevron",
-    "twoPartBtnDropdown"          : ".kh-export-dropdown",
-    "twoPartBtnDropdownItem"      : ".kh-export-dropdown-item",
-    "twoPartBtnDropdownSub"       : ".kh-export-dropdown-sub",
+    "twoPartBtnChevron"           : ".kh-two-part-btn-chevron",
+    "twoPartBtnDropdown"          : ".kh-two-part-btn-dropdown",
+    "twoPartBtnDropdownItem"      : ".kh-two-part-btn-dropdown-item",
+    "twoPartBtnDropdownSub"       : ".kh-two-part-btn-dropdown-sub",
 
     "atlasHighlightHeader": ".kh-atlas-highlight-header",
     "atlasHighlightBody": ".kh-atlas-highlight-body",

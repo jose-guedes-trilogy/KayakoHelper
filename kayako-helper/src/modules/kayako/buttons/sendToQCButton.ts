@@ -1,5 +1,5 @@
 /* ===========================================================================
- * src/modules/buttons/sendToQC.ts
+ * src/modules/buttons/sendToQCButton.ts
  *
  *  Kayako Helper – “Send to QC” Button (v1.3)
  *  – v1.3  Convert h1/h2→h3 and bold all h3
@@ -18,12 +18,12 @@
 import {
     EXTENSION_SELECTORS,
     KAYAKO_SELECTORS,
-} from '@/generated/selectors';
+} from '@/generated/selectors.ts';
 
-import { registerTabButton } from '@/utils/tabButtonManager';
+import { registerTabButton } from '@/utils/tabButtonManager.ts';
 import { isConvPage }        from '@/utils/location.js';
-import { addNewlines }       from '@/modules/newlineSpacer';
-import { applySize }         from '@/modules/replyResizer';
+import { addNewlines }       from '@/modules/kayako/newlineSpacer.ts';
+import { applySize }         from '@/modules/kayako/replyResizer.ts';
 
 /* ------------------------------------------------------------------ */
 /* Constants & UI state                                               */

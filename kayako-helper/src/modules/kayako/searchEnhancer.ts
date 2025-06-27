@@ -4,7 +4,7 @@
  * Kayako Helper – Search UI Enhancement
  * ========================================================================= */
 
-import { EXTENSION_SELECTORS, KAYAKO_SELECTORS } from '@/generated/selectors';
+import { EXTENSION_SELECTORS, KAYAKO_SELECTORS } from '@/generated/selectors.ts';
 
 /* ----------  CONSTANTS  -------------------------------------------------- */
 const ORIGINAL_INPUT_SELECTOR = KAYAKO_SELECTORS.unifiedSearchOriginalInput;

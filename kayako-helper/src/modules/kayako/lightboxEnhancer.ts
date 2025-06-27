@@ -2,7 +2,7 @@
 
 import {
     KAYAKO_SELECTORS,
-} from '@/generated/selectors';
+} from '@/generated/selectors.ts';
 
 const BTN_CLASS = 'ktx-lightbox-btn';
 

@@ -2,24 +2,24 @@
    – Bootstraps individual features; contains no feature code itself
 */
 import '@/styles/global.scss';
-import '@/modules/styleManager'
+import '@/modules/kayako/styleManager.ts'
 
 import { setUpUI }                  from '@/utils/setUpUI';
 
-import { bootCopyChatButton }       from '@/modules/copy-chat/copyChatButton.ts';
-import { bootAtlasHighlighter }     from '@/modules/atlasHighlighter.js';
-import { bootLightboxEnhancer }     from '@/modules/lightboxEnhancer.js';
-import { bootReplyResizer }         from '@/modules/replyResizer.js';
-import { bootDownloadManager }      from '@/modules/download-manager/downloadManager';
-import { bootReplyTracker }         from '@/modules/replyTracker';
-import { bootTrainingMode }         from '@/modules/trainingMode';
-import { bootNewlineSpacer }        from '@/modules/newlineSpacer';
-import { bootSearchEnhancer }       from '@/modules/searchEnhancer';
-import { bootCopyTicketURL }        from "@/modules/copyTicketURL";
-import { bootSendToQcButton }       from "@/modules/buttons/sendToQC";
-import { bootExtraPostButtons }     from "@/modules/extraPostButtons";
-import { bootTagCleaner }           from "@/modules/ui-clean-up/tagCleaner";
-import { bootExportChatButton }     from "@/modules/export-chat/exportChatButton";
+import { bootCopyChatButton }       from '@/modules/kayako/buttons/copy-chat/copyChatButton.ts';
+import { bootAtlasHighlighter }     from '@/modules/kayako/atlasHighlighter.js';
+import { bootLightboxEnhancer }     from '@/modules/kayako/lightboxEnhancer.js';
+import { bootReplyResizer }         from '@/modules/kayako/replyResizer.js';
+import { bootDownloadManager }      from '@/modules/kayako/download-manager/downloadManager';
+import { bootReplyTracker }         from '@/modules/kayako/replyTracker.ts';
+import { bootTrainingMode }         from '@/modules/kayako/trainingMode.ts';
+import { bootNewlineSpacer }        from '@/modules/kayako/newlineSpacer.ts';
+import { bootSearchEnhancer }       from '@/modules/kayako/searchEnhancer.ts';
+import { bootCopyTicketURL }        from "@/modules/kayako/copyTicketURL.ts";
+import { bootSendToQcButton }       from "@/modules/kayako/buttons/sendToQCButton.ts";
+import { bootExtraPostButtons }     from "@/modules/kayako/extraPostButtons.ts";
+import { bootTagCleaner }           from "@/modules/kayako/ui-clean-up/tagCleaner";
+import { bootExportChatButton }     from "@/modules/kayako/buttons/export-chat/exportChatButton.ts";
 
 /* ---------- Global UI ---------- */
 setUpUI();

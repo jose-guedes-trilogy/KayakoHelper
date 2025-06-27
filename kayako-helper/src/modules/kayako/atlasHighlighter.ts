@@ -3,8 +3,8 @@
 import {
     KAYAKO_SELECTORS,
     EXTENSION_SELECTORS,
-} from '@/generated/selectors';
-import { currentConvId }     from '@/utils/location';   // <- new util
+} from '@/generated/selectors.ts';
+import { currentConvId }     from '@/utils/location.ts';   // <- new util
 
 /* ------------------------------------------------------------------ */
 /*  Module-scope state                                                */

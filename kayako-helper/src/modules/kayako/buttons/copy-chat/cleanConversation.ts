@@ -2,11 +2,12 @@
 
 /* turn Kayako “post” array ➜ readable chat transcript
    – chronological (oldest → newest)
-   – includes Product name extracted from the info‑bar
+   – includes Product name extracted from the info-bar
+   – includes Ticket ID extracted from the current URL
    – each line: timestamp, author, role, kind (Reply / Note)
    – posts separated by a clear divider                               */
 
-import {KAYAKO_SELECTORS} from "@/generated/selectors";
+import {KAYAKO_SELECTORS} from "@/generated/selectors.ts";
 
 const SEPARATOR = '\n[——— Post separator ———]\n';
 
@@ -50,7 +51,7 @@ function kindLabel(post: Post): 'NOTE' | 'REPLY' {
 }
 
 /* ------------------------------------------------------------------ */
-/** Attempt to read the “Product” field that lives in the info‑bar */
+/** Attempt to read the “Product” field that lives in the info-bar */
 function detectProduct(): string {
     try {
         // Each trigger container holds the header + placeholder/input
@@ -91,8 +92,23 @@ function detectProduct(): string {
 }
 
 /* ------------------------------------------------------------------ */
+/** Extract the ticket ID from the current URL */
+function detectTicketId(): string {
+    try {
+        const match = window.location.pathname.match(/\/conversations\/(\d+)/);
+        return match ? match[1] : 'Unknown ID';
+    } catch (err) {
+        console.error('[cleanConversation] detectTicketId failed', err);
+        return 'Unknown ID';
+    }
+}
+
+/* ------------------------------------------------------------------ */
 export function cleanConversation(posts: Post[]): string {
-    const productLine = `Product: ${detectProduct()}`;
+    const ticketID  = `Ticket ID: ${detectTicketId()}`;
+    const ticketProduct = `Product: ${detectProduct()}`;
+
+    const ticketInformation = `${ticketID} - ${ticketProduct}`;
 
     const lines = posts
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -110,5 +126,5 @@ export function cleanConversation(posts: Post[]): string {
             return `[${ts}] ${who} (${role}, ${kind}):\n${body}`;
         });
 
-    return [productLine, ...lines].join(SEPARATOR);
+    return [ticketInformation,  ...lines].join(SEPARATOR);
 }

@@ -14,11 +14,16 @@ export interface UrlEntry {
     mode?: 'new-tab' | 'active-tab';
 }
 
+/** A chat‑export provider (e.g. ChatGPT, Gemini …) */
 export interface Provider {
     id: string;
     name: string;
     urls: UrlEntry[];
     defaultUrlId: string | null;
+
+    /** `true` ⇒ user‑added, can hold many URLs
+     *  `false`/`undefined` ⇒ built‑in single‑URL provider */
+    multi?: boolean;              //  ← NEW
 }
 
 export interface Store {
@@ -42,13 +47,18 @@ const DEFAULTS: Store = {
 };
 
 function makeDefault(id: string, name: string): Provider {
-    return { id, name, urls: [], defaultUrlId: null };
+    /* built‑ins are single‑URL (“multi” = false) */
+    return { id, name, urls: [], defaultUrlId: null, multi: false };   // ← CHANGED
 }
 
 /** normalises optional fields added over time (forward‑compat) */
 export function normalizeStore(s: Store): Store {
-    for (const p of s.providers) for (const u of p.urls)
-        if (!u.mode) u.mode = 'new-tab';
+    for (const p of s.providers) {
+        /* add fields that may be missing in configs saved by older versions */
+        if (p.multi === undefined) p.multi = true;                     // ← NEW
+        for (const u of p.urls)
+            if (!u.mode) u.mode = 'new-tab';
+    }
     return s;
 }
 

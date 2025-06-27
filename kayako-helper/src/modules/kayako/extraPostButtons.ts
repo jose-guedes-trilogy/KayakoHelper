@@ -2,7 +2,7 @@
  * Kayako Helper – “Scroll-to-Top” & “Copy Post” buttons
  * ========================================================================= */
 
-import { KAYAKO_SELECTORS, EXTENSION_SELECTORS } from '@/generated/selectors';
+import { KAYAKO_SELECTORS, EXTENSION_SELECTORS } from '@/generated/selectors.ts';
 
 /* ----------  SELECTORS  -------------------------------------------------- */
 

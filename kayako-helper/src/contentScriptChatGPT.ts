@@ -1,14 +1,19 @@
-/* src/contentScriptChatGPT.ts */
-
-import {initMakeTabActiveButton} from '@/modules/activeTabButton';
-
-/* ===========================================================================
- * contentScriptChatGPT.ts – v1.0
- * Shows “Make Active” when visiting chat.openai.com so the tab can be set as
- * the target for “active-tab” exports without running an export first.
- * ---------------------------------------------------------------------------
+/* ========================================================================
+ * contentScriptChatGPT.ts – v1.1
+ * Injects the “Make Active” button when you visit chat.openai.com
+ * without requiring an export to run first.
+ * ------------------------------------------------------------------------
  */
 
 (async () => {
-    await initMakeTabActiveButton(() => location.hostname.endsWith('chat.openai.com'));
+    /* Skip everything unless we’re on ChatGPT */
+    if (!location.hostname.endsWith('chat.openai.com')) return;
+
+    /* Dynamically pull in the helper chunk (classic-script-safe) */
+    const { initMakeTabActiveButton } = await import(
+        /* @vite-ignore */ chrome.runtime.getURL('dist/activeTabButton.js')
+        );
+
+    /* Boot the button – predicate already satisfied above */
+    await initMakeTabActiveButton(() => true);
 })();

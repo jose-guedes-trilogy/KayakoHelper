@@ -25,6 +25,12 @@
 
 #{sel.$twoPartBtnRightHalf} {
   border-radius: 0 4px 4px 0;
+
+  padding: 0 4px 0 2px;
+
+  > #{sel.$twoPartBtnChevron} {
+    transform: scaleY(0.75);
+  }
 }
 
 #{sel.$tabStripCustomButtonArea}
@@ -444,31 +450,49 @@
 
 /* ===== Export Chat – button addons ===== */
 #{sel.$twoPartBtnChevron} {
-  margin-left: .35em;
   user-select: none;
+
+  font-size: 20px;
 }
 
 #{sel.$twoPartBtnDropdown} {
   position: absolute;
   top: 100%;
   left: 0;
-  z-index: 9_999;
+  z-index: 3;
   background: #fff;
+
   border: 1px solid #ddd;
-  min-width: 200px;
+  border-radius: 5px;
+
   padding: 4px 0;
-  font-size: 13px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
   display: none;          /* opened by TS on hover */
+  text-align: left;
+
+  flex-direction: column;
+  gap: 8px;
+
+  min-width: 102px;
+
+  font-size: 14px;
 }
 
 #{sel.$twoPartBtnDropdownItem},
 #{sel.$twoPartBtnDropdownSub} {
-  padding: 4px 12px;
+  padding: 8px 10px;
   white-space: nowrap;
   cursor: pointer;
 
+  border-radius: 5px;
+
   &:hover { background: #f2f2f2; }
+}
+
+#{sel.$twoPartBtnDropdownItem} {
+  #{sel.$twoPartBtnChevron} {
+    transform: scaleX(0.75);
+  }
 }
 
 #{sel.$twoPartBtnDropdownSub} {      /* second-level list */
@@ -478,9 +502,12 @@
   background: #fff;
   border: 1px solid #ddd;
   min-width: 200px;
-  padding: 4px 0;
+  padding: 8px 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
   display: none;                 /* opened by TS */
+
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ===== Settings modal ===== */
@@ -497,7 +524,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, .20);
   padding: 16px 20px 24px;
   z-index: 3;
-  cursor: move;                   /* TS adds the drag listeners */
+  //cursor: move;                   /* TS adds the drag listeners */
 }
 
 #{sel.$exportProviderWrapper} {

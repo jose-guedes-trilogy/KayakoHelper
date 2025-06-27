@@ -1,36 +1,68 @@
-<!-- popup.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>Kayako Helper</title>
+
     <style>
-        body { font-family: sans-serif; padding: 10px; }
-        .section { margin-bottom: 1em; }
-        label { display: block; margin-bottom: 4px; }
+        body      { font-family: system-ui, sans-serif; margin: 0; width: 22rem; }
+        nav       { display: flex; border-bottom: 1px solid #ddd; }
+        nav button{
+            flex: 1; padding: .6rem 0; border: 0; background:#f8f8f8;
+            font-weight:600; cursor:pointer;
+        }
+        nav button.active { background:#fff; border-bottom:2px solid dodgerblue; }
+
+        section   { display:none; padding:1rem; }
+        section.active   { display:block; }
+
+        .setting  { margin-bottom: .8rem; }
+        label     { user-select:none; }
     </style>
 </head>
 <body>
-<div class="section">
-    <label>
-        <input type="checkbox" id="trainingModeCheckbox" />
-        Training mode (warn before sending public replies)
-    </label>
-    <!-- NEW ─────────────────────────────────────────────────────────── -->
-    <label>
-        <input type="checkbox" id="allStylesCheckbox" />
-        Toggle styles      <!-- wording as you like -->
-    </label>
-    <!-- ──────────────────────────────────────────────────────────────── -->
-</div>
 
-<div class="section">
-    <h4>This ticket:</h4>
-    <div>Subject: <span id="subject">-</span></div>
-    <div>Requester: <span id="requesterName">-</span> &lt;<span id="requesterEmail">-</span>&gt;</div>
-    <div>Replies sent: <span id="replyCount">0</span></div>
-</div>
+<!-- ─── tab bar ───────────────────────────────────────────────────── -->
+<nav>
+    <button class="tab active" data-tab="main">Main</button>
+    <button class="tab"        data-tab="settings">Settings</button>
+</nav>
+
+<!-- ─── MAIN (placeholder) ────────────────────────────────────────── -->
+<section id="tab-main" class="active">
+    <p>(Future features will live here.)</p>
+</section>
+
+<!-- ─── SETTINGS ──────────────────────────────────────────────────── -->
+<section id="tab-settings">
+    <div class="setting">
+        <label>
+            <input type="checkbox" id="trainingModeCheckbox" />
+            Training mode <small>(warn before public replies)</small>
+        </label>
+    </div>
+
+    <div class="setting">
+        <label>
+            <input type="checkbox" id="allStylesCheckbox" />
+            Enable Kayako Helper styles
+        </label>
+    </div>
+
+    <div class="setting">
+        <label>
+            <input type="checkbox" id="customCursorCheckbox" />
+            Use thick-border cursor
+        </label>
+    </div>
+
+    <hr />
+
+    <h4>This ticket</h4>
+    <div>Subject&nbsp;&nbsp;: <span id="subject">-</span></div>
+    <div>Requester : <span id="requesterName">-</span>&lt;<span id="requesterEmail">-</span>&gt;</div>
+    <div>Replies&nbsp;&nbsp;: <span id="replyCount">0</span></div>
+</section>
 
 <script type="module" src="popup.js"></script>
 </body>

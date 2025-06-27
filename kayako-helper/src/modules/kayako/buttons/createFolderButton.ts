@@ -4,10 +4,10 @@
 
 import {
     EXTENSION_SELECTORS, KAYAKO_SELECTORS,
-} from '@/generated/selectors';
+} from '@/generated/selectors.ts';
 
-import { currentConvId }       from '@/utils/location';
-import { registerTabButton }   from '@/utils/tabButtonManager';
+import { currentConvId }       from '@/utils/location.ts';
+import { registerTabButton }   from '@/utils/tabButtonManager.ts';
 
 export function bootCreateFolderButton(): void {
     registerTabButton({

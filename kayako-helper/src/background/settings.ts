@@ -21,5 +21,10 @@ chrome.runtime.onMessage.addListener((msg: ToBackground, _sender, sendResponse) 
                 });
             });
             return true;
+
+        case 'cursor.toggle': {
+            /* purely forwarded by popup ➜ content script; nothing else to do */
+            break;
+        }
     }
 });

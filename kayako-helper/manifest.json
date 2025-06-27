@@ -70,6 +70,7 @@
   ],
 
   "permissions": [
+    "nativeMessaging",
     "tabs",
     "scripting",
     "storage",
@@ -85,7 +86,9 @@
         "https://*.chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
-        "https://gemini.google.com/*"]
+        "https://gemini.google.com/*",
+        "https://*.ephor.ai/*",
+        "https://ephor.ai/*"]
     }
   ]
 }

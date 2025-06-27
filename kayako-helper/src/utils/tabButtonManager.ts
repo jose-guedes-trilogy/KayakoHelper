@@ -233,14 +233,12 @@ export function registerSplitTabButton(cfg: SplitTabButtonConfig): void {
         if (!rightBtn) {
             rightBtn = document.createElement('button');
             rightBtn.id = RIGHT_ID;
-            rightBtn.textContent = cfg.rightLabel ?? '▾';
+            rightBtn.innerHTML = `<div class="${EXTENSION_SELECTORS.twoPartBtnChevron.replace(/^./, '')}">${cfg.rightLabel}</div>` ?? '<div>▾</div>';
             rightBtn.className = [
                 EXTENSION_SELECTORS.defaultButtonClass.replace(/^./, ''),
                 EXTENSION_SELECTORS.twoPartBtnRightHalf.slice(1),
                 leftBtn.className,              // keep ext‑specific theme classes
             ].join(' ');
-            rightBtn.style.minWidth = '24px';
-            rightBtn.style.padding  = '0 6px';
             wrap.appendChild(rightBtn);
 
             /* --- dropdown container --- */
@@ -257,7 +255,7 @@ export function registerSplitTabButton(cfg: SplitTabButtonConfig): void {
 
             /* safe‑hover helpers */
             let hideTo: number | null = null;
-            const show = () => { if (hideTo) {clearTimeout(hideTo); hideTo=null;} menu.style.display='block'; };
+            const show = () => { if (hideTo) {clearTimeout(hideTo); hideTo=null;} menu.style.display='flex'; };
             const hide = ()  => { hideTo = window.setTimeout(()=>{menu.style.display='none';}, hideDelay); };
 
             rightBtn.addEventListener('mouseenter', show);

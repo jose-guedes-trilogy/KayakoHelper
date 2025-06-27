@@ -4,10 +4,10 @@
    Now uses an explicit UI-state machine so the tabButtonManager’s
    re-labels never overwrite our “⏳ / ✅ / ❌” feedback. */
 
-import { EXTENSION_SELECTORS }   from '@/generated/selectors';
+import { EXTENSION_SELECTORS }   from '@/generated/selectors.ts';
 import { fetchTranscript }       from '@/utils/api.js';
 import { isConvPage, currentConvId } from '@/utils/location.js';
-import { registerTabButton }     from '@/utils/tabButtonManager';
+import { registerTabButton }     from '@/utils/tabButtonManager.ts';
 
 /* ------------------------------------------------------------------ */
 /* Constants & Types                                                  */

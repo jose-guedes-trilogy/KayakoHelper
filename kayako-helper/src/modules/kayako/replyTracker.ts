@@ -2,9 +2,9 @@
 
 import {
     KAYAKO_SELECTORS,
-} from '@/generated/selectors';
-import { currentConvId } from '@/utils/location';
-import type { ToBackground } from '@/utils/messageTypes';
+} from '@/generated/selectors.ts';
+import { currentConvId } from '@/utils/location.ts';
+import type { ToBackground } from '@/utils/messageTypes.ts';
 
 export function bootReplyTracker() {
     const ALLOWED_HOSTNAME = 'central-supportdesk.kayako.com';

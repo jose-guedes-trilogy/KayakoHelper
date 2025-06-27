@@ -2,7 +2,7 @@
 
 import {
     KAYAKO_SELECTORS,
-} from '@/generated/selectors';
+} from '@/generated/selectors.ts';
 
 const STORAGE_KEY = 'trainingMode';
 let enabled = true;

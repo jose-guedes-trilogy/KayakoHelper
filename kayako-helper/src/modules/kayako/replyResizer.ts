@@ -2,9 +2,9 @@
 
 import {
     KAYAKO_SELECTORS,
-} from '@/generated/selectors';
+} from '@/generated/selectors.ts';
 
-import { currentConvId } from '@/utils/location';
+import { currentConvId } from '@/utils/location.ts';
 
 /* Config / State */
 const BAR_H = 14;
