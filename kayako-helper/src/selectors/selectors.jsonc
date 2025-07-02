@@ -13,7 +13,9 @@
     "hiddenImg": "img[class*=ko-lightbox__hidden-image]",
     "editorChrome": "[class*=ko-agent-content_layout__reply-area_]",
     "editorWrapper": ".fr-wrapper",
-    "replyInner": ".fr-element",
+
+    "replyBoxInputArea": ".fr-element[contenteditable=\"true\"]",
+    "replyBoxFooter": "[class*=ko-case-content__editor-footer-right_]",
 
     "requesterName": "[class*=ko-editable-text__emphasizedText]",
     "requesterEmail": "[class*=ko-identities_identity_trigger__name_]",
@@ -66,8 +68,9 @@
     "textEditorNoteModeAfter": "[class*=ko-text-editor_mode-selector__active_]:after",
     "textEditorReplyModeAfter": "[class*=ko-channel-selector__trigger]:after",
 
-    "sendButtonReply": "[class*=ko-button__primary-with-options_]",
-    "sendButtonReplyRightSection": "[class*=ko-case-content__send-and-set-trigger_]",
+    "sendButtonPublicReply": "[class*=ko-button__primary-with-options_]",
+    "sendButtonPublicReplyInnerSpan": "[class*=ko-button__span_]",
+    "sendButtonPublicReplyRightSection": "[class*=ko-case-content__send-and-set-trigger_]",
 
     "sendButtonNote": "[class*=ko-button__primary-with-options_][class*=ko-button__note_]",
     "sendButtonNoteLoadingAfter": "[class*=ko-button__note_] [class*=ko-button__loading_]::after",
@@ -155,17 +158,24 @@
 
 
     "ticketsListHeader": "[class*=ko-cases-list__heading_]",
-    "ticketsTable": "[class*=ko-cases-list__container_] table",
-    "ticketsTableHeader": "[class*=ko-cases-list__container_] table thead",
-    "ticketsTableBody": "[class*=ko-cases-list__container_] table tbody",
+    "generalTableContainer": "[class*=ko-table__container_]",
+    "generalTable": "[class*=ko-table__table_]",
+    "generalTableHeader": "[class*=ko-table_header__container_]",
+    "generalTableBody": "[class*=ko-table_body__tbody_]",
+    "ticketsTableContainer": "[class*=ko-cases-list__container_]",
 
-    "reloadIcon": "[class*=ko-cases-list_sidebar_item_reload-icon__reload-icon_]"
+    "reloadIcon": "[class*=ko-cases-list_sidebar_item_reload-icon__reload-icon_]",
 
+
+    "searchPageContainer"  : "[class*=session_agent_search__container_]",
+    "searchInput"          : "[class*=session_agent_search__search-input_]"
 
   },
 
   "extension": {
     "defaultButtonClass": ".kh-default-button",
+
+    "sendInChunksButton": "#kh-send-in-chunks-btn",
 
     "tabStripCustomButtonArea": "#kh-tab-strip-custom-btn-area",
 
@@ -180,6 +190,7 @@
     "sendToQcButton": "#kh-send-to-qc-btn",
     "exportChatButton": "#kh-export-chat-btn",
     "exportChatButtonRight": "#kh-export-chat-btn-right",
+
 
     "twoPartBtnLeftHalf"         : ".kh-two-part-btn-left-half",         // left half of the new split “Export” control
     "twoPartBtnRightHalf"         : ".kh-two-part-btn-right-half",     // right (▼) half of the new split control
@@ -196,6 +207,9 @@
 
     "unifiedSearchQueryInputId": "#kh-query-only-input",
     "unifiedSearchElementsParentId": "#kh-enhanced-search-ui-elements",
+
+    // SEARCH RESULTS BUTTONS
+    "searchResultsButtonContainer": "#kh-search-results-button-container",
 
     "searchQueryInput"           : ".kh-enhanced-search-query-input",
     "searchControls"             : ".kh-enhanced-search-controls",

@@ -25,7 +25,6 @@ const waiters: Array<() => void> = [];
 let fallbackId: number | undefined;
 
 /* ---------- helpers ---------------------------------------------------- */
-const LOG = (...a: unknown[]) => console.log("[KTC]", ...a);
 const readyNow = () => {
     ready = true;
     waiters.splice(0).forEach(fn => fn());
@@ -83,7 +82,6 @@ function ingest(json: any): void {
             tagCount += tagActs.length;
         }
     }
-    LOG(`🔍 Ingested ${posts.length} posts – ${tagCount} tag-actions (cache now ${actions.size} posts)`);
 }
 
 /* ---------- fallback bulk fetch (used when injector JSON never arrives) */
@@ -116,15 +114,13 @@ async function fetchAllPages(): Promise<void> {
 
     let pages = 0;
     while (url) {
-        LOG("⏳ GET", url);
         const res = await fetch(url, hdrs);
-        if (!res.ok) { LOG("❌", res.status, res.statusText); break; }
+        if (!res.ok) { break; }
         ingest(await res.json());
         url = res.headers.get("x-next-url") || null;
         if (url && !url.startsWith("http")) url = location.origin + url;
         pages++;
     }
-    LOG(`✅ Bulk fetch complete (${pages} page${pages !== 1 ? "s" : ""}).`);
     readyNow();
 }
 
@@ -165,7 +161,6 @@ async function handle(post: HTMLElement): Promise<void> {
 function resetForCase(newId: string | null): void {
     if (newId === currentCaseId) return;
 
-    LOG(`🔄 Switched case ${currentCaseId ?? "❓"} → ${newId ?? "❓"}`);
     currentCaseId = newId;
     ready = false;
     actions.clear();
@@ -213,14 +208,12 @@ function clearFallbackTimer(): void {
 function startFallbackTimer(delay = 150 ): void {
     clearFallbackTimer();
     fallbackId = window.setTimeout(() => {
-        LOG("⚠️  No JSON captured – running fallback fetch");
         fetchAllPages().catch(err => console.error("[KTC] bulk fetch failed", err));
     }, delay);
 }
 
 /* ---------- BOOTSTRAP -------------------------------------------------- */
 export function bootTagCleaner(): void {
-    LOG("🚀 bootTagCleaner initialising …");
     installUrlWatcher();
     installLocationPoller();
 
@@ -231,7 +224,6 @@ export function bootTagCleaner(): void {
         switch (ev.data.kind) {
             case "POSTS_FETCH_STARTED":
                 clearFallbackTimer();
-                LOG("⏳ Waiting for page-world JSON …");
                 break;
 
             case "POSTS_JSON":
@@ -259,5 +251,4 @@ export function bootTagCleaner(): void {
         )
     ).observe(document.body, { childList: true, subtree: true });
 
-    LOG("✅ bootTagCleaner ready.");
 }

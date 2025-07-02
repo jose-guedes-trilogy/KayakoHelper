@@ -202,8 +202,7 @@ export function registerSplitTabButton(cfg: SplitTabButtonConfig): void {
             wrap = document.createElement('span');
             wrap.id = WRAP_ID;
             wrap.className = EXTENSION_SELECTORS.twoPartBtnParentElement.slice(1);
-            wrap.style.display = 'inline-flex';
-            wrap.style.position = 'relative';
+
             container.appendChild(wrap);
         } else if (!container.contains(wrap)) {
             container.appendChild(wrap);

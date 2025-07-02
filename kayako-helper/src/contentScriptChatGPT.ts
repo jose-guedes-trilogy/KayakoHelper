@@ -7,13 +7,17 @@
 
 (async () => {
     /* Skip everything unless we’re on ChatGPT */
-    if (!location.hostname.endsWith('chat.openai.com')) return;
+    const host = location.hostname;
+    const isChatGpt =
+        host === 'chat.openai.com'      || host.endsWith('.chat.openai.com') ||
+        host === 'chatgpt.com'          || host.endsWith('.chatgpt.com');
+    if (!isChatGpt) return;
 
-    /* Dynamically pull in the helper chunk (classic-script-safe) */
-    const { initMakeTabActiveButton } = await import(
-        /* @vite-ignore */ chrome.runtime.getURL('dist/activeTabButton.js')
-        );
+    // ⤵ path is relative to the extension root, exactly as it sits in the packed CRX
+    const url = chrome.runtime.getURL('dist/activeTabButton.js');
 
-    /* Boot the button – predicate already satisfied above */
+    // Now import it as a real ES-module
+    const { initMakeTabActiveButton } = await import(url);
+
     await initMakeTabActiveButton(() => true);
 })();

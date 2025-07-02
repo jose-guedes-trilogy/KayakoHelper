@@ -446,9 +446,12 @@
   }
 }
 
-
-
 /* ===== Export Chat – button addons ===== */
+#{sel.$twoPartBtnParentElement} {
+  display: inline-flex;
+  position: relative;
+}
+
 #{sel.$twoPartBtnChevron} {
   user-select: none;
 
@@ -458,7 +461,7 @@
 #{sel.$twoPartBtnDropdown} {
   position: absolute;
   top: 100%;
-  left: 0;
+  right: 0;
   z-index: 3;
   background: #fff;
 
@@ -485,6 +488,8 @@
   cursor: pointer;
 
   border-radius: 5px;
+
+  top: 0;
 
   &:hover { background: #f2f2f2; }
 }
@@ -541,3 +546,40 @@
 
 #{sel.$exportLabelInput}   { flex: 0 0 120px; }
 #{sel.$exportUrlInput}     { flex: 1; }
+
+
+#{sel.$searchResultsButtonContainer} {
+  padding: 14px 18px;
+
+  border-bottom: 1px solid #D1D5D7;
+}
+
+#{sel.$sendInChunksButton} {
+  box-sizing: border-box;
+  overflow: visible;
+  font: inherit;
+  text-transform: none;
+  min-width: 0;
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  height: 30px;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: .15s;
+  border-radius: 3px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px 0 rgba(44,48,56,.09);
+  padding: 0 19px;
+  border-right: 1px solid rgba(45,49,56,.25);
+  color: #fff;
+  outline: 0;
+  background: linear-gradient(-180deg, hsl(198, 61%, 60%) 4%, hsl(200, 67%, 44%) 96%) !important;
+  -webkit-appearance: button;
+
+  margin-right: 14px;
+}

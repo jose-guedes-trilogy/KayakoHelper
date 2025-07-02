@@ -20,18 +20,22 @@
     {
       "matches": ["https://*.kayako.com/*"],
       "js": ["dist/tagCleanerInjector.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "type": "module"
     },
     {
       "matches": ["https://*.kayako.com/*"],
       "js": ["dist/contentKayako.js"],
       "css": ["dist/content.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "type": "module"
     },
     {
       "matches": ["https://gemini.google.com/*"],
       "js": ["dist/contentGemini.js"],
-      "run_at": "document_idle"
+      "css": ["dist/content.css"],
+      "run_at": "document_idle",
+      "type": "module"
     },
     {
       "matches": [
@@ -40,7 +44,9 @@
         "https://chatgpt.com/*"
       ],
       "js": ["dist/contentChatGPT.js"],
-      "run_at": "document_idle"
+      "css": ["dist/content.css"],
+      "run_at": "document_idle",
+      "type": "module"
     },
     {
       "matches": [
@@ -48,6 +54,7 @@
         "https://*.ephor.ai/*"
       ],
       "js": ["dist/contentEphor.js"],
+      "css": ["dist/content.css"],
       "run_at": "document_idle"
     }
   ],

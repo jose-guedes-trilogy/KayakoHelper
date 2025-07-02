@@ -158,7 +158,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 
 /* ----- SUBMIT BUTTON ----- */
 
-#{sel.$sendButtonReply} {
+#{sel.$sendButtonPublicReply} {
   background: linear-gradient(-180deg, hsl(198 61% 60% / 1) 4%, hsl(200 67% 44% / 1) 96%) !important;
 
   &:hover {
@@ -166,7 +166,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   }
 }
 
-#{sel.$sendButtonReplyRightSection} {
+#{sel.$sendButtonPublicReplyRightSection} {
   background: linear-gradient(-180deg, hsl(200 59% 56% / 1) 4%, hsl(200 67% 42% / 1) 96%) !important;
 
   &:hover {
@@ -199,7 +199,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 
 /* Container for the reply box */
 #{sel.$textEditorContainer} {
-  box-shadow: 0 2px 9px 2px hsl(203 29% 92% / 0.75),
+  box-shadow: 0 0 6px 2px hsl(203 29% 92% / 0.75),
   0 0 3px 0 hsl(203 10% 85% / 1),
   0 0 0 1px hsl(204 10% 78% / 1);
 
@@ -533,20 +533,28 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 }
 
 // Table Header
-#{sel.$ticketsTableHeader} th:not(:first-child):not(:nth-child(2)) {
+#{sel.$ticketsTableContainer} #{sel.$generalTableHeader} th:not(:first-child):not(:nth-child(2)), :not(#{sel.$ticketsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableHeader} th:not(:first-child) {
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 // Table Contents
-#{sel.$ticketsTableBody} tr td:not(:first-child):not(:nth-child(2)), #{sel.$ticketsTableBody} tr td:not(:first-child):not(:nth-child(2)) > div {
+#{sel.$ticketsTableContainer} #{sel.$generalTableBody} tr td:not(:first-child):not(:nth-child(2)),
+#{sel.$ticketsTableContainer} #{sel.$generalTableBody} tr td:not(:first-child):not(:nth-child(2)) > div > div,
+#{sel.$ticketsTableContainer} #{sel.$generalTableBody} tr td:not(:first-child):not(:nth-child(2)) > div > span,
+:not(#{sel.$ticketsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableBody} tr td:not(:first-child) > div {
   text-align: center;
   padding: 0 !important;
 
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+// For non-case-list tables
+:not(#{sel.$ticketsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableBody} tr td:not(:first-child) {
+  padding: 0;
 }
 
 

@@ -51,7 +51,8 @@
     "dist/contentKayako.js",
     "dist/contentChatGPT.js",
     "dist/contentGemini.js",
-    "dist/contentEphor.js"
+    "dist/contentEphor.js",
+    "node_modules/@types/node/module.d.ts"
   ],
   "exclude": [
     "node_modules",

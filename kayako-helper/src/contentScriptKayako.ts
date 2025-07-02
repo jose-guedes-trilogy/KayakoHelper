@@ -9,7 +9,7 @@ import { setUpUI }                  from '@/utils/setUpUI';
 import { bootCopyChatButton }       from '@/modules/kayako/buttons/copy-chat/copyChatButton.ts';
 import { bootAtlasHighlighter }     from '@/modules/kayako/atlasHighlighter.js';
 import { bootLightboxEnhancer }     from '@/modules/kayako/lightboxEnhancer.js';
-import { bootReplyResizer }         from '@/modules/kayako/replyResizer.js';
+import { bootReplyResizer }         from '@/modules/kayako/reply-box/replyResizer.js';
 import { bootDownloadManager }      from '@/modules/kayako/download-manager/downloadManager';
 import { bootReplyTracker }         from '@/modules/kayako/replyTracker.ts';
 import { bootTrainingMode }         from '@/modules/kayako/trainingMode.ts';
@@ -20,6 +20,8 @@ import { bootSendToQcButton }       from "@/modules/kayako/buttons/sendToQCButto
 import { bootExtraPostButtons }     from "@/modules/kayako/extraPostButtons.ts";
 import { bootTagCleaner }           from "@/modules/kayako/ui-clean-up/tagCleaner";
 import { bootExportChatButton }     from "@/modules/kayako/buttons/export-chat/exportChatButton.ts";
+import {bootCopySearchChats} from "@/modules/kayako/buttons/copy-search/copySearchChats.ts";
+import {bootSendChunks} from "@/modules/kayako/reply-box/sendInChunks.ts";
 
 /* ---------- Global UI ---------- */
 setUpUI();
@@ -42,3 +44,7 @@ bootDownloadManager();
 bootCopyChatButton();
 bootSendToQcButton();
 bootExportChatButton().then(r => {});
+
+bootCopySearchChats();
+
+bootSendChunks();

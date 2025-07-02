@@ -53,7 +53,7 @@ function setRestrictedButtonsVisibility(hide: boolean): void {
 }
 
 function onReplyButtonClick(e: MouseEvent): void {
-    const btn = (e.target as Element).closest(KAYAKO_SELECTORS.sendButtonReply) as HTMLElement | null;
+    const btn = (e.target as Element).closest(KAYAKO_SELECTORS.sendButtonPublicReply) as HTMLElement | null;
     if (!btn) return;
 
     // If it's a public reply (not an internal note)

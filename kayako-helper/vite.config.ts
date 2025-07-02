@@ -38,6 +38,7 @@ export default defineConfig({
     },
 
     build: {
+        modulePreload: false,
         minify: false,            // a) keep readable
         sourcemap: true,          // b) emit *.map next to every js/css file
         outDir: 'dist',
@@ -52,7 +53,8 @@ export default defineConfig({
                 contentEphor:    path.resolve(__dirname, 'src/contentScriptEphor.ts'),
                 background:      path.resolve(__dirname, 'src/backgroundScript.ts'),
                 popup:           path.resolve(__dirname, 'src/popup/popup.ts'),
-                promptInserter:  path.resolve(__dirname, 'src/modules/kayako/buttons/export-chat/promptInserter.ts')
+                promptInserter:  path.resolve(__dirname, 'src/modules/kayako/buttons/export-chat/promptInserter.ts'),
+                activeTabButton: path.resolve(__dirname, 'src/modules/shared/activeTabButton.ts'),
             },
 
             /* Output: stable names, no hashes */
@@ -68,7 +70,8 @@ export default defineConfig({
                     info.name && info.name.endsWith('.css')
                         ? 'content.css'
                         : '[name][extname]',
-            },
+                format: 'es',
+            }
         },
     },
 

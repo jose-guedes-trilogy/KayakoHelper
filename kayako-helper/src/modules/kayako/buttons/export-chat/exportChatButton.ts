@@ -95,8 +95,8 @@ function rebuildDropdown(menu: HTMLElement): void {
        </span>`;
         menu.appendChild(row);
 
-        const sub = div(EXTENSION_SELECTORS.twoPartBtnDropdownSub.slice(1));
-        sub.style.top = '0'; row.appendChild(sub);
+        const sub = div(EXTENSION_SELECTORS.twoPartBtnDropdownSub.replace(/^./,''));
+        row.appendChild(sub);
 
         const dflt = findUrl(p, p.defaultUrlId) ?? p.urls[0];
         row.addEventListener('click',  e => (e as MouseEvent).offsetX < row.offsetWidth - 16 && dflt && performExport(dflt));
@@ -104,7 +104,7 @@ function rebuildDropdown(menu: HTMLElement): void {
         row.addEventListener('mouseleave', () => sub.style.display = 'none');
 
         for (const u of p.urls) {
-            const li = div(EXTENSION_SELECTORS.twoPartBtnDropdownItem.slice(1));
+            const li = div(EXTENSION_SELECTORS.twoPartBtnDropdownItem.replace(/^./,''));
             li.textContent = u.label;
             li.addEventListener('click', () => void performExport(u));
             sub.appendChild(li);

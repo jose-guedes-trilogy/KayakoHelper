@@ -1,5 +1,5 @@
 /* Kayako Helper – popup.ts
- * Two-tab UI + three toggles (training, styles, cursor) – now with strict typing
+ * Two-tab UI + three toggles (training, styles) – now with strict typing
  */
 
 import type { ToBackground } from '@/utils/messageTypes';
@@ -7,7 +7,7 @@ import type { ToBackground } from '@/utils/messageTypes';
 interface Prefs {
     trainingMode?:    boolean;
     allStyles?:       boolean;
-    useCustomCursor?: boolean;
+    sendChunksWPM?:   number;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -25,16 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
     /* ----- controls ----- */
     const chkTraining = document.getElementById('trainingModeCheckbox') as HTMLInputElement;
     const chkStyles   = document.getElementById('allStylesCheckbox')    as HTMLInputElement;
-    const chkCursor   = document.getElementById('customCursorCheckbox') as HTMLInputElement;
+    const inpWpm      = document.getElementById('wpmInput')             as HTMLInputElement;
 
     chrome.storage.sync.get(
-        ['trainingMode', 'allStyles', 'useCustomCursor'] as const,
+        ['trainingMode', 'allStyles', 'sendChunksWPM'] as const,
         (res) => {
-            const { trainingMode, allStyles, useCustomCursor } = res as Prefs;
+            const { trainingMode, allStyles, sendChunksWPM } = res as Prefs;
 
             chkTraining.checked = !!trainingMode;
             chkStyles.checked   = allStyles       ?? true;
-            chkCursor.checked   = useCustomCursor ?? true;
+            inpWpm.value        = (sendChunksWPM ?? 200).toString();
         }
     );
 
@@ -52,12 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.sync.set({ allStyles: enabled });
     });
 
-    /* custom cursor */
-    chkCursor.addEventListener('change', () => {
-        const enabled = chkCursor.checked;
-        chrome.storage.sync.set({ useCustomCursor: enabled });
-        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-            if (tab?.id) chrome.tabs.sendMessage(tab.id, { action: 'cursor.toggle', enabled });
-        });
+    /* WPM input */
+    inpWpm.addEventListener('change', () => {
+        const wpm = Math.max(50, Math.min(800, Number(inpWpm.value) || 200));
+        inpWpm.value = wpm.toString();
+        chrome.storage.sync.set({ sendChunksWPM: wpm });
     });
+
 });

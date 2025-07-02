@@ -1,4 +1,4 @@
-// promptInserter.js - v1.2
+// src/modules/kayako/buttons/export-chat/promptInserter.ts
 // • waits (≤ 5 s) for a *visible* textarea or a content-editable field
 // • inserts the prompt exactly (keeps all newlines)
 // • leaves the caret at the end

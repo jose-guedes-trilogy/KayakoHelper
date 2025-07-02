@@ -23,7 +23,7 @@ import {
 import { registerTabButton } from '@/utils/tabButtonManager.ts';
 import { isConvPage }        from '@/utils/location.js';
 import { addNewlines }       from '@/modules/kayako/newlineSpacer.ts';
-import { applySize }         from '@/modules/kayako/replyResizer.ts';
+import { applySize }         from '@/modules/kayako/reply-box/replyResizer.ts';
 
 /* ------------------------------------------------------------------ */
 /* Constants & UI state                                               */
@@ -173,6 +173,11 @@ function normalizeParagraphs(fragment: string): string {
     /* 1c ─ Wrap every <h3> content in <strong> to force bold */
     tmp.querySelectorAll('h3').forEach(h3 => {
         h3.innerHTML = `<strong>${h3.innerHTML}</strong>`;
+    });
+
+    /* 1d ─ Wrap every <h4> content in <strong> to force bold */
+    tmp.querySelectorAll('h4').forEach(h4 => {
+        h4.innerHTML = `<strong>${h4.innerHTML}</strong>`;
     });
 
     /* 2 ─ Strip data-* attributes everywhere */

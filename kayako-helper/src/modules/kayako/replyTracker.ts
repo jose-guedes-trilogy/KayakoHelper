@@ -33,7 +33,7 @@ export function bootReplyTracker() {
 
     document.addEventListener('click', e => {
         const btn = (e.target as Element)
-            .closest(KAYAKO_SELECTORS.sendButtonReply) as Element | null;
+            .closest(KAYAKO_SELECTORS.sendButtonPublicReply) as Element | null;
         if (!btn) return;
         chrome.runtime.sendMessage(<ToBackground>{
             action: 'incrementReply',
