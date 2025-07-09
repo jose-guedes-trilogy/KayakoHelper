@@ -1,22 +1,48 @@
-// src/modules/shared/activeTabButton.ts
+const BTN_ID = 'kh-make-tab-active-btn';
 
-export async function initMakeTabActiveButton(
+function providerKeyFromUrl(u: Location | URL): string {
+    const h = (u instanceof URL ? u.hostname : u.hostname).replace(/^www\./, '');
+    const p = h.split('.');
+    return p.length >= 2 ? p.slice(-2).join('.') : h;
+}
+
+export function initMakeTabActiveButton(
     shouldInit: () => boolean = () => true,
-): Promise<void> {
+    provider: string = providerKeyFromUrl(location),
+): void {
     if (!shouldInit()) return;
+    if (document.getElementById(BTN_ID)) return;
 
-    const BTN_ID = "kh-make-tab-active-btn";
+    const btn = Object.assign(document.createElement('button'), {
+        id: BTN_ID,
+        textContent: 'Make Active',
+    });
+    document.body.appendChild(btn);
 
-    if (document.getElementById(BTN_ID)) return;   // already present
+    const setLabel = (active: boolean) =>
+        (btn.textContent = active ? 'Active ✔' : 'Make Active');
 
-    const btn = document.createElement('button');
-    btn.id        = BTN_ID;
-    btn.textContent = 'Make Active';
+    /* initial query */
+    chrome.runtime.sendMessage(
+        { action: 'exportChat.isActiveTab', provider },
+        res => setLabel(!!res?.active),
+    );
 
-    btn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ action: 'exportChat.setActiveTab' },
-            () => (btn.textContent = 'Active ✔'));
+    /* react to broadcasts from background */
+    chrome.runtime.onMessage.addListener(msg => {
+        if (msg?.action === 'exportChat.activeChanged' && msg.provider === provider) {
+            chrome.runtime.sendMessage(
+                { action: 'exportChat.isActiveTab', provider },
+                res => setLabel(!!res?.active),
+            );
+        }
     });
 
-    document.body.appendChild(btn);
+    /* manual click */
+    btn.addEventListener('click', () => {
+        chrome.runtime.sendMessage(
+            { action: 'exportChat.setActiveTab', provider },
+            () => setLabel(true),
+        );
+    });
 }

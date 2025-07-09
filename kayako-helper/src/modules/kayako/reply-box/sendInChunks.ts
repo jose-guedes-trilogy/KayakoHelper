@@ -1,6 +1,6 @@
 /*  Kayako Helper – sendInChunks.ts
     “Send in chunks” button + paced delivery (default 200 WPM)
-    v1.5 – 2025-07-02
+    v1.7 – 2025-07-08   ← bumped
 ---------------------------------------------------------------------------- */
 
 import {
@@ -17,7 +17,7 @@ import {
 /* ───────────────── Types & constants ───────────────── */
 
 type ChunkState = {
-    chunks:  string[];
+    chunks:  string[]; // stores raw **HTML** for each chunk
     idx:     number;
     timer?:  number;
     tick?:   number;
@@ -30,7 +30,19 @@ const SEND_BTN_SEL = KAYAKO_SELECTORS.sendButtonPublicReply;
 
 const BTN_ID = EXTENSION_SELECTORS.sendInChunksButton.replace(/^#/, '');
 
-const CHUNK_RE = /(?:\r?\n|\r)\s*(?:\r?\n|\r)+\s*/g;
+const PUBLIC_ACTIVE_SEL = KAYAKO_SELECTORS.replyModeSelectorOn;
+
+/** ── NEW SPLIT RULES ──────────────────────────────────────────────────
+ *  A single *blank* HTML block is now enough to cut a chunk:
+ *    • <div><br></div>      (or any <div …>…</div> that’s only a <br>)
+ *    • <p><br></p>
+ *    • ≥ 2 consecutive <br> tags outside of other blocks
+ */
+const CHUNK_HTML_RE =
+    /(?:<(?:p|div)[^>]*>\s*(?:<br\s*\/?>|\s|&nbsp;)*<\/(?:p|div)>\s*)+|(?:<br\s*\/?>\s*){2,}/gi;
+
+/** Gap inserted when re-stitching remaining chunks after “Cancel”. */
+const GAP_HTML = '<div><br></div>';
 
 let prefs = { wpm: 200 };
 chrome.storage.sync.get({ sendChunksWPM: 200 }, r => {
@@ -43,12 +55,24 @@ export function bootSendChunks(): void {
     if ((window as any).__khSendChunksBooted) return;
     (window as any).__khSendChunksBooted = true;
 
+    /* 🔸  ADD   attributes:true  +   attributeFilter:['class']  */
     new MutationObserver(tryInject).observe(
         document.body,
-        { subtree: true, childList: true, characterData: true },
+        {
+            subtree: true,
+            childList: true,
+            characterData: true,
+            attributes: true,          // ← watch class changes
+            attributeFilter: ['class'] // ← only “class” to stay lightweight
+        },
     );
 
     tryInject();
+}
+
+/** True only when the Public Reply tab is active (Internal Notes has a different state). */
+function publicReplySelected(): boolean {
+    return !!document.querySelector(PUBLIC_ACTIVE_SEL);
 }
 
 /* ───────────────── Injection ───────────────────────── */
@@ -58,13 +82,17 @@ function tryInject(): void {
     if (!footer) return;
 
     const isMessenger = messengerSelected();
+    const isPublic    = publicReplySelected();
     const existingBtn = footer.querySelector<HTMLElement>('#' + BTN_ID);
 
-    if (existingBtn && !isMessenger) {                       // remove when channel switches
+    // Remove if we leave Messenger *or* switch to Internal Notes
+    if (existingBtn && (!isMessenger || !isPublic)) {
         existingBtn.remove();
         return;
     }
-    if (!isMessenger || existingBtn) return;                 // nothing to add
+
+    // Only add when Messenger **and** Public Reply are both active
+    if (!isMessenger || !isPublic || existingBtn) return;
 
     const sendBtn = footer.querySelector<HTMLButtonElement>(SEND_BTN_SEL);
     if (!sendBtn) return;
@@ -97,8 +125,7 @@ async function onClickSendChunks(ev: MouseEvent): Promise<void> {
     const editor = getEditorElement();
     if (!editor) return;
 
-    const raw   = htmlToPlain(editor.innerHTML).trim();
-    const parts = raw.split(CHUNK_RE).map(t => t.trim()).filter(Boolean);
+    const parts = htmlToChunks(editor.innerHTML);
     if (parts.length <= 1) return;
 
     Object.assign(state, { chunks: parts, idx: 0 });
@@ -163,13 +190,14 @@ function waitForEditorEmpty(timeoutMs = 5_000): Promise<void> {
     });
 }
 
-function writeToEditor(text: string): Promise<void> {
+/** Writes **either** plain-text or raw HTML into the editor. */
+function writeToEditor(content: string): Promise<void> {
     const editor = getEditorElement();
     if (!editor) return Promise.resolve();
 
-    editor.innerHTML = text
-        .replace(/\n/g, '<br>')
-        .replace(/ {2}/g, ' &nbsp;');
+    editor.innerHTML = /[<&>]/.test(content)
+        ? content
+        : content.replace(/\n/g, '<br>').replace(/ {2}/g, ' &nbsp;');
 
     editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
 
@@ -195,7 +223,7 @@ function abortRun(restore = true): void {
     if (restore && state.chunks.length) {
         const remaining = state.chunks.slice(state.idx);
         if (remaining.length) {
-            writeToEditor(remaining.join('\n\n')).then(fitEditorHeight);
+            writeToEditor(remaining.join(GAP_HTML)).then(fitEditorHeight);
         }
     }
     Object.assign(state, { chunks: [], idx: 0, timer: undefined, tick: undefined, nextAt: undefined });
@@ -229,8 +257,73 @@ function refreshBtnLabel(secs?: number): void {
     }
 }
 
-const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
+/* ───────── Text helpers ───────── */
 
+const words = (html: string) => htmlToPlain(html).split(/\s+/).filter(Boolean).length;
+
+
+/**
+ * Split the raw editor HTML into chunks by looking for:
+ *   • An empty <div>…</div> or <p>…</p> that contains only <br>, &nbsp; or whitespace
+ *   • Two or more consecutive <br> elements **outside** any other block element
+ *
+ * The browser’s parser handles all oddities (attribute order, comments, entities, etc.)
+ * so the rules stay robust if Froala or Kayako tweak their markup in the future.
+ */
+function htmlToChunks(html: string): string[] {
+    const container = document.createElement('div');
+    container.innerHTML = html;
+
+    const chunks: string[] = [];
+    let currentChunk: string[] = [];
+    let consecutiveTopLevelBr = 0;
+
+    const flush = () => {
+        if (currentChunk.length) {
+            chunks.push(currentChunk.join(''));
+            currentChunk = [];
+        }
+        consecutiveTopLevelBr = 0;
+    };
+
+    Array.from(container.childNodes).forEach(node => {
+        // Top-level <br>
+        if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+            consecutiveTopLevelBr++;
+            if (consecutiveTopLevelBr >= 2) {
+                flush();
+                return; // don’t include the <br><br> that acted as the separator
+            }
+        } else {
+            consecutiveTopLevelBr = 0;
+        }
+
+        // Empty <div> or <p> that should act as a separator
+        if (
+            node.nodeType === Node.ELEMENT_NODE &&
+            /^(DIV|P)$/i.test((node as HTMLElement).tagName)
+        ) {
+            const el = node as HTMLElement;
+            const isBlankBlock = el.textContent?.trim() === '' &&
+                // strip the usual suspects and see if there’s anything left
+                el.innerHTML.replace(/<br\s*\/?>|&nbsp;|\s+/gi, '') === '';
+
+            if (isBlankBlock) {
+                flush();
+                return; // separator not part of any chunk
+            }
+        }
+
+        // Anything else → keep
+        currentChunk.push(node.outerHTML ?? node.textContent ?? '');
+    });
+
+    flush(); // push the last chunk
+    return chunks;
+}
+
+
+/** Existing plain-text converter, unchanged. */
 const htmlToPlain = (html: string) => html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|blockquote|li)>/gi, '\n')

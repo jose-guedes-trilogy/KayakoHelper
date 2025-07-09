@@ -57,6 +57,9 @@ export default defineConfig({
                 activeTabButton: path.resolve(__dirname, 'src/modules/shared/activeTabButton.ts'),
             },
 
+            /* ✱ 2. Tell Rollup “even if nobody appears to use these exports, keep them” */
+            preserveEntrySignatures: 'exports-only',
+
             /* Output: stable names, no hashes */
             output: {
                 entryFileNames: ({ name }) =>

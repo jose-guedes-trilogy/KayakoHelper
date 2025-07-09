@@ -37,7 +37,8 @@
     /* ▾ Global types ▾ */
     "types": [
       "chrome",          // Chrome extension APIs
-      "vite/client"      // import.meta, HMR, etc.
+      "vite/client",      // import.meta, HMR, etc.
+      "node"
     ],
 
     /* ▾ Misc ▾ */
@@ -47,6 +48,7 @@
   /* ▾ File globs ▾ */
   "include": [
     "src",
+    "scripts",
     "vite.config.ts",
     "dist/contentKayako.js",
     "dist/contentChatGPT.js",

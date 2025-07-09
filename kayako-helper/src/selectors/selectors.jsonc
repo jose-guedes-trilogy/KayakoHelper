@@ -2,8 +2,8 @@
 
 {
   "kayako": {
-    "tabStrip": "[class^=ko-tab-strip__tabs_]",
-    "timeline": "[class^=ko-agent-content_layout__timeline__]",
+    "tabStrip": "[class*=ko-tab-strip__tabs_]",
+    "timeline": "[class*=ko-agent-content_layout__timeline_]",
     "creatorLabel": "[class*=creator]",
     "contentBody": "[class*=list_item__content]",
     "AIName": "ATLAS",
@@ -17,14 +17,22 @@
     "replyBoxInputArea": ".fr-element[contenteditable=\"true\"]",
     "replyBoxFooter": "[class*=ko-case-content__editor-footer-right_]",
 
-    "requesterName": "[class*=ko-editable-text__emphasizedText]",
+    "requesterName": "[class*=ko-agent-content_sidebar_requester-info-card__requester-name_] [class*=ko-editable-text__emphasizedText]",
     "requesterEmail": "[class*=ko-identities_identity_trigger__name_]",
     "ticketSubject": "[class*=ko-tabs_case__subject_]",
 
+    /* Conversation Window Header */
     "conversationWindowHeader": "[class*=ko-agent-content_layout__heading_]",
     "conversationWindowHeaderInner": "[class*=ko-tabs__tabs_]",
     "conversationWindowHeaderTab": "[class*=ko-tabs_tab__item_]",
     "conversationWindowHeaderSelectedTab": "[class*=ko-tabs_tab__item--shrink_]",
+
+    "conversationWindowHeaderRightButtonArea": "[class*=ko-tabs__right_]",
+
+    "completeTicketButton": "[class*=ko-case-content__complete_]",
+    "trashTicketButton": "[class*=ko-case-content__trash_]",
+
+    /* END Conversation Window Header */
 
     "messageOrNote": ".message-or-note",
 
@@ -137,8 +145,8 @@
 
     "cancelPropertiesButton": "[class*=ko-case-content__cancel-property-changes_]",
 
-    "completeTicketButton": "[class*=ko-case-content__complete_]",
-    "trashTicketButton": "[class*=ko-case-content__trash_]",
+    // This is where the Unified Search button is located, along with the notification badge and user profile
+    "userActionsContainer": "[class*=session__header-secondary_]",
 
     "unifiedSearchOuterContainer": "[class*=ko-universal-search__containerAbsolute_]",
     "unifiedSearchLowerContainer": "[class*=ko-universal-search__content-absolute_]",
@@ -163,6 +171,7 @@
     "generalTableHeader": "[class*=ko-table_header__container_]",
     "generalTableBody": "[class*=ko-table_body__tbody_]",
     "ticketsTableContainer": "[class*=ko-cases-list__container_]",
+    "resultsTableContainer": "[class*=session_agent_search__right_]",
 
     "reloadIcon": "[class*=ko-cases-list_sidebar_item_reload-icon__reload-icon_]",
 
@@ -220,6 +229,8 @@
     "searchDropdown"             : ".kh-enhanced-search-dropdown",
     "searchDropdownCloseButton"  : ".kh-enhanced-search-close-btn",
 
+    // END SEARCH RESULTS BUTTONS
+
     "searchEnhancerCustomField" : ".kh-search-enhancer-custom-field",
     "searchEnhancerDateField"    : ".kh-search-enhancer-date-field",
 
@@ -251,8 +262,23 @@
     /* per‑URL “make default” button */
     "exportSetDefaultUrlBtn"  : ".kh-exp-set-default-url",
 
-
     "exportUrlMode"         : ".kh-exp-mode",            // per‑URL “New / Active tab” selector
-    "noActiveTabNotice"     : ".kh-no-active-tab"        // tiny warning when no active tab exists
+    "noActiveTabNotice"     : ".kh-no-active-tab",        // tiny warning when no active tab exists
+
+    /* ─ Assets Inspector ────────────────────────────────────── */
+    "assetsButton":            "#kh-assets-btn",
+    "assetsButtonLabel":       ".kh-assets-btn-label",
+    "assetsModal":             ".kh-assets-modal",
+    "assetsNavItem":           ".kh-assets-nav-item",
+    "assetsPane":              ".kh-assets-pane",
+    "assetsSummary":           ".kh-assets-summary",
+    "assetsFetchNextBtn":      ".kh-assets-fetch-next-btn",
+    "assetsFetchAllBtn":       ".kh-assets-fetch-all-btn",
+    "assetsNav":               ".kh-assets-nav",
+    "assetsResults":           ".kh-assets-results",
+    "assetsGrid":              ".kh-assets-grid",
+    "assetsHeader":            ".kh-assets-header",
+    "assetsJumpButton":        ".kh-assets-jump",
+    "assetsList":              ".kh-assets-list"
   }
 }

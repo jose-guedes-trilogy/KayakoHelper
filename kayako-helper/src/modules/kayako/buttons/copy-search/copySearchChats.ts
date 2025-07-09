@@ -14,18 +14,6 @@
    – Re-inserts itself on SPA route changes.
    – Relies on `cleanConversation` for transcript formatting.
 
-   2025-06 — updated:
-   • Retry loop for late-rendering outlet (max 10 × 400 ms).
-   • Works only on https://central-supportdesk.kayako.com/agent/search/*
-   • All selectors & CSS extracted to central files.
-   • No inline styling – presentation handled entirely in SCSS.
-   2025-06-30 — updated:
-   • Dropdown options are now descriptive strings
-     (“Copy 1 ticket”, …); parsing adapted accordingly.
-   • Dropdown hides whenever the pointer leaves the entire
-     right-hand button area (not just the list itself).
-   • Added “Custom” option at the bottom of the dropdown – lets the
-     agent enter any positive number of tickets to copy.
    ───────────────────────────────────────────────────────────── */
 
 import { cleanConversation, Post }            from '@/modules/kayako/buttons/copy-chat/cleanConversation.ts';
@@ -268,11 +256,26 @@ async function copyChats(
         const ids = await firstNConversationIds(q, ui.limit);
         if (!ids.length) throw new Error('No matching conversations.');
 
+        /* --------------------------------------------------------------
+           Fetch, patch and format each transcript
+           ---------------------------------------------------------- */
         const texts = await Promise.all(
-            ids.map(id => fetchTranscriptByCase(id, POST_LIMIT_PER_CASE))
+            ids.map(async id => {
+                const raw = await fetchTranscriptByCase(id, POST_LIMIT_PER_CASE);
+
+                /* 🔄 CHANGED: put the real ticket ID in place of “Unknown ID” */
+                const fixed = raw.replace(
+                    /^Ticket ID:\s+Unknown ID\b/m,
+                    `Ticket ID: ${id}`
+                );
+
+                return fixed;
+            })
         );
 
-        const bundle = texts.join('\n\n[=========== Next Conversation ===========]\n\n');
+        const bundle =
+            texts.join('\n\n[=========== Next Conversation ===========]\n\n');
+
         await navigator.clipboard.writeText(bundle);
         setUi('ok');
     } catch (err: any) {

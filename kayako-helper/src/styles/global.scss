@@ -58,7 +58,7 @@
 
 
 #{sel.$atlasHighlightHeader} {
-  background: hsl(124 66% 80%);
+  background: hsl(124 63% 81% / 1);
   border-radius:4px 4px 0 0;
   padding-left:14px !important;
   padding-right:14px !important;
@@ -67,7 +67,7 @@
 }
 
 #{sel.$atlasHighlightBody} {
-  background:hsl(124 76% 90% / 1);
+  background: hsl(125 72% 91% / 1);
   border-radius:0 0 4px 4px;
   padding: 4px 14px !important;
 }
@@ -218,7 +218,6 @@
 
   display: grid;
   grid-template-columns: max-content 1fr;   /* label | input(s)           */
-  column-gap: 8px;                          /* keep old gap               */
   align-items: center;                      /* vertical alignment         */
   font-size: 13px;
   position: relative;
@@ -582,4 +581,168 @@
   -webkit-appearance: button;
 
   margin-right: 14px;
+}
+
+
+/* ASSETS INSPECTOR */
+
+#{sel.$assetsModal} {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  font-size: 13px;
+  flex-direction: row;
+  min-width: 1000px;
+  max-width: 1000px;
+  cursor: default;
+  height: 348px;          /* fixed height across tabs */
+}
+
+#{sel.$assetsModal}.open { display: flex; }
+
+#{sel.$assetsNav} {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 8px 8px;
+  width: 120px;
+  border-right: 1px solid #eee;
+}
+
+#{sel.$assetsNavItem} {
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover  { background: #f3f3f3; }
+  &.active { font-weight: 600; background: #e6f0ff; }
+}
+
+#{sel.$assetsList} {               /* Images tab */
+  list-style: none;
+  margin: 0;
+  display: flex;
+
+  gap: 6px;
+  padding: 0 14px;
+  text-align: left;
+
+  > li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+#{sel.$assetsHeader} {
+  font-weight: 600;
+  margin: 0;                /* remove extra white space */
+}
+
+#{sel.$assetsPane} {
+  flex: 1;
+  padding: 16px 14px;
+  height: 100%;
+  overflow: auto;
+}
+
+#{sel.$assetsSummary} {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+#{sel.$assetsFetchNextBtn},
+#{sel.$assetsFetchAllBtn} {
+  margin-left: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: #1976d2;
+}
+
+#{sel.$assetsButton} { position: relative; margin-right: 8px; }
+#{sel.$assetsButton} #{sel.$assetsButtonLabel} { pointer-events: none; }
+
+#{sel.$assetsButtonLabel} {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  padding-left: 3px;
+
+  > div {
+    font-size: 10px;
+    position: relative;
+    top: 1px;
+    color: #3f3f3f;
+    transform: scaleY(0.65);
+  }
+}
+
+/* Kayako Helper – Assets Inspector
+   Links & Attachments rendered as CSS GRID
+----------------------------------------------------------------------------- */
+
+#{sel.$assetsGrid} {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  row-gap: 0;            /* remove vertical gap between header rows */
+  width: 100%;
+  font-size: 12px;
+
+  /* Header cells (“Post link / Content”) */
+  .header-cell {
+    padding: 4px 6px;
+    font-weight: 600;
+    background: #f3f3f3;
+    border-bottom: 1px solid #ccc;
+  }
+
+  /* each asset row */
+  .asset-row { display: contents; }
+
+  /* zebra stripes */
+  .asset-row:nth-of-type(odd) .id-cell,
+  .asset-row:nth-of-type(odd) .link-cell { background: #fafafa; }
+
+  .id-cell,
+  .link-cell {
+    padding: 4px 6px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .id-cell { width: 60px; white-space: nowrap; }
+
+  .link-cell a {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+}
+
+/* Section headers inside the grid (Kayako Instances / GitHub Links / …) */
+#{sel.$assetsGrid} #{sel.$assetsHeader},
+#{sel.$assetsGrid} .header-row {
+  grid-column: 1 / -1;
+  background: #f3f3f3;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-bottom: 1px solid #ccc;
+}
+
+/* Tiny “jump to post” button */
+#{sel.$assetsJumpButton} {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  cursor: pointer;
+  color: #1976d2;
 }

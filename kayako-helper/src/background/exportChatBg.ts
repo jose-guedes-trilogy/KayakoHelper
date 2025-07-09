@@ -1,91 +1,133 @@
 /* ===========================================================================
- * Export-chat background helper – v3.0
- *  – keeps the active tab in chrome.storage.session
- *  – replies immediately to avoid the 30 s keep-alive limit
- *  – injects promptInserter.js from the bundle root
+ * src/background/exportChatBg.ts
+ * Export-chat background helper – v4.0  (provider-aware)
+ * ---------------------------------------------------------------------------
+ *  • tracks ONE active tab **per provider** (keyed by eTLD+1, e.g. "openai.com")
+ *  • stores that map in chrome.storage.session
+ *  • broadcasts changes only to tabs of the same provider
+ *  • injects promptInserter.js and activeTabButton.js on demand
  * ---------------------------------------------------------------------------
  */
 
-import type { ExportMode } from './constants';
+import type { ExportMode } from '@/modules/kayako/buttons/export-chat/constants';
 
-let activeTabId: number | null = null;
-const ACTIVE_KEY = 'exportChat.activeTabId';
+type ProviderKey = string;              // e.g. "openai.com", "google.com"
+type ActiveMap   = Record<ProviderKey, number /*tabId*/>;
 
-/* ------------------------------------------------------------------ */
-/*  Bootstrap – restore activeTabId if the service-worker restarted   */
-/* ------------------------------------------------------------------ */
+const ACTIVE_KEY = 'exportChat.activeTabs';   // session-storage key
+let activeTabs: ActiveMap = {};
+
+/* ───────────────────────────────── bootstrap ─────────────────────────── */
 (async () => {
     const stored = (await chrome.storage.session.get(ACTIVE_KEY))[ACTIVE_KEY];
-    if (typeof stored === 'number') activeTabId = stored;
+    if (stored && typeof stored === 'object') activeTabs = stored as ActiveMap;
 })();
 
-/* ------------------------------------------------------------------ */
-/*  Small utilities                                                   */
-/* ------------------------------------------------------------------ */
+/* ──────────────────────────── helpers ────────────────────────────────── */
 
-/** Persist the current active tab id; null clears */
-async function setActive(id: number | null): Promise<void> {
-    activeTabId = id;
-    await chrome.storage.session.set({ [ACTIVE_KEY]: id ?? null });
+/** Quick eTLD+1 extraction (fallback = hostname). */
+function getProviderKey(urlOrStr: string | URL): ProviderKey {
+    const h = (urlOrStr instanceof URL ? urlOrStr : new URL(urlOrStr))
+        .hostname.replace(/^www\./i, '');
+    const parts = h.split('.');
+    return parts.length >= 2 ? parts.slice(-2).join('.') : h;
 }
 
-/** Wait until the tab’s status reports “complete” */
+/** Persist (or clear) the active tab for a provider and broadcast. */
+async function setActive(provider: ProviderKey, tabId: number | null): Promise<void> {
+    if (tabId) activeTabs[provider] = tabId;
+    else       delete activeTabs[provider];
+
+    await chrome.storage.session.set({ [ACTIVE_KEY]: activeTabs });
+
+    /* tell only tabs that belong to this provider */
+    const targets = await chrome.tabs.query({
+        url: [`*://${provider}/*`, `*://*.${provider}/*`],
+    });
+
+    for (const t of targets) {
+        if (t.id) {
+            chrome.tabs.sendMessage(t.id, {
+                action  : 'exportChat.activeChanged',
+                provider,
+                activeId: tabId,          // null when cleared
+            });
+        }
+    }
+}
+
+/** Wait until the tab reports status "complete". */
 function waitForLoad(tabId: number): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise((resolve) => {
         chrome.tabs.get(tabId, (tab) => {
             if (tab?.status === 'complete') return resolve();
 
-            const listener = (id: number, info: chrome.tabs.TabChangeInfo) => {
+            const lis = (id: number, info: chrome.tabs.TabChangeInfo) => {
                 if (id === tabId && info.status === 'complete') {
-                    chrome.tabs.onUpdated.removeListener(listener);
+                    chrome.tabs.onUpdated.removeListener(lis);
                     resolve();
                 }
             };
-            chrome.tabs.onUpdated.addListener(listener);
+            chrome.tabs.onUpdated.addListener(lis);
         });
     });
 }
 
-/** Open or reuse a tab depending on the chosen mode */
+/** Re-open or reuse the provider’s active tab, depending on mode. */
 async function ensureTargetTab(url: string, mode: ExportMode): Promise<number> {
-    if (mode === 'active-tab' && activeTabId !== null) {
+    const provider = getProviderKey(url);
+    let tabId: number | undefined = activeTabs[provider];
+
+    if (mode === 'active-tab' && tabId != null) {
         try {
-            const tab = await chrome.tabs.get(activeTabId);
-            if (tab.url !== url) await chrome.tabs.update(activeTabId, { url });
-            return activeTabId; // ✅ we can reuse it
-        } catch {
-            /* fall through – tab vanished */
-        }
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.url !== url) await chrome.tabs.update(tabId, { url });
+        } catch { tabId = undefined; }           // tab no longer exists
     }
 
-    // Otherwise create a fresh tab
-    const { id } = await chrome.tabs.create({ url, active: true });
-    if (!id) throw new Error('Could not create tab');
-    await setActive(id);
-    return id;
+    if (!tabId) {
+        const created = await chrome.tabs.create({ url, active: true });
+        if (!created.id) throw new Error('Could not create tab');
+        tabId = created.id;
+        await setActive(provider, tabId);
+    }
+
+    await chrome.tabs.update(tabId, { active: true });  // be sure it has focus
+    return tabId;
 }
 
-/** Inject the helper script and deliver the prompt */
-async function injectPrompt(tabId: number, prompt: string): Promise<string> {
+/** Inject helper script(s) and hand over the prompt. */
+async function injectPrompt(tabId: number, prompt: string, provider: ProviderKey): Promise<string> {
     await Promise.race([
-        waitForLoad(tabId),                // page finished
-        new Promise((r) => setTimeout(r, 15_000)), // …or max 15 s
+        waitForLoad(tabId),
+        new Promise(r => setTimeout(r, 15_000)),
     ]);
 
-    // idempotently inject the content script from the bundle root
     await chrome.scripting.executeScript({
         target: { tabId },
-        files: ['dist/promptInserter.js'],
-        injectImmediately: true,
+        files:  ['dist/activeTabButton.js', 'dist/promptInserter.js'],
     });
-    if (chrome.runtime.lastError) throw new Error(chrome.runtime.lastError.message);
 
-    // hand over the prompt
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        func:  (prov: string) => {
+            import(chrome.runtime.getURL('dist/activeTabButton.js'))
+                .then(mod => mod.initMakeTabActiveButton?.(() => true, prov));
+        },
+        args: [provider],                        // <- now legal
+    });
+
+    if (chrome.runtime.lastError) {
+        throw new Error(chrome.runtime.lastError.message ?? 'unknown runtime error');
+    }
+
+
+
     return new Promise<string>((resolve) => {
         chrome.tabs.sendMessage(
             tabId,
             { action: 'exportChat.insertPrompt', prompt },
-            (resp) => {
+            resp => {
                 if (chrome.runtime.lastError) {
                     return resolve(chrome.runtime.lastError.message);
                 }
@@ -95,32 +137,42 @@ async function injectPrompt(tabId: number, prompt: string): Promise<string> {
     });
 }
 
-/* ------------------------------------------------------------------ */
-/*  onMessage router                                                  */
-/* ------------------------------------------------------------------ */
+/* ────────────────────────── onMessage router ─────────────────────────── */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    /* book-keeping shortcuts – unchanged from earlier versions */
+    /* Resolve provider: explicit field → sender URL → '' */
+    const provider = msg?.provider
+        ?? (sender.tab?.url ? getProviderKey(sender.tab.url) : '');
+
+    /* bookkeeping routes */
     if (msg?.action === 'exportChat.setActiveTab') {
-        void setActive(sender.tab?.id ?? null).then(() => sendResponse('ok'));
+        void setActive(provider, sender.tab?.id ?? null).then(() => sendResponse('ok'));
         return true;
     }
+
     if (msg?.action === 'exportChat.clearActiveTab') {
-        if (sender.tab?.id === activeTabId) void setActive(null).then(() => sendResponse('ok'));
-        else sendResponse('ok');
+        if (sender.tab?.id === activeTabs[provider]) {
+            void setActive(provider, null).then(() => sendResponse('ok'));
+        } else sendResponse('ok');
         return true;
     }
-    if (msg?.action === 'exportChat.getStatus') {
-        sendResponse({ active: activeTabId !== null });
-        return;
-    }
-    if (msg?.action === 'exportChat.activeExists') {
-        sendResponse({ exists: activeTabId !== null });
+
+    if (msg?.action === 'exportChat.isActiveTab') {
+        sendResponse({ active: sender.tab?.id === activeTabs[provider] });
         return;
     }
 
-    /* ----------------- main “export” entry-point ------------------ */
+    if (msg?.action === 'exportChat.getStatus') {
+        sendResponse({ active: provider in activeTabs });
+        return;
+    }
+
+    if (msg?.action === 'exportChat.activeExists') {
+        sendResponse({ exists: provider in activeTabs });
+        return;
+    }
+
+    /* ------------------------- main export ------------------------- */
     if (msg?.action === 'exportChat.export') {
-        // Wrap the async work so we can return `true` immediately
         (async () => {
             try {
                 const { url, prompt, mode } = msg as {
@@ -130,20 +182,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 };
 
                 const tabId  = await ensureTargetTab(url, mode);
-                const result = await injectPrompt(tabId, prompt);
+                const result = await injectPrompt(tabId, prompt, getProviderKey(url));
                 sendResponse(result);
             } catch (err) {
                 sendResponse((err as Error).message);
             }
         })();
-
-        return true; // keep the message port open
+        return true;                       // keep port open
     }
 });
 
-/* ------------------------------------------------------------------ */
-/*  Clean up when the tab closes                                      */
-/* ------------------------------------------------------------------ */
+/* ───────────────────── clean up when tab closes ─────────────────────── */
 chrome.tabs.onRemoved.addListener((id) => {
-    if (id === activeTabId) void setActive(null);
+    for (const [prov, tId] of Object.entries(activeTabs)) {
+        if (tId === id) { void setActive(prov, null); break; }
+    }
 });

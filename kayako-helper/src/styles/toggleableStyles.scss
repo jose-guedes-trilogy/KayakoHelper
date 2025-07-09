@@ -543,7 +543,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 #{sel.$ticketsTableContainer} #{sel.$generalTableBody} tr td:not(:first-child):not(:nth-child(2)),
 #{sel.$ticketsTableContainer} #{sel.$generalTableBody} tr td:not(:first-child):not(:nth-child(2)) > div > div,
 #{sel.$ticketsTableContainer} #{sel.$generalTableBody} tr td:not(:first-child):not(:nth-child(2)) > div > span,
-:not(#{sel.$ticketsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableBody} tr td:not(:first-child) > div {
+:not(#{sel.$ticketsTableContainer}):not(#{sel.$resultsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableBody} tr td:not(:first-child) > div{
   text-align: center;
   padding: 0 !important;
 
@@ -553,7 +553,7 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 }
 
 // For non-case-list tables
-:not(#{sel.$ticketsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableBody} tr td:not(:first-child) {
+:not(#{sel.$ticketsTableContainer}):not(#{sel.$resultsTableContainer}) > #{sel.$generalTableContainer} #{sel.$generalTableBody} tr td:not(:first-child) {
   padding: 0;
 }
 

@@ -6,63 +6,87 @@
 
     <style>
         body      { font-family: system-ui, sans-serif; margin: 0; width: 22rem; }
-        nav       { display: flex; border-bottom: 1px solid #ddd; }
-        nav button{
-            flex: 1; padding: .6rem 0; border: 0; background:#f8f8f8;
-            font-weight:600; cursor:pointer;
-        }
-        nav button.active { background:#fff; border-bottom:2px solid dodgerblue; }
+        nav       { display:flex;border-bottom:1px solid #ddd; }
+        nav button{ flex:1;padding:.6rem 0;border:0;background:#f8f8f8;font-weight:600;cursor:pointer; }
+        nav button.active{ background:#fff;border-bottom:2px solid dodgerblue; }
 
-        section   { display:none; padding:1rem; }
-        section.active   { display:block; }
+        section   { display:none;padding:1rem; }
+        section.active{ display:block; }
 
-        .setting  { margin-bottom: .8rem; }
+        .kh-popup-setting{ margin-bottom:.8rem; }
         label     { user-select:none; }
+
+        ul{ list-style:none;padding-left:0; }
+        li{ line-height:1.3; }
+
+        #kh-ticket-info{ display:grid;grid-template-columns:max-content 1fr;gap:.5rem; }
+        .kh-ticket-info-label{ font-weight:600; }
+
+        /* sub-tab bar inside ticket list */
+        #kh-ticket-list-tabs{ display:flex;border-bottom:1px solid #ddd;margin-bottom:.3rem; }
+        #kh-ticket-list-tabs button{ flex:1;padding:.4rem 0;border:0;background:#f8f8f8;font-weight:600;cursor:pointer; }
+        #kh-ticket-list-tabs button.active{ background:#fff;border-bottom:2px solid dodgerblue; }
+
+        /* pagination */
+        #kh-pagination button{ margin:0 .25rem;padding:.15rem .5rem;border:1px solid #ccc;background:#f8f8f8;cursor:pointer; }
+        #kh-pagination button[disabled]{ opacity:.4;cursor:default; }
     </style>
 </head>
 <body>
 
-<!-- ─── tab bar ───────────────────────────────────────────────────── -->
+<!-- top-level tabs -->
 <nav>
     <button class="tab active" data-tab="main">Main</button>
     <button class="tab"        data-tab="settings">Settings</button>
 </nav>
 
-<!-- ─── MAIN (placeholder) ────────────────────────────────────────── -->
+<!-- MAIN -->
 <section id="tab-main" class="active">
-    <p>(Future features will live here.)</p>
+    <h4>This ticket</h4>
+    <div id="kh-ticket-info">
+        <div class="kh-ticket-info-label">ID:</div>              <div><span id="kh-popup-ticket-info-id">-</span></div>
+        <div class="kh-ticket-info-label">Subject:</div>         <div><span id="kh-popup-ticket-info-subject">-</span></div>
+        <div class="kh-ticket-info-label">Requester:</div>       <div><span id="kh-popup-ticket-info-requester-name">-</span></div>
+        <div class="kh-ticket-info-label">Requester Email:</div> <div><span id="kh-popup-ticket-info-requester-email">-</span></div>
+        <div class="kh-ticket-info-label">Your Replies:</div>    <div><span id="kh-popup-ticket-info-reply-count">0</span></div>
+    </div>
+
+    <!-- Notes -->
+    <label for="kh-popup-ticket-notes" style="display:block;margin:.8rem 0 .3rem;font-weight:600">Notes</label>
+    <textarea id="kh-popup-ticket-notes" rows="4" style="width:100%;padding:.4rem;font-family:inherit" disabled></textarea>
+
+    <hr />
+
+    <h4>Tickets</h4>
+    <!-- sub-tabs -->
+    <div id="kh-ticket-list-tabs">
+        <button class="list-tab active" data-list="saved">Saved</button>
+        <button class="list-tab"        data-list="visited">Visited</button>
+    </div>
+
+    <input type="search" id="kh-search-tickets"
+           placeholder="Filter by ID, subject, requester, notes…"
+           style="width:100%;padding:.3rem;margin-bottom:.5rem" />
+
+    <ul id="kh-ticket-list" style="max-height:12rem;overflow:auto;"></ul>
+    <div id="kh-pagination" style="text-align:center;margin-top:.5rem;"></div>
 </section>
 
-<!-- ─── SETTINGS ──────────────────────────────────────────────────── -->
+<!-- SETTINGS -->
 <section id="tab-settings">
-    <div class="setting">
-        <label>
-            <input type="checkbox" id="trainingModeCheckbox" />
-            Training mode <small>(warn before public replies)</small>
-        </label>
+    <div class="kh-popup-setting">
+        <label><input type="checkbox" id="kh-training-mode-checkbox" /> Training mode <small>(warn before public replies)</small></label>
     </div>
-
-    <div class="setting">
-        <label>
-            <input type="checkbox" id="allStylesCheckbox" />
-            Enable Kayako Helper styles
-        </label>
+    <div class="kh-popup-setting">
+        <label><input type="checkbox" id="kh-toggle-styles-checkbox" /> Enable Kayako Helper styles</label>
     </div>
-
     <hr />
-    <div class="setting">
-    <label for="wpmInput">Max words per minute&nbsp;</label>
-    <input type="number" id="wpmInput"
-                    value="200" min="50" max="800" step="10"
-                    style="width:6rem;padding:.2rem" />
+    <div class="kh-popup-setting">
+        <label for="kh-send-in-chunks-wpm-limit">Max words per minute&nbsp;</label>
+        <input type="number" id="kh-send-in-chunks-wpm-limit"
+               value="200" min="50" max="800" step="10"
+               style="width:6rem;padding:.2rem" />
     </div>
-
-    <hr />
-
-    <h4>This ticket</h4>
-    <div>Subject&nbsp;&nbsp;: <span id="subject">-</span></div>
-    <div>Requester : <span id="requesterName">-</span>&lt;<span id="requesterEmail">-</span>&gt;</div>
-    <div>Replies&nbsp;&nbsp;: <span id="replyCount">0</span></div>
 </section>
 
 <script type="module" src="popup.js"></script>

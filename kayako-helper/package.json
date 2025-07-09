@@ -10,7 +10,8 @@
     "dev": "npm-run-all --parallel watch-selectors vite-dev",
     "build": "node src/selectors/build-selectors.mjs && vite build",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
-    "build:debug": "node src/selectors/build-selectors.mjs && vite build --mode debug"
+    "build:debug": "node src/selectors/build-selectors.mjs && vite build --mode debug",
+    "postinstall": "ts-node -P tsconfig.scripts.json scripts/build-native.ts"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.326",
