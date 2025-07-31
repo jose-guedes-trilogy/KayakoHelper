@@ -47,11 +47,17 @@
                 /* ───── contentEditable-based UIs (ChatGPT) ───── */
                 field.innerHTML = prompt
                     .split('\n')
-                    .map(line => line
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;'))
-                    .join('<br>');
+                    .map(line => {
+                        const safe = line
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;');
+                        // blank line → empty paragraph with a <br> so the cursor can reach it
+                        return safe.trim() === ''
+                            ? '<p><br></p>'
+                            : `<p>${safe}</p>`;
+                    })
+                    .join('');
 
                 // move caret to the end so the user can keep typing
                 const range = document.createRange();

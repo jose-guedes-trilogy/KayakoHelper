@@ -4,29 +4,41 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build-selectors": "node src/selectors/build-selectors.mjs ",
-    "watch-selectors": "nodemon --watch src/selectors/selectors.jsonc --exec \"npm run build-selectors\" -q",
-    "vite-dev": "vite dev",
+    "build-selectors": "node src/selectors/build-selectors.mjs",
+    "build-native": "node --no-warnings --loader ts-node/esm scripts/build-native.ts",
+    "clean": "rimraf dist",
+    "vite-dev": "vite dev --config configs/vite.dev.ts",
+    "watch-selectors": "nodemon --watch src/selectors/selectors.jsonc -q -x \"npm run build-selectors\"",
     "dev": "npm-run-all --parallel watch-selectors vite-dev",
-    "build": "node src/selectors/build-selectors.mjs && vite build",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
-    "build:debug": "node src/selectors/build-selectors.mjs && vite build --mode debug",
-    "postinstall": "ts-node -P tsconfig.scripts.json scripts/build-native.ts"
+    "build": "npm run clean && npm run build-native && npm run build:bg && npm-run-all --sequential build:cs:* build:helpers build:shared build:popup",
+    "build:cs": "npm-run-all --parallel build:cs:kayako build:cs:chatgpt build:cs:gemini build:cs:ephor",
+    "build:bg": "vite build --config ./configs/vite.bg.ts",
+    "build:cs:kayako": "vite build --config ./configs/vite.cs.kayako.ts",
+    "build:cs:chatgpt": "vite build --config ./configs/vite.cs.chatgpt.ts",
+    "build:cs:gemini": "vite build --config ./configs/vite.cs.gemini.ts",
+    "build:cs:ephor": "vite build --config ./configs/vite.cs.ephor.ts",
+    "build:popup": "vite build --config ./configs/vite.popup.ts",
+    "build:shared": "vite build --config ./configs/vite.activeTabButton.ts",
+    "build:helpers": "vite build --config ./configs/vite.activeTabButton.ts && vite build --config ./configs/vite.promptInserter.ts"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.326",
-    "@types/node": "^22.15.30",
+    "@types/node": "^22.16.2",
     "json5": "^2.2.3",
     "nodemon": "^3.1.10",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.1",
     "sass": "^1.89.2",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vite-plugin-static-copy": "^3.0.0"
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "sanitize-html": "^2.17.0"
+    "sanitize-html": "^2.17.0",
+    "uuid": "^11.1.0"
   }
 }

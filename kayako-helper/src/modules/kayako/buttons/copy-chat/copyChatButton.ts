@@ -1,13 +1,13 @@
 /* modules/copy-chat/copyChatButton.ts
    ──────────────────────────────────────────────────────────
    Adds a “Copy chat” button on conversation pages.
-   Now uses an explicit UI-state machine so the tabButtonManager’s
+   Now uses an explicit UI-state machine so the buttonManager’s
    re-labels never overwrite our “⏳ / ✅ / ❌” feedback. */
 
 import { EXTENSION_SELECTORS }   from '@/generated/selectors.ts';
 import { fetchTranscript }       from '@/utils/api.js';
 import { isConvPage, currentConvId } from '@/utils/location.js';
-import { registerTabButton }     from '@/utils/tabButtonManager.ts';
+import { registerButton }     from '@/modules/kayako/buttons/buttonManager.ts';
 
 /* ------------------------------------------------------------------ */
 /* Constants & Types                                                  */
@@ -54,7 +54,7 @@ export function bootCopyChatButton(): void {
     };
 
     /* ---------- Feature wiring ---------- */
-    registerTabButton({
+    registerButton({
         id: BTN_ID,
         label: buildLabel,
         routeTest: isConvPage,
@@ -79,6 +79,9 @@ export function bootCopyChatButton(): void {
                 setState('idle', btn);
             }
         },
+
+        groupId   : EXTENSION_SELECTORS.tabStripCustomButtonAreaGroup2,
+        groupOrder: 2,
     });
 
     /* ------------------------------------------------------------------ */
@@ -98,7 +101,7 @@ export function bootCopyChatButton(): void {
                 setTimeout(() => setState('idle'), RESET_MS);
             })
             .catch(err => {
-                console.error('[copyChat] export failed', err);
+                console.log('[copyChat] export failed', err);
                 setState('err', el);
                 setTimeout(() => setState('idle'), RESET_MS);
 

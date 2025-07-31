@@ -1,9 +1,9 @@
-/*  Kayako Helper – replyResizer.ts
+/*  Kayako Helper – replyResizer.ts  (rev-v2)
     ──────────────────────────────────────────────────────────────────
     • Drag-to-resize bar (+ stored height per conversation)
-    • Auto-expand: whenever content overflows *and* the current
-      height is below DEFAULT_MAX, grow just enough (up to the cap)
-      so the scrollbar disappears. Works for typing *and* pasting.  */
+    • Auto-expand to hide the scrollbar when typing/pasting
+    • NEW: double-click the bar to collapse → MIN, or restore to a
+      “best fit” height (≤ DEFAULT_MAX) if already collapsed.          */
 
 import {
     KAYAKO_SELECTORS,
@@ -68,10 +68,42 @@ function injectBar(chromeEl: HTMLElement): void {
 
     chromeEl.prepend(bar);
     attachDrag(bar);
+    attachDoubleClick(bar);   // ← NEW
+}
+function toggleCollapseExpand(): void {
+    const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
+    if (!wrap || !inner) return;
+
+    const curH = getCurrentHeight();
+    const key  = currentConvId() ?? 'global';
+
+    if (curH > MIN_HEIGHT + 1) {                     // ① collapse
+        applySize(MIN_HEIGHT);
+        stored[key] = MIN_HEIGHT;
+        return;
+    }
+
+    /* ② expand – use scrollHeight *unless* it’s too small,
+          then default to DEFAULT_MAX                         */
+    const fit     = inner.scrollHeight;
+    const desired = fit > MIN_HEIGHT + 1 ? fit : DEFAULT_MAX;
+    const newH    = Math.min(desired, DEFAULT_MAX);
+
+    applySize(newH);
+    stored[key] = newH;
 }
 
 function attachDrag(bar: HTMLElement): void {
     bar.addEventListener('mousedown', e => {
+        /* Fast double-click? handle & bail */
+        if (e.detail === 2) {
+            e.preventDefault();
+            toggleCollapseExpand();
+            return;
+        }
+
+        /* Normal drag-to-resize below (unchanged) */
         e.preventDefault();
 
         const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
@@ -87,7 +119,7 @@ function attachDrag(bar: HTMLElement): void {
 
         const onUp = () => {
             document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
+            document.removeEventListener('mouseup',   onUp);
             stored[currentConvId() ?? 'global'] = getCurrentHeight();
         };
 
@@ -96,11 +128,36 @@ function attachDrag(bar: HTMLElement): void {
     });
 }
 
-/* ────────────────────── auto-expand ─────────────────────── */
+/* ───────────────────── NEW: dbl-click toggle ───────────────────── */
 
-/* …inside replyResizer.ts … */
+function attachDoubleClick(bar: HTMLElement): void {
+    bar.addEventListener('dblclick', () => {
+        const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+        const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
+        if (!wrap || !inner) return;
 
-/* ────────────────────── auto-expand ─────────────────────── */
+        const curH = getCurrentHeight();
+        const key  = currentConvId() ?? 'global';
+
+        /* Collapse if taller than MIN; tolerate ±1 px rounding */
+        if (curH > MIN_HEIGHT + 1) {
+            applySize(MIN_HEIGHT);
+            stored[key] = MIN_HEIGHT;
+            return;
+        }
+
+        /* Already at MIN → expand:
+           – “Best fit” to content if ≤ DEFAULT_MAX
+           – Otherwise hard-cap at DEFAULT_MAX                        */
+        const desired  = Math.max(inner.scrollHeight, MIN_HEIGHT);
+        const newH     = desired <= DEFAULT_MAX ? desired : DEFAULT_MAX;
+
+        applySize(newH);
+        stored[key] = newH;
+    });
+}
+
+/* ────────────────────── auto-expand (unchanged) ─────────────────────── */
 
 function maybeAttachAutoExpand(wrap: HTMLElement): void {
     const inner = wrap.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
@@ -110,19 +167,14 @@ function maybeAttachAutoExpand(wrap: HTMLElement): void {
 
     const scheduleCheck = () => requestAnimationFrame(checkOverflowAndExpand);
 
-    /* Content changes that already triggered expansion */
     inner.addEventListener('input', scheduleCheck);
     inner.addEventListener('paste', scheduleCheck);
-
-    /* NEW: catch pure “newline” presses that add <br> but no text */
     inner.addEventListener('keyup', (ev: KeyboardEvent) => {
         if (ev.key === 'Enter') scheduleCheck();
     });
 
-    /* first run in case a draft is pre-loaded */
     scheduleCheck();
 }
-
 
 function checkOverflowAndExpand(): void {
     const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
@@ -166,7 +218,7 @@ function getCurrentHeight(): number {
 
 function applyInitialSize(): void {
     const key = currentConvId() ?? 'global';
-    applySize(stored[key] ?? DEFAULT_MAX);
+    applySize(MIN_HEIGHT);
 }
 
 /* ────────── conversation change watch (Kayako SPA) ───────── */

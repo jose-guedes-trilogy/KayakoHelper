@@ -1,6 +1,6 @@
 {
-  "name": "Kayako Helper",
-  "description": "Every Kayako Agent's best friend.",
+  "name": "OmniHelper",
+  "description": "Every Central Support agent's best friend.",
   "version": "1.0.0",
   "manifest_version": 3,
 
@@ -55,7 +55,8 @@
       ],
       "js": ["dist/contentEphor.js"],
       "css": ["dist/content.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "type": "module"
     }
   ],
 
@@ -82,7 +83,8 @@
     "scripting",
     "storage",
     "activeTab",
-    "clipboardWrite"
+    "clipboardWrite",
+    "cookies"
   ],
 
   "web_accessible_resources": [

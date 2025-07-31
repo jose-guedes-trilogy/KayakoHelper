@@ -3,13 +3,18 @@
 // Builds utils/native/kayako_helper.exe **once** using PyInstaller.
 // Skip if the exe is already present (CI/CD friendly).
 
+// scripts/build-native.ts
 import { existsSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, dirname } from "path";
 import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
 
-const root = resolve(__dirname, "..");
-const exePath = join(root, "utils", "native", "kayako_helper.exe");
-const helperPy = join(root, "utils", "native", "helper.py");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const root       = resolve(__dirname, "..");
+const nativeDir  = join(root, "src", "utils", "native");   // 👈  one-liner
+const exePath    = join(nativeDir, "kayako_helper.exe");
+const helperPy   = join(nativeDir, "helper.py");
 
 if (existsSync(exePath)) {
     console.log("✓ Native helper already built – skipping");
@@ -26,7 +31,7 @@ const r = spawnSync(
         "--name",
         "kayako_helper",
         "--distpath",
-        join(root, "utils", "native"),
+        nativeDir,          // 👈  drop the hard-coded utils/native path
         helperPy,
     ],
     { stdio: "inherit" }

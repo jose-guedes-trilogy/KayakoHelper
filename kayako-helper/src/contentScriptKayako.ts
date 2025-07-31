@@ -6,6 +6,7 @@ import '@/modules/kayako/styleManager.ts'
 
 import { setUpUI }                  from '@/utils/setUpUI';
 
+import { bootLocationWatcher }      from '@/modules/kayako/locationWatcher.ts';
 import { bootCopyChatButton }       from '@/modules/kayako/buttons/copy-chat/copyChatButton.ts';
 import { bootAtlasHighlighter }     from '@/modules/kayako/atlasHighlighter.js';
 import { bootLightboxEnhancer }     from '@/modules/kayako/lightboxEnhancer.js';
@@ -22,15 +23,19 @@ import { bootTagCleaner }           from "@/modules/kayako/ui-clean-up/tagCleane
 import { bootExportChatButton }     from "@/modules/kayako/buttons/export-chat/exportChatButton.ts";
 import { bootCopySearchChats }      from "@/modules/kayako/buttons/copy-search/copySearchChats.ts";
 import { bootSendChunks }           from "@/modules/kayako/reply-box/sendInChunks.ts";
-import { bootAssetsInspector }      from "@/modules/kayako/conversation-window-header/assetsInspector.ts";
-import {bootEmbeddingsSearch} from "@/modules/kayako/embeddingsSearch.ts";
-import {bootTargetBlankLinks} from "@/modules/kayako/ui-clean-up/targetBlankLinks.ts";
+import { bootAssetsInspector }      from "@/modules/kayako/buttons/assetsInspector/assetsInspectorIndex.ts";
+import { bootEmbeddingsSearch }     from "@/modules/kayako/embeddingsSearch.ts";
+import { bootTargetBlankLinks }     from "@/modules/kayako/ui-clean-up/targetBlankLinks.ts";
+import {bootHoverTicketPreview} from "@/modules/kayako/hoverTicketPreview.ts";
+import {bootEphorButton} from "@/modules/kayako/buttons/ephor/buttonEphor.ts";
 
 /* ---------- Global UI ---------- */
 setUpUI();
 
 
 /* ---------- Boot modules ---------- */
+
+bootLocationWatcher();
 
 bootAtlasHighlighter();
 bootLightboxEnhancer();
@@ -48,6 +53,7 @@ bootDownloadManager();
 bootCopyChatButton();
 bootSendToQcButton();
 bootExportChatButton().then(r => {});
+bootEphorButton().then(r => {});
 
 bootCopySearchChats();
 
@@ -55,3 +61,4 @@ bootSendChunks();
 bootAssetsInspector();
 
 bootEmbeddingsSearch();
+bootHoverTicketPreview();

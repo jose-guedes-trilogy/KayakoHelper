@@ -31,7 +31,7 @@
     "jsx":               "preserve",
     "baseUrl":           "./src",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["*"]
     },
 
     /* ▾ Global types ▾ */
@@ -49,7 +49,7 @@
   "include": [
     "src",
     "scripts",
-    "vite.config.ts",
+    "configs/vite.dev.ts",
     "dist/contentKayako.js",
     "dist/contentChatGPT.js",
     "dist/contentGemini.js",

@@ -22,8 +22,10 @@
     "ticketSubject": "[class*=ko-tabs_case__subject_]",
 
     /* Conversation Window Header */
+    "conversationWindowContainer": "[class*=ko-agent-content_layout__content_]",
     "conversationWindowHeader": "[class*=ko-agent-content_layout__heading_]",
     "conversationWindowHeaderInner": "[class*=ko-tabs__tabs_]",
+    "conversationWindowHeaderInnerTabContainer": "[class*=ko-tabs__list_]",
     "conversationWindowHeaderTab": "[class*=ko-tabs_tab__item_]",
     "conversationWindowHeaderSelectedTab": "[class*=ko-tabs_tab__item--shrink_]",
 
@@ -31,6 +33,8 @@
 
     "completeTicketButton": "[class*=ko-case-content__complete_]",
     "trashTicketButton": "[class*=ko-case-content__trash_]",
+
+    "sideConversationIcon": "[class*=ko-case-content__side-conversations_][class*=ko-case-content__selected_] svg path, [class*=ko-case-content__side-conversations_]:hover:not([aria-disabled]) svg path",
 
     /* END Conversation Window Header */
 
@@ -51,6 +55,8 @@
     "timelineItemAttachment": "[class*=ko-timeline-2_list_item_attachment__attachment_]",
 
     "timelineItemAttachmentNoteFlap": "[class*=ko-timeline-2_list_item__note_] .attachment-container-flap-hide",
+
+    "timelineItemPostLarge": "[class*=ko-timeline-2_list_post__large_]", // for "completed" and "SLA missed" messages
 
     "modeSelectorContainer": "[class*=ko-text-editor__group_]",
 
@@ -119,7 +125,11 @@
 
     "inboxTicketCountLeftMenu": "[class*=session__case-count-pill_]",
     "inboxTicketCountConversationsView": "[class*=ko-cases-list_sidebar_item__inbox_]",
+    "inboxTicketCountConversationsViewItem": "[class*=ko-cases-list_sidebar_item__item_]",
     "inboxTicketCountConversationsViewAllViews": "[class*=ko-cases-list_sidebar_item__counter_]",
+
+    "inboxTicketRowContainer": "[class*=ko-table_row__container_]",
+    "inboxTicketItemLink": "[class*=ko-cases-list_column_conversation__text-link_]",
 
     "searchResultsPageSideBarItemCounter": "[class*=ko-search-sidebar_item__counter_]",
 
@@ -187,6 +197,12 @@
     "sendInChunksButton": "#kh-send-in-chunks-btn",
 
     "tabStripCustomButtonArea": "#kh-tab-strip-custom-btn-area",
+    "tabStripCustomButtonAreaGroup": ".kh-tab-strip-custom-btn-area-group-container",
+
+
+    "tabStripCustomButtonAreaGroup1": "first-button-group",
+    "tabStripCustomButtonAreaGroup2": "second-button-group",
+
 
     "makeTabActiveButton": "#kh-make-tab-active-btn",
 
@@ -279,6 +295,18 @@
     "assetsGrid":              ".kh-assets-grid",
     "assetsHeader":            ".kh-assets-header",
     "assetsJumpButton":        ".kh-assets-jump",
-    "assetsList":              ".kh-assets-list"
+    "assetsList":              ".kh-assets-list",
+
+
+    /* Ticket preview tooltip */
+
+    "ticketPreviewTooltip": ".kh-ticket-preview-tooltip",
+    "ticketPreviewPost": ".kh-ticket-preview-post",
+    "ticketPreviewMeta": ".kh-ticket-preview-meta",
+    "ticketPreviewBody": ".kh-ticket-preview-body",
+    "ticketPreviewReply": ".kh-ticket-preview-reply",
+    "ticketPreviewCustomerReply": ".kh-ticket-preview-customer-reply",
+    "ticketPreviewNote": ".kh-ticket-preview-note"
+
   }
 }

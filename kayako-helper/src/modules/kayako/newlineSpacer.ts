@@ -22,6 +22,13 @@ import {
     EXTENSION_SELECTORS,
 } from '@/generated/selectors.ts';
 
+
+import {
+    registerEditorHeaderButton,
+    HeaderSlot,
+} from '@/modules/kayako/buttons/buttonManager.ts';
+
+
 const BTN_ID             = EXTENSION_SELECTORS.newLinesButton;
 const BLOCK_SELECTOR     = 'DIV,OL,UL';
 const HEADER_SELECTOR    = 'H1,H2,H3';
@@ -131,63 +138,6 @@ const ensureDoubleBreaksInDiv = (div: HTMLElement): void => {
 };
 
 /* ------------------------------------------------------------------ */
-/* Public bootstrap                                                   */
-/* ------------------------------------------------------------------ */
-
-export function bootNewlineSpacer(): void {
-    attachAllButtons();
-
-    // Kayako is an SPA—editors appear/destroy dynamically.
-    new MutationObserver(attachAllButtons).observe(document.body, {
-        childList: true,
-        subtree: true,
-    });
-}
-
-export default bootNewlineSpacer;
-
-/* ------------------------------------------------------------------ */
-/* DOM helpers                                                        */
-/* ------------------------------------------------------------------ */
-
-function attachAllButtons(): void {
-    document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.textEditorHeader).forEach(header => {
-        if (header.querySelector(BTN_ID)) return;
-
-        const btnDiv = document.createElement('div');
-        const btn = buildButton();
-
-        btnDiv.appendChild(btn);
-        btnDiv.style.cssText = 'display:flex;align-items:center;';
-
-        header.children.length
-            ? header.insertBefore(btnDiv, header.children[1]) // 2nd child
-            : header.appendChild(btnDiv);
-
-    });
-}
-
-function buildButton(): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = 'Add newlines';
-    btn.id = BTN_ID.replace(/^#/, '');
-    btn.className = EXTENSION_SELECTORS.defaultButtonClass.replace(/^./, '');
-
-    btn.addEventListener('click', e => {
-        const header = (e.currentTarget as HTMLElement).closest(KAYAKO_SELECTORS.textEditorHeader);
-        const editor = header?.parentElement?.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
-        if (!editor) {
-            console.warn('[newlineSpacer] editor area not found');
-            return;
-        }
-        addNewlines(editor);
-    });
-
-    return btn;
-}
-
-/* ------------------------------------------------------------------ */
 /* Formatting logic                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -255,4 +205,24 @@ function signalFroalaChanged(root: HTMLElement): void {
             inst.undo.saveStep();                  // add undo checkpoint
         }
     }
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Bootstrap – now via editor-header manager                          */
+/* ------------------------------------------------------------------ */
+
+export function bootNewlineSpacer(): void {
+    registerEditorHeaderButton({
+        id   : BTN_ID,
+        type : 'simple',
+        slot : HeaderSlot.SECOND,
+        label: 'Add newlines',
+        onClick(btn) {
+            const header  = btn.closest(KAYAKO_SELECTORS.textEditorHeader);
+            const editor  = header?.parentElement
+                ?.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
+            if (editor) addNewlines(editor);
+        },
+    });
 }

@@ -1,54 +1,56 @@
 /* modules/download-manager/createFolderButton.ts
    ──────────────────────────────────────────────────────────
-   Sets up the “Create folder” button – now via tabButtonManager. */
+   Sets up the “Create folder” button – now via buttonManager. */
 
 import {
     EXTENSION_SELECTORS, KAYAKO_SELECTORS,
 } from '@/generated/selectors.ts';
 
 import { currentConvId }       from '@/utils/location.ts';
-import { registerTabButton }   from '@/utils/tabButtonManager.ts';
+import { registerButton }   from '@/modules/kayako/buttons/buttonManager.ts';
 
 export function bootCreateFolderButton(): void {
-    registerTabButton({
+    registerButton({
         id   : EXTENSION_SELECTORS.createFolderButton.replace(/^#/, ''),
         label: () => '📁 Create folder',
-        routeTest: () => !!currentConvId(),   // only on ticket pages
+        routeTest: () => !!currentConvId(),
 
-        onClick(_btn) {
+        onClick() {
             const ticketId = currentConvId();
             if (!ticketId) return;
-
-            const requesterEmail = document.querySelector(KAYAKO_SELECTORS.requesterEmail)?.textContent?.trim();
-
+            const requester = document
+                .querySelector(KAYAKO_SELECTORS.requesterEmail)
+                ?.textContent?.trim();
             chrome.runtime.sendMessage({
                 action: 'createFolder',
-                ticketId: `${requesterEmail} - ${ticketId}`,
-                location: 'V'
+                ticketId: `${requester} - ${ticketId}`,
+                location: 'V',
             });
         },
 
-        onContextMenu(_ev, _btn) {
+        onContextMenu() {
             const ticketId = currentConvId();
             if (!ticketId) return;
-
-            const requesterEmail = document.querySelector(KAYAKO_SELECTORS.requesterEmail)?.textContent?.trim();
-
-            chrome.runtime.sendMessage({ action: 'createFolder',
-                ticketId: `${requesterEmail} - ${ticketId}`, location: 'DOWNLOADS' });
+            const requester = document
+                .querySelector(KAYAKO_SELECTORS.requesterEmail)
+                ?.textContent?.trim();
+            chrome.runtime.sendMessage({
+                action: 'createFolder',
+                ticketId: `${requester} - ${ticketId}`,
+                location: 'DOWNLOADS',
+            });
         },
+
+        groupId   : EXTENSION_SELECTORS.tabStripCustomButtonAreaGroup1,
+        groupOrder: 1,
     });
 
-    /* Result handler – untouched */
+    /* result listener unchanged */
     chrome.runtime.onMessage.addListener(msg => {
         if (msg.action !== 'createFolderResult') return;
-
-        if (!msg.success) {
-            alert(`❌ Error creating folder: ${msg.error}`);
-        } else if (msg.alreadyExisted) {
-            alert(`⚠️ Folder already exists at:\n${msg.path}`);
-        } else {
-            alert(`✅ Folder created at:\n${msg.path}`);
-        }
+        const { success, alreadyExisted, error, path } = msg;
+        if (!success)          alert(`❌ Error creating folder: ${error}`);
+        else if (alreadyExisted) alert(`⚠️ Folder already exists at:\n${path}`);
+        else                    alert(`✅ Folder created at:\n${path}`);
     });
 }

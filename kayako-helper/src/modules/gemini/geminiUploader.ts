@@ -30,7 +30,7 @@ export function bootGeminiUploader(): void {
     if (location.hostname !== 'gemini.google.com') return;
 
     waitForWrapper().then(async wrapper => {
-        if (wrapper.querySelector(`#${BTN_ID}`)) return; // already injected
+        if (wrapper.querySelector(`${BTN_ID}`)) return; // already injected
         await createButton(wrapper);
     });
 }

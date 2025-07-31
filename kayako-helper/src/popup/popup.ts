@@ -1,9 +1,9 @@
 /* Kayako Helper – popup.ts */
 
 import type { ToBackground, FromBackground } from '@/utils/messageTypes';
+import { TicketData } from '@/background/replyDataBg.ts';
 
 interface Prefs { trainingMode?: boolean; allStyles?: boolean; sendChunksWPM?: number; }
-interface TicketData { count: number; name: string; email: string; subject: string; notes?: string }
 
 /* ─ constants & state ─ */
 const ITEMS_PER_PAGE = 10;
@@ -36,9 +36,11 @@ const refs = {
     searchBox : document.getElementById('kh-search-tickets')  as HTMLInputElement,
     list      : document.getElementById('kh-ticket-list')     as HTMLUListElement,
     pager     : document.getElementById('kh-pagination')      as HTMLElement,
+
+    ephorToken : document.getElementById('kh-ephor-api-token') as HTMLInputElement,
 };
 
-/* ─ boot ─ */
+
 document.addEventListener('DOMContentLoaded', () => {
     /* top-level tab bar */
     refs.tabButtons.forEach(btn =>
@@ -80,6 +82,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const wpm = Math.max(50, Math.min(800, Number(refs.inpWpm.value) || 200));
         refs.inpWpm.value = wpm.toString();
         chrome.storage.sync.set({ sendChunksWPM: wpm });
+    });
+
+    /* ------- Ephor API token ------- */
+    const MISC_KEY = 'kh-ephor-misc';
+
+    // populate
+    chrome.storage.local.get(MISC_KEY, raw => {
+        refs.ephorToken.value = raw[MISC_KEY]?.token ?? '';
+    });
+
+    // save on change
+    refs.ephorToken.addEventListener('change', () => {
+        const token = refs.ephorToken.value.trim();
+        chrome.storage.local.get(MISC_KEY, raw => {
+            const misc = raw[MISC_KEY] ?? { apiBase: 'https://api.ephor.ai', token: '' };
+            misc.token = token;
+            chrome.storage.local.set({ [MISC_KEY]: misc });
+        });
     });
 
     /* live ticket info */
@@ -145,7 +165,7 @@ function renderList(): void {
                 t.email.toLowerCase().includes(term) ||
                 (t.notes ?? '').toLowerCase().includes(term);
         })
-        .sort((a, b) => Number(b[0]) - Number(a[0]));   // newest first
+        .sort((a, b) => (b[1].lastAccess ?? 0) - (a[1].lastAccess ?? 0));   // newest first
 
     /* paging */
     const pageCount = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));

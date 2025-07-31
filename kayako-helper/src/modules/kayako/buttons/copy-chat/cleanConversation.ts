@@ -1,11 +1,10 @@
 /* turn Kayako “post” array ➜ readable chat transcript
+    src/modules/kayako/buttons/copy-chat/cleanConversation.ts
    – chronological (oldest → newest)
    – includes Product name extracted from the info‑bar
    – includes Ticket ID extracted from the current URL
    – each line: timestamp, author, role, kind (Reply / Note)
    – posts separated by a clear divider                              */
-
-import { KAYAKO_SELECTORS } from "@/generated/selectors.ts";
 
 const SEPARATOR = "\n[——— Post separator ———]\n";
 

@@ -21,9 +21,9 @@ import {
     Store, UrlEntry,
 } from '@/utils/providerStore.ts';
 import {
-    registerSplitTabButton,
-    SplitTabButtonConfig,
-} from '@/utils/tabButtonManager.ts';
+    registerSplitButton,
+    SplitButtonConfig,
+} from '@/modules/kayako/buttons/buttonManager.ts';
 import { openSettingsModal } from './settingsModal.ts';
 
 /* ───────────────────────── state ───────────────────────── */
@@ -43,7 +43,7 @@ export async function bootExportChatButton(): Promise<void> {
         await saveStore(store);
     }
 
-    const cfg: SplitTabButtonConfig = {
+    const cfg: SplitButtonConfig = {
         id: BTN_ID, rightId: MENU_ID, rightLabel: '▾',
         label : () => `${ICON[uiState]} ${uiState === 'idle' ? 'Export' :
             uiState === 'work' ? 'Working…' :
@@ -64,9 +64,12 @@ export async function bootExportChatButton(): Promise<void> {
         },
         hideDelayMs: HIDE_DELAY_MS,
         buildMenu  : rebuildDropdown,
+
+        groupId   : EXTENSION_SELECTORS.tabStripCustomButtonAreaGroup2,
+        groupOrder: 2,
     };
 
-    registerSplitTabButton(cfg);
+    registerSplitButton(cfg);
 }
 
 /* External helper (used by tests & background) */

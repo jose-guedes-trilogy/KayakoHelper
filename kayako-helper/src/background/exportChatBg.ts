@@ -105,7 +105,7 @@ async function injectPrompt(tabId: number, prompt: string, provider: ProviderKey
 
     await chrome.scripting.executeScript({
         target: { tabId },
-        files:  ['dist/activeTabButton.js', 'dist/promptInserter.js'],
+        files:  ['dist/promptInserter.js'],
     });
 
     await chrome.scripting.executeScript({

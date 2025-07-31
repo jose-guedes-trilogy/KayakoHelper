@@ -4,8 +4,8 @@
 $noteBackgroundColor: hsl(203 76% 99% / 1);
 
 #{sel.$messageOrNote} {
-    margin-top: 5px;
-    margin-bottom: 5px;
+    margin-top: 8px;
+    margin-bottom: 8px;
 
   /* Images in posts */
   img {
@@ -31,11 +31,35 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
 #{sel.$conversationWindowHeader} {
   border-bottom: 1px solid #D1D5D7;
 
-  box-shadow: 0 0 3px 1px hsl(203 10% 94% / 1);
+  box-shadow: none;
+
+  height: 45px;
+  align-items: center;
+  display: flex
+;
 }
 
 #{sel.$conversationWindowHeaderInner} {
   border-bottom: none !important;
+
+  width: 100%;
+  height: 100%;
+}
+
+#{sel.$conversationWindowHeaderInnerTabContainer}  {
+  > li, > li * {
+    /* Set a default max-width for the tabs */
+    max-width: 200px;
+
+    /* These three properties work together to create the ellipsis */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  > :nth-child(3), > :nth-child(3) * {
+    max-width: 300px;
+  }
 }
 
 #{sel.$conversationWindowHeaderTab} {
@@ -140,13 +164,18 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   background: $noteBackgroundColor !important;
 }
 
+#{sel.$timelineItemPostLarge} {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 
 /* ----- INTERNAL NOTES ----- */
 
 /* Internal notes in the ticket's timeline */
 #{sel.$timelineItemNote} {
   background: $noteBackgroundColor;
-  border-color: hsl(203 32% 60% / 1);
+  border-color: hsl(203 34% 60% / 1);
   border-width: 5px;
   border-top: 1px solid hsl(203 43% 94% / 1);
   border-bottom: 1px solid hsl(203 43% 94% / 1);
@@ -469,6 +498,12 @@ $noteBackgroundColor: hsl(203 76% 99% / 1);
   color: white !important;
 }
 
+#{sel.$inboxTicketCountConversationsViewItem} {
+  &:hover {
+    background-color: hsl(203 14% 95% / 1);
+  }
+}
+
 #{sel.$inboxTicketCountConversationsViewAllViews} {
   position: relative;
   right: -4px;
@@ -625,3 +660,6 @@ $left-menu-hover-bg-color: hsl(268 18% 18% / 1);
 }
 
 
+#{sel.$sideConversationIcon} {
+  fill: hsl(203 40% 57% / 1) !important;
+}

@@ -1,7 +1,11 @@
 // src/backgroundScript.ts
 
-import './background/settings';
+import './background/settingsBg.ts';
 import './background/exportChatBg';
-import './background/createFolder';
-import './background/replyData';
-import './background/download-manager/downloadManagerBackground';
+import './background/createFolderBg.ts';
+import './background/replyDataBg.ts';
+import './background/downloadManagerBg.ts';
+import './background/ephorClient.ts';
+
+
+

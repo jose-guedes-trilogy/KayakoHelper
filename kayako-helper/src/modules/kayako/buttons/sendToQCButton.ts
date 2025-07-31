@@ -1,10 +1,10 @@
 /* ===========================================================================
- * src/modules/buttons/sendToQCButton.ts
+ * src/modules/buttons/sendToQCButton.ts  (v1.4.1)
  *
- *  Kayako Helper – “Send to QC” Button (v1.3)
- *  – v1.3  Convert h1/h2→h3 and bold all h3
+ *  Kayako Helper – “Send to QC” Button
+ *  – v1.4.1  • 🛠 FIX: duplicate-button bug + TS type mismatch
  * ---------------------------------------------------------------------------
- *  • Adds a tab-strip button that automates the full “QC pending” workflow:
+ *  • Adds a button that automates the full “QC pending” workflow:
  *      1. Reads the clipboard (preferring rich HTML).
  *      2. Normalises <p>→<div>, removes <hr>, converts h1/h2→h3, bolds h3.
  *      3. Wraps it in the required template (preserving formatting).
@@ -20,16 +20,18 @@ import {
     KAYAKO_SELECTORS,
 } from '@/generated/selectors.ts';
 
-import { registerTabButton } from '@/utils/tabButtonManager.ts';
 import { isConvPage }        from '@/utils/location.js';
 import { addNewlines }       from '@/modules/kayako/newlineSpacer.ts';
 import { applySize }         from '@/modules/kayako/reply-box/replyResizer.ts';
+import {HeaderSlot, registerEditorHeaderButton} from "@/modules/kayako/buttons/buttonManager.ts";
 
 /* ------------------------------------------------------------------ */
 /* Constants & UI state                                               */
 /* ------------------------------------------------------------------ */
 
-const BTN_ID = EXTENSION_SELECTORS.sendToQcButton.replace(/^#/, '');
+/* 🛠 FIX 1 – keep the leading “#” so the querySelector in
+   tabButtonManager can find the element and avoid duplicates. */
+const BTN_ID = EXTENSION_SELECTORS.sendToQcButton;   // <─ CHANGED
 
 const ICON     = { idle: '📤', work: '⏳', ok: '✅', err: '❌' } as const;
 type UiState   = keyof typeof ICON;
@@ -40,75 +42,79 @@ const RESET_MS = 2_000;
 /* ------------------------------------------------------------------ */
 
 export function bootSendToQcButton(): void {
+    /* central UI-state tracker */
     let uiState: UiState = 'idle';
+    const label = () =>
+        `${ICON[uiState]} ${
+            uiState==='idle' ? 'Send to QC' :
+                uiState==='work' ? 'Working…'  :
+                    uiState==='ok'   ? 'Done'      : 'Failed' }`;
 
-    const label = (): string => {
-        switch (uiState) {
-            case 'idle': return `${ICON.idle} Send to QC`;
-            case 'work': return `${ICON.work} Working…`;
-            case 'ok'  : return `${ICON.ok} Done`;
-            case 'err' : return `${ICON.err} Failed`;
-        }
-    };
-
-    const setState = (state: UiState, btn?: HTMLButtonElement): void => {
-        uiState = state;
-        (btn ?? document.getElementById(BTN_ID) as HTMLButtonElement | null)!.textContent = label();
-    };
-
-    registerTabButton({
-        id: BTN_ID,
+    /* create + register the editor-header button */
+    registerEditorHeaderButton({
+        id   : BTN_ID,
+        type : 'simple',
+        slot : HeaderSlot.THIRD,
         label,
-        routeTest : isConvPage,
-        onClick   : handleClick,
+        async onClick(btn) {
+            /* 🛠 FIX 2 – the helper now only needs the new state */
+            const setState = (s: UiState) => { uiState=s; btn.textContent=label(); };
+            await handleClick(btn, setState);
+            if (uiState !== 'idle') {
+                setTimeout(() => { setState('idle'); }, RESET_MS);
+            }
+        },
     });
+}
 
-    /* --------------------------------------------------------- */
-    /* Click handler                                             */
-    /* --------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* Click handler                                                      */
+/* ------------------------------------------------------------------ */
 
-    async function handleClick(btn?: HTMLButtonElement): Promise<void> {
-        const self = btn ?? document.getElementById(BTN_ID) as HTMLButtonElement;
-        if (!self) return;
+/* 🛠 FIX 3 – simplify the callback signature so it matches the
+   setState we pass in (and remove the unused second argument). */
+async function handleClick(
+    self: HTMLButtonElement,
+    setState: (s: UiState) => void,
+): Promise<void> {
 
-        setState('work', self);
+    setState('work');
 
-        try {
-            /* 1 · Grab the clipboard (prefer rich HTML) */
-            const clipHtml = await readClipboardHtml();
+    try {
+        /* 1 · Grab the clipboard (prefer rich HTML) */
+        const clipHtml = await readClipboardHtml();
 
-            /* 2 · Build the template (normalise & clean) */
-            const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, ' ');
+        /* 2 · Build the template (normalise & clean) */
+        const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, ' ');
 
-            /* 3 · Inject into the active Froala editor */
-            const editor = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
-            if (!editor) throw new Error('Reply editor not found');
-            editor.innerHTML = html;
+        /* 3 · Inject into the active Froala editor */
+        const editor = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
+        if (!editor) throw new Error('Reply editor not found');
+        editor.innerHTML = html;
 
-            /* 4 · Tidy spacing */
-            addNewlines(editor);
+        /* 4 · Tidy spacing */
+        addNewlines(editor);
 
-            /* 5 · Switch to Internal-Note mode (robust click) */
-            const noteBtn = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.activateNoteModeButton);
-            if (!noteBtn) throw new Error('Note-mode button not found');
-            simulateClick(noteBtn);
+        /* 5 · Switch to Internal-Note mode (robust click) */
+        const noteBtn = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.activateNoteModeButton);
+        if (!noteBtn) throw new Error('Note-mode button not found');
+        simulateClick(noteBtn);
 
-            /* 6 · Add the qc_pending tag */
-            await addTag('qc_pending');
+        /* 6 · Add the qc_pending tag */
+        await addTag('qc_pending');
 
-            /* ✅ All good */
-            setState('ok', self);
-            setTimeout(() => setState('idle'), RESET_MS);
+        /* ✅ All good */
+        setState('ok');
+        setTimeout(() => setState('idle'), RESET_MS);
 
-            /* Enlarge reply box */
-            applySize(500);
+        /* Enlarge reply box */
+        applySize(500);
 
-        } catch (err) {
-            console.error('[SendToQC] failed:', err);
-            alert(`Send to QC failed: ${(err as Error).message}`);
-            setState('err', self);
-            setTimeout(() => setState('idle'), RESET_MS);
-        }
+    } catch (err) {
+        console.error('[SendToQC] failed:', err);
+        alert(`Send to QC failed: ${(err as Error).message}`);
+        setState('err');
+        setTimeout(() => setState('idle'), RESET_MS);
     }
 }
 
@@ -136,6 +142,7 @@ async function readClipboardHtml(): Promise<string> {
     const txt = await navigator.clipboard.readText();
     return txt.replace(/\n/g, '<br>');
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Template & normalisation                                           */
@@ -170,14 +177,9 @@ function normalizeParagraphs(fragment: string): string {
         h.replaceWith(h3);
     });
 
-    /* 1c ─ Wrap every <h3> content in <strong> to force bold */
-    tmp.querySelectorAll('h3').forEach(h3 => {
-        h3.innerHTML = `<strong>${h3.innerHTML}</strong>`;
-    });
-
-    /* 1d ─ Wrap every <h4> content in <strong> to force bold */
-    tmp.querySelectorAll('h4').forEach(h4 => {
-        h4.innerHTML = `<strong>${h4.innerHTML}</strong>`;
+    /* 1c ─ Wrap every <h3> & <h4> content in <strong> to force bold */
+    tmp.querySelectorAll('h3,h4').forEach(h => {
+        h.innerHTML = `<strong>${h.innerHTML}</strong>`;
     });
 
     /* 2 ─ Strip data-* attributes everywhere */

@@ -8,6 +8,20 @@ const DEBOUNCE_MS = 350;        // keystroke debounce
 const HEADER_SEL  = '[class*="session__header-secondary_"]';
 const WRAPPER_ID  = "kh-embeddings-search-parent";
 
+
+interface SearchHit {
+    title: string;
+    url: string;
+    snippet: string;
+}
+interface SearchResp {
+    success: boolean;
+    corrected?: string;
+    results?: SearchHit[];
+    error?: string;
+}
+
+
 export function bootEmbeddingsSearch() {
     /* ----------------------------------------------------------------–
      * 1.  idempotent mount helper
@@ -26,7 +40,7 @@ export function bootEmbeddingsSearch() {
 
         const input = document.createElement("input");
         input.type = "search";
-        input.placeholder = "Search KB…";
+        input.placeholder = "Embeddings-based KB search…";
         input.autocomplete = "off";
         Object.assign(input.style, {
             width:        "100%",
@@ -102,19 +116,27 @@ export function bootEmbeddingsSearch() {
         };
 
         const triggerSearch = (q: string) => {
+            console.log("[KH] search →", q);
+
             lastQuery = q;
-            sendNativeMsg(
-                { type: "search", text: q, k: 10 },
-                (resp) => {
-                    if (q !== lastQuery) return; // stale
-                    if (!resp?.success) {
+            sendNativeMsg<{ type: "search"; text: string; k: number }, SearchResp>(
+                { type: "search", text: q, k: 10 }
+            )
+                .then((resp) => {
+                    console.log("[KH] resp:", resp);
+
+                    if (q !== lastQuery) return;          // stale debounce
+                    if (!resp.success) {
                         clearResults();
-                        console.error("KB search error:", resp?.error);
+                        console.error("KB search error:", resp.error);
                         return;
                     }
                     renderResults(resp, q);
-                }
-            );
+                })
+                .catch((err) => {
+                    clearResults();
+                    console.error("KB search exception:", err);
+                });
         };
 
         /* ── input events ────────────────────────────────────────── */

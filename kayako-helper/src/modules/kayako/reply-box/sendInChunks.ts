@@ -1,6 +1,6 @@
 /*  Kayako Helper – sendInChunks.ts
-    “Send in chunks” button + paced delivery (default 200 WPM)
-    v1.7 – 2025-07-08   ← bumped
+    “Send in chunks” button + paced delivery  (default 200 WPM)
+    v1.9.1 – 2025-07-16  ← fix <br …> detection
 ---------------------------------------------------------------------------- */
 
 import {
@@ -14,147 +14,120 @@ import {
     MIN_HEIGHT,
 } from '@/modules/kayako/reply-box/replyResizer.ts';
 
-/* ───────────────── Types & constants ───────────────── */
+/* ───────────────── Types, constants & utils ───────────────── */
 
-type ChunkState = {
-    chunks:  string[]; // stores raw **HTML** for each chunk
-    idx:     number;
-    timer?:  number;
-    tick?:   number;
-    nextAt?: number;
-};
+const DBG = true;
+const log = (...a: any[]) => DBG && console.log('[KH-SendChunks]', ...a);
+
+type ChunkState = { chunks: string[]; idx: number; timer?: number; tick?: number; nextAt?: number };
 
 const INPUT_SEL    = KAYAKO_SELECTORS.textEditorReplyArea;
 const FOOTER_SEL   = KAYAKO_SELECTORS.replyBoxFooter;
 const SEND_BTN_SEL = KAYAKO_SELECTORS.sendButtonPublicReply;
-
-const BTN_ID = EXTENSION_SELECTORS.sendInChunksButton.replace(/^#/, '');
-
+const BTN_ID       = EXTENSION_SELECTORS.sendInChunksButton.replace(/^#/, '');
 const PUBLIC_ACTIVE_SEL = KAYAKO_SELECTORS.replyModeSelectorOn;
 
-/** ── NEW SPLIT RULES ──────────────────────────────────────────────────
- *  A single *blank* HTML block is now enough to cut a chunk:
- *    • <div><br></div>      (or any <div …>…</div> that’s only a <br>)
- *    • <p><br></p>
- *    • ≥ 2 consecutive <br> tags outside of other blocks
- */
-const CHUNK_HTML_RE =
-    /(?:<(?:p|div)[^>]*>\s*(?:<br\s*\/?>|\s|&nbsp;)*<\/(?:p|div)>\s*)+|(?:<br\s*\/?>\s*){2,}/gi;
-
-/** Gap inserted when re-stitching remaining chunks after “Cancel”. */
+/* UI text */
 const GAP_HTML = '<div><br></div>';
 
-let prefs = { wpm: 200 };
-chrome.storage.sync.get({ sendChunksWPM: 200 }, r => {
-    prefs.wpm = +r.sendChunksWPM || 200;
-});
+/* NEW: matches <br>, <br />, <br data-foo="…">, etc. */
+const BR_TAG_RE = /<br\b[^>]*>/gi;
 
-/* ───────────────── Bootstrap ───────────────────────── */
+let prefs = { wpm: 200 };
+chrome.storage.sync.get({ sendChunksWPM: 200 }, r => prefs.wpm = +r.sendChunksWPM || 200);
+
+/* ───────────────── Bootstrapping ─────────────────────────── */
 
 export function bootSendChunks(): void {
     if ((window as any).__khSendChunksBooted) return;
     (window as any).__khSendChunksBooted = true;
+    log('bootSendChunks');
 
-    /* 🔸  ADD   attributes:true  +   attributeFilter:['class']  */
-    new MutationObserver(tryInject).observe(
-        document.body,
-        {
-            subtree: true,
-            childList: true,
-            characterData: true,
-            attributes: true,          // ← watch class changes
-            attributeFilter: ['class'] // ← only “class” to stay lightweight
-        },
-    );
+    new MutationObserver(tryInject).observe(document.body, {
+        subtree: true, childList: true, characterData: true,
+        attributes: true, attributeFilter: ['class'],
+    });
 
     tryInject();
 }
 
-/** True only when the Public Reply tab is active (Internal Notes has a different state). */
-function publicReplySelected(): boolean {
-    return !!document.querySelector(PUBLIC_ACTIVE_SEL);
-}
+/* ───────────────── Button injection / removal ───────────── */
 
-/* ───────────────── Injection ───────────────────────── */
-
-function tryInject(): void {
-    const footer = document.querySelector<HTMLElement>(FOOTER_SEL);
-    if (!footer) return;
-
-    const isMessenger = messengerSelected();
-    const isPublic    = publicReplySelected();
-    const existingBtn = footer.querySelector<HTMLElement>('#' + BTN_ID);
-
-    // Remove if we leave Messenger *or* switch to Internal Notes
-    if (existingBtn && (!isMessenger || !isPublic)) {
-        existingBtn.remove();
-        return;
-    }
-
-    // Only add when Messenger **and** Public Reply are both active
-    if (!isMessenger || !isPublic || existingBtn) return;
-
-    const sendBtn = footer.querySelector<HTMLButtonElement>(SEND_BTN_SEL);
-    if (!sendBtn) return;
-
-    const btn  = document.createElement('button');
-    btn.id     = BTN_ID;
-    btn.className = 'ko-button ko-button--secondary';        // UNIQUE styling!
-    btn.addEventListener('click', onClickSendChunks);
-
-    const span = document.createElement('span');
-    span.className   = 'ko-button__span_ka3fcv';
-    span.textContent = 'Send in chunks';
-    btn.appendChild(span);
-
-    footer.insertBefore(btn, sendBtn);
-}
-
+function publicReply(): boolean     { return !!document.querySelector(PUBLIC_ACTIVE_SEL); }
 function messengerSelected(): boolean {
     const el = document.querySelector<HTMLElement>('[class*=ko-channel-selector_selected-channel__text_]');
     return !!el && /^Messenger\b/i.test(el.textContent?.trim() || '');
 }
 
-/* ───────────────── Runtime ─────────────────────────── */
+function tryInject(): void {
+    const footer = document.querySelector<HTMLElement>(FOOTER_SEL);
+    if (!footer) return;
+
+    const inMessenger = messengerSelected(), inPublic = publicReply();
+    const btn = footer.querySelector<HTMLElement>(`#${BTN_ID}`);
+
+    if (btn && (!inMessenger || !inPublic)) { btn.remove(); return; }
+    if (!inMessenger || !inPublic || btn)   return;
+
+    const sendBtn = footer.querySelector<HTMLButtonElement>(SEND_BTN_SEL);
+    if (!sendBtn) return;
+
+    const newBtn = document.createElement('button');
+    newBtn.id        = BTN_ID;
+    newBtn.className = 'ko-button ko-button--secondary';
+    newBtn.addEventListener('click', onClickSendChunks);
+
+    const span = document.createElement('span');
+    span.className = 'ko-button__span_ka3fcv';
+    span.textContent = 'Send in chunks';
+    newBtn.appendChild(span);
+
+    footer.insertBefore(newBtn, sendBtn);
+}
+
+/* ───────────────── Runtime ──────────────────────────────── */
 
 const state: ChunkState = { chunks: [], idx: 0 };
 
-async function onClickSendChunks(ev: MouseEvent): Promise<void> {
+async function onClickSendChunks(): Promise<void> {
+    log('button', state.timer ? '→ cancel' : 'clicked');
+
     if (state.timer) { abortRun(); return; }
 
-    const editor = getEditorElement();
-    if (!editor) return;
+    const editor = getEditor();
+    if (!editor) { log('⚠️ editor not found'); return; }
 
     const parts = htmlToChunks(editor.innerHTML);
-    if (parts.length <= 1) return;
+    log('chunk count =', parts.length);
+    if (parts.length <= 1) { log('nothing to chunk'); return; }
 
     Object.assign(state, { chunks: parts, idx: 0 });
     await writeToEditor(parts[0]);
     await new Promise(r => requestAnimationFrame(r));
-    triggerSend();
+    if (!triggerSend()) { abortRun(); return; }
     scheduleNext();
 }
 
-/* ───────────────── Scheduler ──────────────────────── */
+/* ───────────────── Scheduler ────────────────────────────── */
 
 async function scheduleNext(): Promise<void> {
     state.idx += 1;
     if (state.idx >= state.chunks.length) { abortRun(false); return; }
 
-    await waitForEditorEmpty();
+    await waitUntilEmpty();
 
-    const chunk = state.chunks[state.idx];
-    await writeToEditor(chunk);
+    const next = state.chunks[state.idx];
+    await writeToEditor(next);
 
-    const delay = Math.max(500, words(chunk) * 60_000 / prefs.wpm);
+    const delay = Math.max(500, words(next) * 60_000 / prefs.wpm);
     let secs    = Math.ceil(delay / 1000);
     state.nextAt = Date.now() + delay;
 
-    refreshBtnLabel(secs);
+    refreshBtn(secs);
     state.tick = window.setInterval(() => {
         secs = Math.max(0, Math.ceil((state.nextAt! - Date.now()) / 1000));
-        refreshBtnLabel(secs);
-    }, 1_000);
+        refreshBtn(secs);
+    }, 1000);
 
     state.timer = window.setTimeout(() => {
         clearInterval(state.tick!);
@@ -163,169 +136,210 @@ async function scheduleNext(): Promise<void> {
     }, delay);
 }
 
-/* ───────────────── Helpers ────────────────────────── */
+/* ───────────────── DOM helpers ─────────────────────────── */
 
-function getEditorElement(): HTMLElement | null {
-    const wrap = document.querySelector<HTMLElement>(INPUT_SEL);
-    return wrap?.matches('.fr-element[contenteditable]')
+function getEditor(): HTMLElement | null {
+    const wrap  = document.querySelector<HTMLElement>(INPUT_SEL);
+    const inner = wrap?.matches('.fr-element[contenteditable]')
         ? wrap
-        : wrap?.querySelector<HTMLElement>('.fr-element[contenteditable]') ?? null;
+        : wrap?.querySelector<HTMLElement>('.fr-element[contenteditable]');
+    return inner ?? null;
 }
 
-function waitForEditorEmpty(timeoutMs = 5_000): Promise<void> {
+function waitUntilEmpty(max = 5000): Promise<void> {
     return new Promise(res => {
-        const editor = getEditorElement();
-        if (!editor) { res(); return; }
+        const ed = getEditor();
+        if (!ed) { res(); return; }
+        if (htmlToPlain(ed.innerHTML).trim() === '') { res(); return; }
 
-        if (htmlToPlain(editor.innerHTML).trim() === '') { res(); return; }
-
-        const obs = new MutationObserver(() => {
-            if (htmlToPlain(editor.innerHTML).trim() === '') {
-                obs.disconnect(); clearTimeout(to); res();
-            }
+        const mo = new MutationObserver(() => {
+            if (htmlToPlain(ed.innerHTML).trim() === '') { mo.disconnect(); clearTimeout(to); res(); }
         });
-        obs.observe(editor, { childList: true, subtree: true, characterData: true });
+        mo.observe(ed, { childList: true, subtree: true, characterData: true });
 
-        const to = setTimeout(() => { obs.disconnect(); res(); }, timeoutMs);
+        const to = setTimeout(() => { mo.disconnect(); res(); }, max);
     });
 }
 
-/** Writes **either** plain-text or raw HTML into the editor. */
 function writeToEditor(content: string): Promise<void> {
-    const editor = getEditorElement();
-    if (!editor) return Promise.resolve();
+    const ed = getEditor();
+    if (!ed) return Promise.resolve();
 
-    editor.innerHTML = /[<&>]/.test(content)
+    ed.innerHTML = /[<&>]/.test(content)
         ? content
         : content.replace(/\n/g, '<br>').replace(/ {2}/g, ' &nbsp;');
 
-    editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    ed.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
 
-    const $ = (window as any).jQuery as JQueryStatic | undefined;
-    $?.fn?.froalaEditor && $(editor).closest('.fr-box')
-        .data('froala.editor')
-        ?.events.trigger('contentChanged')
-        ?.undo.saveStep();
+    /* notify Froala if available */
+    try {
+        const $ = (window as any).jQuery as JQueryStatic | undefined;
+        $?.fn?.froalaEditor &&
+        $(ed).closest('.fr-box').data('froala.editor')?.events.trigger('contentChanged')?.undo.saveStep();
+    } catch { /* noop */ }
 
     return new Promise(r => requestAnimationFrame(r));
 }
 
 function triggerSend(): boolean {
-    const sendBtn = document.querySelector<HTMLButtonElement>(SEND_BTN_SEL);
-    if (!sendBtn) return false;
-    sendBtn.click();
-    return true;
+    const btn = document.querySelector<HTMLButtonElement>(SEND_BTN_SEL);
+    if (!btn) { log('⚠️ send button not found'); return false; }
+    btn.click(); return true;
 }
 
 function abortRun(restore = true): void {
     clearTimeout(state.timer!); clearInterval(state.tick!);
 
     if (restore && state.chunks.length) {
-        const remaining = state.chunks.slice(state.idx);
-        if (remaining.length) {
-            writeToEditor(remaining.join(GAP_HTML)).then(fitEditorHeight);
-        }
+        const rest = state.chunks.slice(state.idx);
+        rest.length && writeToEditor(rest.join(GAP_HTML)).then(adjustHeight);
     }
     Object.assign(state, { chunks: [], idx: 0, timer: undefined, tick: undefined, nextAt: undefined });
-    refreshBtnLabel();
+    refreshBtn();
 }
 
-function fitEditorHeight(): void {
-    const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+function adjustHeight(): void {
+    const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
     if (!wrap) return;
-
     const inner = wrap.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea) || wrap;
-    const needed = Math.max(MIN_HEIGHT, inner.scrollHeight + 4);
-    applySize(Math.min(DEFAULT_MAX, needed));
+    applySize(Math.min(DEFAULT_MAX, Math.max(MIN_HEIGHT, inner.scrollHeight + 4)));
 }
 
 /* ───────── UI helpers ───────── */
 
-function getBtn(): HTMLButtonElement | null {
-    return document.getElementById(BTN_ID) as HTMLButtonElement | null;
+function refreshBtn(secs?: number): void {
+    const span = document.getElementById(BTN_ID)?.querySelector('span');
+    if (!span) return;
+    span.textContent = state.timer
+        ? `Cancel (${secs ?? Math.max(0, Math.ceil((state.nextAt! - Date.now()) / 1000))}s)`
+        : 'Send in chunks';
 }
 
-function refreshBtnLabel(secs?: number): void {
-    const span = getBtn()?.querySelector('span');
-    if (!span) return;
+/* ───────── Chunk splitter  – NEW! ───────── */
 
-    if (state.timer) {
-        const s = secs ?? Math.max(0, Math.ceil((state.nextAt! - Date.now()) / 1000));
-        span.textContent = `Cancel (${s}s)`;
-    } else {
-        span.textContent = 'Send in chunks';
+/**
+ * DOM-based splitter:
+ *   • tags any pair `<br><br>` *anywhere* in the tree
+ *   • tags an empty `<div>` / `<p>` (only whitespace, &nbsp; or a single `<br>`)
+ *   • adds a harmless comment node `<!-- KH-SEP -->`
+ *   • serialises outerHTML once and splits on that comment
+ *
+ * Unlike the old version, it doesn’t care about nesting — so a blank line
+ * inside `<li>` finally counts.  No giant regexes, no fragile “top-level only”.
+ */
+function htmlToChunks(html: string): string[] {
+    const SEP  = 'KH-SEP';
+    const root = document.createElement('div');
+    root.innerHTML = html;
+
+    const after = (ref: Node) =>
+        ref.parentNode!.insertBefore(document.createComment(SEP), ref.nextSibling);
+
+    /* 1️⃣  Split EMPTY <div>/<p> blocks */
+    [...root.querySelectorAll('div, p')].forEach(el => {
+        const blank = el.textContent?.trim() === '' &&
+            el.innerHTML.replace(BR_TAG_RE, '').replace(/&nbsp;|\s+/gi, '') === '';
+        if (blank) { after(el); el.remove(); }
+    });
+
+    /* 2️⃣  Split on <br><br>  (same logic as v1.12) */
+    [...root.querySelectorAll('br')].forEach(br1 => {
+        let nxt = br1.nextSibling;
+        while (nxt && nxt.nodeType === 3 && !nxt.textContent!.trim())
+            nxt = nxt.nextSibling;
+        if (!(nxt && nxt.nodeType === 1 && (nxt as HTMLElement).tagName === 'BR')) return;
+
+        const li = br1.closest('li');
+        if (li) {
+            let tailStart = nxt.nextSibling;
+            while (tailStart && tailStart.nodeType === 3 && !tailStart.textContent!.trim())
+                tailStart = tailStart.nextSibling;
+
+            if (!tailStart) {            /* just mark boundary */
+                after(li);
+                removeBetween(br1, nxt);
+                return;
+            }
+
+            const liTail = li.cloneNode(false) as HTMLElement;
+            while (tailStart) {
+                const next = tailStart.nextSibling;
+                liTail.appendChild(tailStart);
+                tailStart = next;
+            }
+            after(li);
+            li.parentNode!.insertBefore(liTail, li.nextSibling!.nextSibling);
+            removeBetween(br1, nxt);
+            return;
+        }
+
+        after(nxt);
+        removeBetween(br1, nxt);
+    });
+
+    /* 3️⃣  Serialise → raw chunks */
+    const raw = root.innerHTML
+        .split(`<!--${SEP}-->`)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    /* 4️⃣  Fix ordered-list numbering */
+    const fixed: string[] = [];
+    let inOl = false;
+    let counter = 0;
+
+    raw.forEach(chunk => {
+        let s = chunk.trim();
+
+        /* chunk with its own <ol …> */
+        if (/^<ol\b/i.test(s)) {
+            /* ensure it closes */
+            if (!/<\/ol>/i.test(s)) s += '</ol>';
+
+            /* figure out current number */
+            const m = s.match(/<ol[^>]*start\s*=\s*["']?(\d+)/i);
+            counter = m ? parseInt(m[1], 10) : 1;
+            inOl = true;
+
+            fixed.push(s);
+            return;
+        }
+
+        /* orphan <li> that belongs to the running list */
+        if (/^<li\b/i.test(s) && inOl) {
+            counter += 1;
+            s = s.replace(/\s*<\/ol>\s*$/i, '');               // strip stray </ol> if any
+            s = `<ol start="${counter}">\n${s}\n</ol>`;
+            fixed.push(s);
+            return;
+        }
+
+        /* any other content closes the list context */
+        inOl = false;
+        counter = 0;
+        fixed.push(s);
+    });
+
+    return fixed;
+
+    /* helper – remove nodeA, nodeB and everything between */
+    function removeBetween(a: Node, b: Node) {
+        let n: Node | null = a;
+        while (n) {
+            const next = n.nextSibling;
+            n.remove();
+            if (n === b) break;
+            n = next;
+        }
     }
 }
 
-/* ───────── Text helpers ───────── */
+/* ───────── Misc. helpers ───────── */
 
-const words = (html: string) => htmlToPlain(html).split(/\s+/).filter(Boolean).length;
+const words = (h: string) => htmlToPlain(h).split(/\s+/).filter(Boolean).length;
 
-
-/**
- * Split the raw editor HTML into chunks by looking for:
- *   • An empty <div>…</div> or <p>…</p> that contains only <br>, &nbsp; or whitespace
- *   • Two or more consecutive <br> elements **outside** any other block element
- *
- * The browser’s parser handles all oddities (attribute order, comments, entities, etc.)
- * so the rules stay robust if Froala or Kayako tweak their markup in the future.
- */
-function htmlToChunks(html: string): string[] {
-    const container = document.createElement('div');
-    container.innerHTML = html;
-
-    const chunks: string[] = [];
-    let currentChunk: string[] = [];
-    let consecutiveTopLevelBr = 0;
-
-    const flush = () => {
-        if (currentChunk.length) {
-            chunks.push(currentChunk.join(''));
-            currentChunk = [];
-        }
-        consecutiveTopLevelBr = 0;
-    };
-
-    Array.from(container.childNodes).forEach(node => {
-        // Top-level <br>
-        if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
-            consecutiveTopLevelBr++;
-            if (consecutiveTopLevelBr >= 2) {
-                flush();
-                return; // don’t include the <br><br> that acted as the separator
-            }
-        } else {
-            consecutiveTopLevelBr = 0;
-        }
-
-        // Empty <div> or <p> that should act as a separator
-        if (
-            node.nodeType === Node.ELEMENT_NODE &&
-            /^(DIV|P)$/i.test((node as HTMLElement).tagName)
-        ) {
-            const el = node as HTMLElement;
-            const isBlankBlock = el.textContent?.trim() === '' &&
-                // strip the usual suspects and see if there’s anything left
-                el.innerHTML.replace(/<br\s*\/?>|&nbsp;|\s+/gi, '') === '';
-
-            if (isBlankBlock) {
-                flush();
-                return; // separator not part of any chunk
-            }
-        }
-
-        // Anything else → keep
-        currentChunk.push(node.outerHTML ?? node.textContent ?? '');
-    });
-
-    flush(); // push the last chunk
-    return chunks;
-}
-
-
-/** Existing plain-text converter, unchanged. */
-const htmlToPlain = (html: string) => html
-    .replace(/<br\s*\/?>/gi, '\n')
+const htmlToPlain = (h: string) => h
+    .replace(BR_TAG_RE, '\n')
     .replace(/<\/(p|div|blockquote|li)>/gi, '\n')
     .replace(/<li[^>]*>/gi, '• ')
     .replace(/<[^>]+>/g, '')

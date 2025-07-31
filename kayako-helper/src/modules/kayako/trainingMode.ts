@@ -42,7 +42,7 @@ export function bootTrainingMode(): void {
 
 /** Hide “Complete”+“Trash” buttons while training mode is enabled */
 function setRestrictedButtonsVisibility(hide: boolean): void {
-    const display = hide ? 'none' : '';
+    const display = 'none';
     [
         KAYAKO_SELECTORS.completeTicketButton,
         KAYAKO_SELECTORS.trashTicketButton,

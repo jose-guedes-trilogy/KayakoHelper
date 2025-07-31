@@ -1,3 +1,6 @@
+// src/modules/shared/activeTabButton.ts
+
+
 const BTN_ID = 'kh-make-tab-active-btn';
 
 function providerKeyFromUrl(u: Location | URL): string {

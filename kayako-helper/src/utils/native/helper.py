@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-helper.py  –  native-messaging bridge  +  KB-host babysitter
+src/utils/native/helper.py  –  native-messaging bridge  +  KB-host babysitter
 ============================================================
 
 Changes since the last version:

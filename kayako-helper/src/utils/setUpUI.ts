@@ -18,7 +18,7 @@ export function setUpUI(): void {
     /* Attempt immediate insertion.
        Returns true if successful, false if header unavailable. */
     const tryInsert = (): boolean => {
-        const strip = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.tabStrip);
+        const strip = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.conversationWindowContainer);
         if (!strip) return false;
 
         const area = document.createElement('div');

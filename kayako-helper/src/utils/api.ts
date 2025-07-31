@@ -1,14 +1,16 @@
+// src/utils/api.ts
+
 import { cleanConversation, Post } from '@/modules/kayako/buttons/copy-chat/cleanConversation.ts';
 import { currentConvId }           from './location.ts';
 
 export const PAGE_SIZE       = 30;                            // how many posts we page by
 
 /** Shape of the Kayako API response for posts */
-interface ApiResponse {
+export interface ApiResponse {
     data: Post[];
 }
 
-interface RawApiResponse {
+export interface RawApiResponse {
     data: Post[];
     total_count?: number;
     total?: number;
