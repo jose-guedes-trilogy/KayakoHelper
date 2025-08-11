@@ -1,18 +1,53 @@
-// modules/kayako/buttons/ephor/ephorStore.ts
-/* src/utils/ephorStore.ts (v1.4.1)
-   • Channel type matches live API (no messages[])
-*/
-export interface EphorProject {
-    project_id : string;
-    owner_id   : string;
-    name       : string;
-    description: string | null;
-    is_admin   : boolean;
-    access_level: "admin" | "member";
-    users      : Record<string, "admin" | "member">;
-    model      : string;
-    library_id : string;
+// Kayako Helper – ephorStore.ts (v2.3.0 – adds lastOutputs persistence, canned-prompts kept)
+
+/* Full file replaces the existing one */
+
+export type ConnectionMode = "multiplexer" | "stream";
+export type RunMode        = "automatic"   | "manual";
+
+/* ------------------------------------------------------------------ */
+/* NEW ▸ canned-prompt type                                            */
+/* ------------------------------------------------------------------ */
+export interface CannedPrompt {
+    /** Stable UUID */
+    id         : string;
+    /** Human-readable title shown in the manager list */
+    title      : string;
+    /** Placeholder token, e.g. @#GREETING#@ (used in Prompt editor) */
+    placeholder: string;
+    /** Prompt body text */
+    body       : string;
 }
+
+/* ------------------------------------------------------------------ */
+/* Workflow types                                                     */
+/* ------------------------------------------------------------------ */
+export interface WorkflowStage {
+    /** Stable UUID so list ops don’t depend on array index */
+    id           : string;
+    /** Human label shown in the UI */
+    name         : string;
+    /** Prompt template – use {{TRANSCRIPT}} / {{PRV_RD_OUTPUT}} or @#RD_n_*#@ tokens */
+    prompt       : string;
+    /** One-or-many model IDs – first is used for cost display, all are run */
+    selectedModels: string[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Server-side objects                                                */
+/* ------------------------------------------------------------------ */
+export interface EphorProject {
+    project_id  : string;
+    owner_id    : string;
+    name        : string;
+    description : string | null;
+    is_admin    : boolean;
+    access_level: "admin" | "member";
+    users       : Record<string, "admin" | "member">;
+    model       : string;
+    library_id  : string;
+}
+
 export interface EphorChannel {
     id        : string;
     name      : string | null;
@@ -22,36 +57,130 @@ export interface EphorChannel {
     created_at: string;
     updated_at: string;
 }
+
+/* ------------------------------------------------------------------ */
+/* Persisted UI store                                                 */
+/* ------------------------------------------------------------------ */
 export interface EphorStore {
-    projects           : EphorProject[];
-    selectedProjectId  : string | null;
-    selectedChannelId  : string | null;
-    logFullResponses   : boolean;
-    messagePrompt      : string;
-    selectedModels     : string[];
-    draftModels        : string[];
-    factModels         : string[];
-    refineModels       : string[];
+    /* selections */
+    projects          : EphorProject[];
+    selectedProjectId : string | null;
+    selectedChannelId : string | null;
+
+    /* misc prefs */
+    logFullResponses  : boolean;
+    messagePrompt     : string;
+
+    /* manual-send model pick list */
+    selectedModels    : string[];
+
+    /* connection & run modes */
+    preferredMode     : ConnectionMode;
+    runMode           : RunMode;
+
+    /* multi-stage workflow */
+    workflowStages    : WorkflowStage[];
+
+    /* NEW ▸ user-defined canned prompts */
+    cannedPrompts     : CannedPrompt[];
+
+    /* NEW ▸ persisted outputs by stage */
+    lastOutputs       : Record<string, { combined: string; byModel: Record<string,string> }>;
+
+    /* 👇 NEW: caches the latest message id per channel (for correct parent_id) */
+    lastMsgIdByChannel: Record<string, string>;
 }
 
 const KEY = "kh-ephor-store";
 
+/* ------------------------------------------------------------------ */
+/* Default workflow stages                                            */
+/* ------------------------------------------------------------------ */
+const defaultStages: WorkflowStage[] = [
+    {
+        id   : crypto.randomUUID(),
+        name : "Write Public Reply",
+        prompt:
+            `Write a public reply using the following ticket transcript:
+
+{{TRANSCRIPT}}`,
+        selectedModels: ["gpt-4o"],
+    },
+    {
+        id   : crypto.randomUUID(),
+        name : "Review Public Reply",
+        prompt:
+            `Review the draft reply below for accuracy, clarity and tone.  
+Return ONLY corrections / suggested edits.
+
+{{PRV_RD_OUTPUT}}`,
+        selectedModels: ["claude-4-opus-latest-thinking", "gemini-2.5-pro", "gpt-4o"],
+    },
+    {
+        id   : crypto.randomUUID(),
+        name : "Adapt Initial Public Reply",
+        prompt:
+            `Apply the reviewer corrections to produce the final reply.
+
+=== CORRECTIONS ===
+{{PRV_RD_OUTPUT}}
+
+=== ORIGINAL TRANSCRIPT ===
+{{TRANSCRIPT}}`,
+        selectedModels: ["gpt-4o"],
+    },
+];
+
+/* ------------------------------------------------------------------ */
+/* Load / save helpers                                                */
+/* ------------------------------------------------------------------ */
 export async function loadEphorStore(): Promise<EphorStore> {
     const raw   = await chrome.storage.local.get(KEY);
     const saved = raw[KEY] as EphorStore | undefined;
+
     const defaults: EphorStore = {
-        projects: [],
-        selectedProjectId: null,
-        selectedChannelId: null,
-        logFullResponses: false,
-        messagePrompt   : "Please summarize the following ticket.",
-        selectedModels  : ["gpt-4o"],
-        draftModels : ["gpt-4o"],
-        factModels  : ["claude-3-opus-20240229"],
-        refineModels: ["gpt-4o"],
+        projects          : [],
+        selectedProjectId : null,
+        selectedChannelId : null,
+
+        logFullResponses  : false,
+        messagePrompt     : "Please summarize the following ticket.",
+        selectedModels    : ["gpt-4o"],
+
+        preferredMode     : "multiplexer",
+        runMode           : "automatic",
+
+        workflowStages    : defaultStages,
+
+        /* NEW ▸ canned-prompts default empty list */
+        cannedPrompts     : [],
+
+        /* NEW ▸ outputs cache */
+        lastOutputs: {},
+        lastMsgIdByChannel: {},
     };
-    return { ...defaults, ...saved };
+    return { ...defaults, ...saved, lastOutputs: saved?.lastOutputs ?? {},
+        lastMsgIdByChannel: saved?.lastMsgIdByChannel ?? {} };
 }
-export async function saveEphorStore(store: EphorStore) {
-    await chrome.storage.local.set({ [KEY]: store });
+
+export async function saveEphorStore(store: EphorStore): Promise<void> {
+    /* ------------------------------------------------------------------
+     * Merge-save instead of clobbering the existing record. This prevents
+     * older tabs (with stale copies) from overwriting newer changes such
+     * as `preferredMode`.
+     * ------------------------------------------------------------------ */
+    const existingRaw = (await chrome.storage.local.get(KEY))[KEY] as
+        Partial<EphorStore> | undefined;
+
+    const merged: EphorStore = { ...(existingRaw ?? {}), ...store };
+
+    /* Optional debug trace – handy for reproducing mode flips. */
+    if (existingRaw?.preferredMode !== merged.preferredMode) {
+        console.debug(
+            `[Ephor] preferredMode changed → ${merged.preferredMode} (was ${existingRaw?.preferredMode ?? "undefined"})`,
+        );
+    }
+
+    await chrome.storage.local.set({ [KEY]: merged });
 }
+

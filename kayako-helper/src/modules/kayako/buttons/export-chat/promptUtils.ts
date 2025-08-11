@@ -9,7 +9,6 @@ import { PH } from './constants.ts';
 /** Placeholder replacement */
 export const fillPrompt = (tpl: string, transcript: string): string =>
     tpl.replaceAll(PH.TRANSCRIPT, transcript)
-        .replaceAll(PH.TRASNCRIPT, transcript)
         .replaceAll(PH.URL, location.href)
         .replaceAll(PH.ID,  currentConvId() ?? '');
 
