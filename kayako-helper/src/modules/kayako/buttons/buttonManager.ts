@@ -37,16 +37,6 @@ function attachDomObserver(): void {
     obs.observe(document.body, { childList: true, subtree: true, attributes: true });
 }
 
-/* Cache-aware HTML setter to avoid infinite reflows / blinking */
-function setHtmlIfChanged(el: HTMLElement, html: string): void {
-    const key = '__khHtmlSig';
-    // @ts-expect-error – augmenting element with a private cache
-    if (el[key] === html) return;
-    el.innerHTML = html;
-    // @ts-expect-error
-    el[key] = html;
-}
-
 /* ================================================================== */
 /*                         1 ▸ TAB-STRIP AREA                         */
 /* ================================================================== */
@@ -162,7 +152,7 @@ export function registerButton(cfg: buttonConfig): void {
 
         if (btn) {
             const newLabel = cfg.label();
-            setHtmlIfChanged(btn, newLabel);   // HTML-aware & stable
+            if (btn.textContent !== newLabel) btn.textContent = newLabel;
         }
         cfg.onRouteChange?.(btn ?? null);
     };
@@ -263,9 +253,9 @@ export function registerSplitButton(cfg: SplitButtonConfig): void {
         if (wrap.firstChild !== left)  wrap.insertBefore(left!, wrap.firstChild);
         if (left!.nextSibling !== right) wrap.appendChild(right!);
 
-        /* label update (left) */
+        /* label update */
         const txt = cfg.label();
-        setHtmlIfChanged(left!, txt);     // HTML-aware & stable
+        if (left!.textContent !== txt) left!.textContent = txt;
 
         /* build / rebuild dropdown */
         const dropdown = right!.querySelector<HTMLElement>(
@@ -345,7 +335,7 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                     wrap.appendChild(btn);
                 } else {
                     const newLabel = typeof cfg.label==='function' ? cfg.label() : cfg.label;
-                    setHtmlIfChanged(btn, newLabel);    // HTML-aware & stable
+                    if (btn.textContent !== newLabel) btn.textContent = newLabel;
                 }
                 return; // simple done
             }
@@ -368,7 +358,7 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                 wrap.appendChild(left);
             } else {
                 const newLabel = typeof cfg.label==='function' ? cfg.label() : cfg.label;
-                setHtmlIfChanged(left, newLabel);       // HTML-aware & stable
+                if (left.textContent !== newLabel) left.textContent = newLabel;
             }
 
             if (!right) {
@@ -409,7 +399,6 @@ function createHeaderBtn(id: string, lbl: string | (()=>string)): HTMLButtonElem
     btn.id        = id.replace(/^#/, '');
     btn.type      = 'button';
     btn.className = EXTENSION_SELECTORS.defaultButtonClass.replace(/^./,'');
-    const html = typeof lbl==='function' ? lbl() : lbl;
-    setHtmlIfChanged(btn, html);   // initial cache
+    btn.textContent = typeof lbl==='function' ? lbl() : lbl;
     return btn;
 }

@@ -29,11 +29,12 @@ import {HeaderSlot, registerEditorHeaderButton} from "@/modules/kayako/buttons/b
 /* Constants & UI state                                               */
 /* ------------------------------------------------------------------ */
 
+/* 🛠 FIX 1 – keep the leading “#” so the querySelector in
+   tabButtonManager can find the element and avoid duplicates. */
 const BTN_ID = EXTENSION_SELECTORS.sendToQcButton;   // <─ CHANGED
 
-// const ICON     = { idle: '📤', work: '⏳', ok: '✅', err: '❌' } as const;
-// type UiState   = keyof typeof ICON;
-type UiState = 'idle' | 'work' | 'ok' | 'err'; // keep type but without icons
+const ICON     = { idle: '📤', work: '⏳', ok: '✅', err: '❌' } as const;
+type UiState   = keyof typeof ICON;
 const RESET_MS = 2_000;
 
 /* ------------------------------------------------------------------ */
@@ -41,20 +42,22 @@ const RESET_MS = 2_000;
 /* ------------------------------------------------------------------ */
 
 export function bootSendToQcButton(): void {
+    /* central UI-state tracker */
     let uiState: UiState = 'idle';
     const label = () =>
-        // `${ICON[uiState]} ${
-        `${
+        `${ICON[uiState]} ${
             uiState==='idle' ? 'Send to QC' :
                 uiState==='work' ? 'Working…'  :
                     uiState==='ok'   ? 'Done'      : 'Failed' }`;
 
+    /* create + register the editor-header button */
     registerEditorHeaderButton({
         id   : BTN_ID,
         type : 'simple',
         slot : HeaderSlot.THIRD,
         label,
         async onClick(btn) {
+            /* 🛠 FIX 2 – the helper now only needs the new state */
             const setState = (s: UiState) => { uiState=s; btn.textContent=label(); };
             await handleClick(btn, setState);
             if (uiState !== 'idle') {
@@ -68,6 +71,8 @@ export function bootSendToQcButton(): void {
 /* Click handler                                                      */
 /* ------------------------------------------------------------------ */
 
+/* 🛠 FIX 3 – simplify the callback signature so it matches the
+   setState we pass in (and remove the unused second argument). */
 async function handleClick(
     self: HTMLButtonElement,
     setState: (s: UiState) => void,
@@ -76,22 +81,33 @@ async function handleClick(
     setState('work');
 
     try {
+        /* 1 · Grab the clipboard (prefer rich HTML) */
         const clipHtml = await readClipboardHtml();
+
+        /* 2 · Build the template (normalise & clean) */
         const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, ' ');
+
+        /* 3 · Inject into the active Froala editor */
         const editor = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
         if (!editor) throw new Error('Reply editor not found');
         editor.innerHTML = html;
+
+        /* 4 · Tidy spacing */
         addNewlines(editor);
 
+        /* 5 · Switch to Internal-Note mode (robust click) */
         const noteBtn = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.activateNoteModeButton);
         if (!noteBtn) throw new Error('Note-mode button not found');
         simulateClick(noteBtn);
 
+        /* 6 · Add the qc_pending tag */
         await addTag('qc_pending');
 
+        /* ✅ All good */
         setState('ok');
         setTimeout(() => setState('idle'), RESET_MS);
 
+        /* Enlarge reply box */
         applySize(500);
 
     } catch (err) {
@@ -107,33 +123,40 @@ async function handleClick(
 /* ------------------------------------------------------------------ */
 
 async function readClipboardHtml(): Promise<string> {
+    /* Try → navigator.clipboard.read(…) for rich HTML */
     try {
         if ('clipboard' in navigator && 'read' in navigator.clipboard) {
             const items = await (navigator.clipboard as any).read();
             for (const it of items) {
                 if (it.types.includes('text/html')) {
                     const blob = await it.getType('text/html');
-                    return await blob.text();
+                    return await blob.text();             // ⬅ rich fragment
                 }
             }
         }
-    } catch {}
+    } catch {
+        /* Ignore → fall back to plain text */
+    }
 
+    /* Fallback → plain text, convert linebreaks to <br> */
     const txt = await navigator.clipboard.readText();
     return txt.replace(/\n/g, '<br>');
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Template & normalisation                                           */
 /* ------------------------------------------------------------------ */
 
+/** Normalises p→div, strips data-* & <hr>, converts h1/h2→h3 and bolds h3. */
 function normalizeParagraphs(fragment: string): string {
     const tmp = document.createElement('div');
     tmp.innerHTML = fragment;
 
+    /* 1 ─ Replace <p> with <div>, but **only if the <p> is not inside an <li>** */
     tmp.querySelectorAll('p').forEach(p => {
         if (p.closest('li')) {
-            p.replaceWith(...Array.from(p.childNodes));
+            p.replaceWith(...Array.from(p.childNodes));   // unwrap for inline flow
             return;
         }
         const div = document.createElement('div');
@@ -144,6 +167,7 @@ function normalizeParagraphs(fragment: string): string {
         p.replaceWith(div);
     });
 
+    /* 1b ─ Convert <h1> & <h2> → <h3> (attrs kept, data-* stripped later) */
     tmp.querySelectorAll('h1,h2').forEach(h => {
         const h3 = document.createElement('h3');
         Array.from(h.attributes).forEach(attr => {
@@ -153,18 +177,22 @@ function normalizeParagraphs(fragment: string): string {
         h.replaceWith(h3);
     });
 
+    /* 1c ─ Wrap every <h3> & <h4> content in <strong> to force bold */
     tmp.querySelectorAll('h3,h4').forEach(h => {
         h.innerHTML = `<strong>${h.innerHTML}</strong>`;
     });
 
+    /* 2 ─ Strip data-* attributes everywhere */
     tmp.querySelectorAll('*').forEach(el =>
         Array.from(el.attributes).forEach(attr => {
             if (attr.name.startsWith('data-')) el.removeAttribute(attr.name);
         }),
     );
 
+    /* 2b ─ Remove all <hr> elements */
     tmp.querySelectorAll('hr').forEach(hr => hr.remove());
 
+    /* 3 ─ Remove whitespace-only text nodes sitting between elements */
     const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
     const toRemove: Text[] = [];
     let node: Text | null;
@@ -218,8 +246,8 @@ function simulateEnter(el: HTMLElement): void {
                 cancelable: true,
                 key       : 'Enter',
                 code      : 'Enter',
-                keyCode   : 13,
-                which     : 13,
+                keyCode   : 13,   // legacy
+                which     : 13,   // legacy
                 charCode  : type === 'keypress' ? 13 : 0,
             }),
         )

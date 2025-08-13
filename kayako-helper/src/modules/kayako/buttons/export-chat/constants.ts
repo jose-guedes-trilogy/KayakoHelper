@@ -14,6 +14,7 @@ export const PH = {
     URL       : '@#URL#@',
     ID        : '@#ID#@',
     TRANSCRIPT: '@#TRANSCRIPT#@',
+    TRASNCRIPT: '@#TRASNCRIPT#@',
 } as const;
 
 export const BLANK_PROMPT = `${PH.TRANSCRIPT}\n`;

@@ -1,7 +1,7 @@
 /* src/contentScriptKayako.ts
    – Bootstraps individual features; contains no feature code itself
 */
-import '@/styles/extensionStyles.scss';
+import '@/styles/global.scss';
 import '@/modules/kayako/styleManager.ts'
 
 import { setUpUI }                  from '@/utils/setUpUI';
@@ -23,12 +23,11 @@ import { bootTagCleaner }           from "@/modules/kayako/ui-clean-up/tagCleane
 import { bootExportChatButton }     from "@/modules/kayako/buttons/export-chat/exportChatButton.ts";
 import { bootCopySearchChats }      from "@/modules/kayako/buttons/copy-search/copySearchChats.ts";
 import { bootSendChunks }           from "@/modules/kayako/reply-box/sendInChunks.ts";
-import { bootAssetsInspector }      from "@/modules/kayako/buttons/assets-inspector/assetsInspectorIndex.ts";
+import { bootAssetsInspector }      from "@/modules/kayako/buttons/assetsInspector/assetsInspectorIndex.ts";
 import { bootEmbeddingsSearch }     from "@/modules/kayako/embeddingsSearch.ts";
 import { bootTargetBlankLinks }     from "@/modules/kayako/ui-clean-up/targetBlankLinks.ts";
 import {bootHoverTicketPreview} from "@/modules/kayako/hoverTicketPreview.ts";
 import {bootEphorButton} from "@/modules/kayako/buttons/ephor/buttonEphor.ts";
-import "@/modules/ephor/clerkTokenInjector.ts";
 
 /* ---------- Global UI ---------- */
 setUpUI();

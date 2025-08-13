@@ -60,9 +60,6 @@ const DROPDOWN_OPTS = [
     CUSTOM_LABEL,
 ] as const;
 
-/* Pagination */
-const RESULTS_PER_PAGE     = 20;         /* 🔄 NEW – matches Kayako UI */
-
 /* Retry settings */
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 400; // ms
@@ -213,7 +210,7 @@ function buildDropdown(
 }
 
 /* ------------------------------------------------------------------ */
-/* Business logic                                                     */
+/* Business logic                                                      */
 /* ------------------------------------------------------------------ */
 
 function label(ui: { state: UiState; limit: number }): string {
@@ -254,14 +251,9 @@ async function copyChats(
     const q = currentSearchQuery();
     if (!q) return alert('Search query not found.');
 
-    /* 🔄 NEW – determine current page & offset */
-    const searchParams = new URLSearchParams(location.search);
-    const page         = parseInt(searchParams.get('page') || '1', 10);
-    const offset       = (page - 1) * RESULTS_PER_PAGE;
-
     try {
         setUi('work');
-        const ids = await firstNConversationIds(q, ui.limit, offset);  /* 🔄 NEW arg */
+        const ids = await firstNConversationIds(q, ui.limit);
         if (!ids.length) throw new Error('No matching conversations.');
 
         /* --------------------------------------------------------------
@@ -301,22 +293,18 @@ async function copyChats(
 }
 
 /* ------------------------------------------------------------------ */
-/* Kayako API helpers                                                 */
+/* Kayako API helpers                                                  */
 /* ------------------------------------------------------------------ */
 
-/**
- * Fetch up to `limit` conversation IDs, starting at `offset`.
- */
 async function firstNConversationIds(
     query: string,
-    limit: number,
-    offset: number          /* 🔄 NEW */
+    limit: number
 ): Promise<string[]> {
     const hostname = location.hostname;
     const params   = new URLSearchParams({
         query,
-        offset: String(offset),           /* 🔄 NEW – dynamic */
-        limit : String(limit),
+        offset: '0',
+        limit: String(limit),
         fields:
             'data(requester(avatar%2Cfull_name)%2Clast_post_status%2Clast_replier(full_name%2Crole)%2Clast_message_preview%2Csubject%2Cpriority%2Cstate%2Cstatus%2Cassigned_agent(full_name%2Cavatar)%2Cupdated_at%2Clast_replied_at%2Chas_attachments)%2Cresource',
         include : 'case%2Ccase_status%2Ccase_priority%2Cuser%2Crole',
@@ -358,7 +346,7 @@ async function fetchTranscriptByCase(
 }
 
 /* ------------------------------------------------------------------ */
-/* Persistence helpers                                                */
+/* Persistence helpers                                                 */
 /* ------------------------------------------------------------------ */
 
 function loadLimit(): number {

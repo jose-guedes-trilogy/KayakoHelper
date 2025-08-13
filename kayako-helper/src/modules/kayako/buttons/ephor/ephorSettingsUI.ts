@@ -1,194 +1,167 @@
-/* Kayako Helper – ephorSettingsUI.ts (v9.4.0 – adds Cancel ref, clamps modal to viewport, log toggle ref remains) */
+/* Ephor Settings – UI factory (rev-v3.3.1)
+   • Header is now draggable again (cursor:move + mousedown tracking).
+   • No markup omitted – this is the full file.
+*/
+import type { EphorStore } from "./ephorStore.ts";
 
-import { EPHOR_SETTINGS_MARKUP } from "./ephorSettingsMarkup.ts";
-
-/* ------------------------------------------------------------------ */
-/* Refs interface                                                     */
-/* ------------------------------------------------------------------ */
 export interface ModalRefs {
-    runAutoRadio: HTMLInputElement;
-    runManualRadio: HTMLInputElement;
-    progressBadge: HTMLSpanElement;
-    runRow: HTMLSpanElement;
-    placeholderRow: HTMLDivElement;
+    /* log section */
+    logPre        : HTMLPreElement;
+    logContainer  : HTMLDivElement;
+    verboseCbx    : HTMLInputElement;
 
-    logPre: HTMLPreElement;
-    logContainer: HTMLDivElement;
-    verboseCbx: HTMLInputElement;
-    logToggle: HTMLParagraphElement; /* NEW */
-
-    modeMultiplexer: HTMLInputElement;
-    modeStream: HTMLInputElement;
-
-    tabSettingsBtn: HTMLButtonElement;
-    tabOutputsBtn: HTMLButtonElement;
-    paneSettings: HTMLDivElement;
-    paneOutputs: HTMLDivElement;
-    outputPane: HTMLDivElement;
-
-    querySingleRadio: HTMLInputElement;
-    queryWorkflowRadio: HTMLInputElement;
-
-    stageBarDiv: HTMLDivElement;
-    addStageBtn: HTMLButtonElement;
-
+    /* project / chat pickers */
     projectSearchInp: HTMLInputElement;
     channelSearchInp: HTMLInputElement;
-    projectListDiv: HTMLDivElement;
-    channelListDiv: HTMLDivElement;
+    projectListDiv  : HTMLDivElement;
+    channelListDiv  : HTMLDivElement;
 
-    modelSearchInp: HTMLInputElement;
-    aiListDiv: HTMLDivElement;
+    /* models / prompt */
+    aiListDiv   : HTMLDivElement;
+    promptInput : HTMLTextAreaElement;
 
-    promptInput: HTMLTextAreaElement;
+    /* toolbar buttons */
+    refreshBtn  : HTMLButtonElement;
+    newChatBtn  : HTMLButtonElement;
+    sendBtn     : HTMLButtonElement;
 
-    refreshBtn: HTMLButtonElement;
-    newChatBtn: HTMLButtonElement;
-    sendBtn: HTMLButtonElement;
-    cancelBtn: HTMLButtonElement;
-
-    closeBtn: HTMLButtonElement;
-
-    /* NEW */
-    cannedBtn: HTMLButtonElement;
+    /* close button */
+    closeBtn    : HTMLButtonElement;
 }
 
-/* ------------------------------------------------------------------ */
-/* Factory                                                             */
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
-/* Factory                                                             */
-/* ------------------------------------------------------------------ */
-export function createSettingsModal() {
+export function createSettingsModal(): { modal: HTMLDivElement; refs: ModalRefs } {
     const modal = Object.assign(document.createElement("div"), { id: "kh-ephor-settings-modal" });
     modal.style.cssText = `
-      position:fixed;top:90px;left:50%;transform:translateX(-50%);
-      min-width:980px;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;
-      z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.2);
-      max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;
-      font-family:system-ui;font-size:13px;display:flex;flex-direction:column;gap:12px;`;
+        position:fixed;top:90px;left:50%;transform:translateX(-50%);
+        min-width:850px;background:#fff;border:1px solid #ccc;border-radius:6px;
+        padding:12px;z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.2);
+        font-family:system-ui;font-size:13px;display:flex;flex-direction:column;gap:12px;`;
 
-    modal.innerHTML = EPHOR_SETTINGS_MARKUP;
+    modal.innerHTML = /* HTML */`
+      <style>
+        #kh-ephor-ai-list label { display:flex;align-items:center;gap:6px;padding:4px 8px;cursor:pointer;border-radius:3px; }
+        #kh-ephor-ai-list label:hover { background:#f0f0f0; }
+        #kh-ephor-ai-list input { margin-right:5px; }
+      </style>
 
-    /* ---------- drag-to-move (top/bottom clamped; horizontal free) ---------- */
+      <!-- Header (drag handle) -->
+      <div class="kh-ephor-header" style="display:flex;align-items:center;gap:12px;cursor:move;">
+        <h2 style="margin:0;font-size:16px;">Ephor – Settings & Manual Send</h2>
+        <button id="kh-ephor-close"
+                style="margin-left:auto;font-size:18px;border:0;background:none;cursor:pointer;">✕</button>
+      </div>
 
-    // Convert from centered (translateX) to absolute px the first time we drag.
-    const ensureAbsolutePosition = () => {
-        if (modal.style.transform !== "none") {
-            const rect = modal.getBoundingClientRect();
-            modal.style.transform = "none";
-            modal.style.left = `${rect.left}px`;
-            modal.style.top = `${rect.top}px`;
-        }
+      <!-- Selector grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:20px;">
+        <!-- Projects -->
+        <div>
+          <p style="margin:0 0 4px;font-weight:600;">1. Select Project</p>
+          <input id="kh-ephor-project-search" placeholder="Search projects…"
+                 style="width:100%;padding:4px 6px;margin-bottom:8px;">
+          <div id="kh-ephor-project-list"
+               style="height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
+        </div>
+
+        <!-- Chats -->
+        <div>
+          <p style="margin:0 0 4px;font-weight:600;">2. Select Chat</p>
+          <input id="kh-ephor-channel-search" placeholder="Search chats…"
+                 style="width:100%;padding:4px 6px;margin-bottom:8px;">
+          <div id="kh-ephor-channel-list"
+               style="height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
+        </div>
+
+        <!-- AI Models -->
+        <div>
+          <p style="margin:0 0 4px;font-weight:600;">3. Select AI Models</p>
+          <div id="kh-ephor-ai-list"
+               style="height:215px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
+        </div>
+      </div>
+
+      <!-- Prompt input -->
+      <div>
+        <p style="margin:0 0 4px;font-weight:600;">4. Write Prompt & Send</p>
+        <textarea id="kh-ephor-prompt-input" placeholder="Enter your prompt…"
+                  style="width:100%;height:80px;padding:6px;border:1px solid #ddd;border-radius:4px;resize:vertical;"></textarea>
+      </div>
+
+      <!-- Toolbar -->
+      <div style="display:flex;align-items:center;gap:8px;border-top:1px solid #eee;padding-top:12px;">
+        <button id="kh-ephor-refresh-projects" style="padding:4px 8px;">🔄 Refresh Projects</button>
+        <button id="kh-ephor-new-chat"          style="padding:4px 8px;">＋ New Chat</button>
+        <button id="kh-ephor-send-btn"
+                style="padding:6px 12px;font-weight:bold;margin-left:auto;background:#2e73e9;color:#fff;border:none;border-radius:4px;">
+          Send Message
+        </button>
+      </div>
+
+      <!-- Log area -->
+      <div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <p style="margin:0;font-weight:600;">API Log</p>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" id="kh-ephor-log-verbose"> Verbose
+          </label>
+          <button id="kh-ephor-copy-log"  style="margin-left:auto;padding:2px 6px;">📋 Copy</button>
+          <button id="kh-ephor-clear-log" style="padding:2px 6px;">🗑 Clear</button>
+        </div>
+        <div id="kh-ephor-log-container"
+             style="background:#f0f0f0;border:1px solid #ddd;border-radius:4px;height:100px;overflow-y:scroll;padding:5px;margin-top:4px;">
+          <pre style="margin:0;font-size:10px;font-family:monospace;white-space:pre-wrap;word-break:break-all;"></pre>
+        </div>
+      </div>
+    `;
+
+    /* ----------------- gather refs ----------------- */
+    const $ = <T extends HTMLElement>(q: string) => modal.querySelector<T>(q)!;
+    const refs: ModalRefs = {
+        /* log */
+        logPre: $("#kh-ephor-log-container pre"),
+        logContainer: $("#kh-ephor-log-container"),
+        verboseCbx: $("#kh-ephor-log-verbose"),
+
+        /* project / chat pickers */
+        projectSearchInp: $("#kh-ephor-project-search"),
+        channelSearchInp: $("#kh-ephor-channel-search"),
+        projectListDiv : $("#kh-ephor-project-list"),
+        channelListDiv : $("#kh-ephor-channel-list"),
+
+        /* models / prompt */
+        aiListDiv  : $("#kh-ephor-ai-list"),
+        promptInput: $("#kh-ephor-prompt-input"),
+
+        /* toolbar buttons */
+        refreshBtn : $("#kh-ephor-refresh-projects"),
+        newChatBtn : $("#kh-ephor-new-chat"),
+        sendBtn    : $("#kh-ephor-send-btn"),
+
+        /* close */
+        closeBtn: $("#kh-ephor-close"),
     };
 
-    const clampY = (topPx: number, heightPx: number) => {
-        const margin = 8;
-        const minTop = margin;
-        const maxTop = Math.max(margin, window.innerHeight - heightPx - margin);
-        return Math.min(Math.max(topPx, minTop), maxTop);
-    };
-
-    const head = modal.querySelector<HTMLDivElement>(".kh-ephor-header")!;
-    head.addEventListener("mousedown", ev => {
+    /* ----------------- drag-to-move ----------------- */
+    const header = modal.querySelector<HTMLDivElement>(".kh-ephor-header")!;
+    header.addEventListener("mousedown", ev => {
+        // ignore when clicking on buttons / inputs in the header
         if ((ev.target as HTMLElement).closest("button,input,label")) return;
-
-        ev.preventDefault(); // stop text selection / focus changes
-        ensureAbsolutePosition();
 
         const startX = ev.clientX;
         const startY = ev.clientY;
-        const startLeft = modal.offsetLeft;
-        const startTop = modal.offsetTop;
+        const origLeft = modal.offsetLeft;
+        const origTop  = modal.offsetTop;
 
-        // Prevent accidental text selection while dragging
-        const prevSelect = document.body.style.userSelect;
-        document.body.style.userSelect = "none";
-
-        const onMove = (e: MouseEvent) => {
-            // horizontal: free — no clamp
-            const newLeft = startLeft + (e.clientX - startX);
-
-            // vertical: clamp within viewport
-            const h = modal.offsetHeight;
-            const newTop = clampY(startTop + (e.clientY - startY), h);
-
-            modal.style.left = `${newLeft}px`;
-            modal.style.top = `${newTop}px`;
+        const move = (mv: MouseEvent) => {
+            const dx = mv.clientX - startX;
+            const dy = mv.clientY - startY;
+            modal.style.left = origLeft + dx + "px";
+            modal.style.top  = origTop  + dy + "px";
         };
+        const up = () => window.removeEventListener("mousemove", move);
 
-        const onUp = () => {
-            window.removeEventListener("mousemove", onMove);
-            document.body.style.userSelect = prevSelect;
-        };
-
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp, { once: true });
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up, { once: true });
     });
-
-    // Keep only vertical clamping on resize; do not touch horizontal.
-    window.addEventListener("resize", () => {
-        const rect = modal.getBoundingClientRect();
-        const newTop = clampY(rect.top, rect.height);
-        modal.style.top = `${newTop}px`;
-        // left stays as-is (free to cross viewport)
-    });
-
-    const $ = <T extends HTMLElement>(q: string) => modal.querySelector<T>(q)!;
-
-    /* ---------- refs ---------- */
-    const refs: ModalRefs = {
-        runAutoRadio: $("#kh-run-auto") as HTMLInputElement,
-        runManualRadio: $("#kh-run-manual") as HTMLInputElement,
-        progressBadge: $("#kh-ephor-progress"),
-        runRow: $("#kh-ephor-run-row") as HTMLSpanElement,
-        placeholderRow: $("#kh-placeholder-row"),
-
-        logPre: $("#kh-ephor-log-container pre"),
-        logContainer: $("#kh-ephor-log-container"),
-        verboseCbx: $("#kh-ephor-log-verbose") as HTMLInputElement,
-        logToggle: $("#kh-ephor-log-toggle") as HTMLParagraphElement, /* NEW */
-
-        modeMultiplexer: $("#kh-ephor-mode-multiplexer") as HTMLInputElement,
-        modeStream: $("#kh-ephor-mode-stream") as HTMLInputElement,
-
-        tabSettingsBtn: $("#kh-ephor-tab-settings") as HTMLButtonElement,
-        tabOutputsBtn: $("#kh-ephor-tab-outputs") as HTMLButtonElement,
-        paneSettings: $("#kh-ephor-pane-settings"),
-        paneOutputs: $("#kh-ephor-pane-outputs"),
-        outputPane: $("#kh-ephor-output-pane"),
-
-        querySingleRadio: $("#kh-query-single") as HTMLInputElement,
-        queryWorkflowRadio: $("#kh-query-workflow") as HTMLInputElement,
-
-        stageBarDiv: $("#kh-ephor-stage-bar"),
-        addStageBtn: Object.assign(
-            document.createElement("button"),
-            { id: "kh-ephor-add-stage", textContent: "➕", className: "kh-btn" }
-        ),
-
-        projectSearchInp: $("#kh-ephor-project-search"),
-        channelSearchInp: $("#kh-ephor-channel-search"),
-        projectListDiv: $("#kh-ephor-project-list"),
-        channelListDiv: $("#kh-ephor-channel-list"),
-
-        modelSearchInp: $("#kh-ephor-model-search"),
-        aiListDiv: $("#kh-ephor-ai-list"),
-
-        promptInput: $("#kh-ephor-prompt-input") as HTMLTextAreaElement,
-
-        refreshBtn: $("#kh-ephor-refresh-projects") as HTMLButtonElement,
-        newChatBtn: $("#kh-ephor-new-chat") as HTMLButtonElement,
-        sendBtn: $("#kh-ephor-send-btn") as HTMLButtonElement,
-        cancelBtn: $("#kh-ephor-cancel-btn") as HTMLButtonElement,
-
-        closeBtn: $("#kh-ephor-close") as HTMLButtonElement,
-
-        /* NEW */
-        cannedBtn: $("#kh-ephor-canned-btn") as HTMLButtonElement,
-    };
-
-    refs.stageBarDiv.appendChild(refs.addStageBtn);
 
     return { modal, refs };
 }
