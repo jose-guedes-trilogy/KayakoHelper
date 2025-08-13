@@ -1,4 +1,6 @@
 // src/selectors/selectors.jsonc
+// All Kayako selectors are kept here in case they change. If they do, we just send this to an AI along with the old and new HTML files.
+// We then ask it to update the selectors for us.
 
 {
   "kayako": {

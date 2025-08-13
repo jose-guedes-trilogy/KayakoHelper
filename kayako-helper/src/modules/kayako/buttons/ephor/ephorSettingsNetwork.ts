@@ -2,7 +2,7 @@
    • Saves EphorStore back to storage whenever projects refresh.
    • Propagates save after model checkbox changes.
 */
-import type { EphorProject, EphorChannel, EphorStore } from "./ephorStore.ts";
+import type {EphorProject, EphorChannel, EphorStore, WorkflowStage} from "./ephorStore.ts";
 import type { LogFn }   from "./ephorSettingsLogger.ts";
 import type { ModalRefs } from "./ephorSettingsUI.ts";
 import { EphorClient }  from "@/background/ephorClient.ts";
@@ -45,53 +45,75 @@ export function rebuildProjectList(state: ModalState, refs: ModalRefs, filter = 
 
 export function rebuildChannelList(state: ModalState, refs: ModalRefs, filter = "") {
     const { store, channels } = state;
+
+    /* Multiplexer ignores channel_id – grey-out UI */
+    if (store.preferredMode === "multiplexer") {
+        refs.channelSearchInp.disabled = true;
+        refs.channelListDiv.innerHTML =
+            `<em style="color:#666;padding:8px;display:block;">Connection Mode set to API</em>`;
+        return;
+    }
+    refs.channelSearchInp.disabled = false;
+
     refs.channelListDiv.textContent = "";
     if (!store.selectedProjectId) {
-        refs.channelListDiv.innerHTML = `<em style="color:#666;padding:8px;display:block;">Select a project first.</em>`;
+        refs.channelListDiv.innerHTML =
+            `<em style="color:#666;padding:8px;display:block;">Select a project first.</em>`;
         return;
     }
-    const filtered = channels.filter(c => (c.name ?? "").toLowerCase().includes(filter.toLowerCase()));
-    if (filtered.length === 0) {
-        refs.channelListDiv.innerHTML = `<em style="color:#666;padding:8px;display:block;">No chats found.</em>`;
+    const visible = channels.filter(c => (c.name ?? "").toLowerCase().includes(filter.toLowerCase()));
+    if (visible.length === 0) {
+        refs.channelListDiv.innerHTML =
+            `<em style="color:#666;padding:8px;display:block;">No chats found.</em>`;
         return;
     }
-    for (const c of filtered) {
+    for (const c of visible) {
         const el = document.createElement("div");
         el.textContent = c.name || `(created ${new Date(c.created_at).toLocaleDateString()})`;
         el.dataset.channelId = c.id;
         el.style.cssText = "padding:6px 8px;cursor:pointer;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-        if (c.id === store.selectedChannelId) {
-            el.style.background = "hsl(203 100% 95%)";
-            el.style.fontWeight = "600";
-        }
+        if (c.id === store.selectedChannelId) { el.style.background="hsl(203 100% 95%)"; el.style.fontWeight="600"; }
         refs.channelListDiv.appendChild(el);
     }
 }
 
-export function rebuildModelList(state: ModalState, refs: ModalRefs) {
+
+export function rebuildModelList(
+    state : ModalState,
+    refs  : ModalRefs,
+    filter= "",
+    stage : WorkflowStage | null = null,
+) {
     const { store, availableModels } = state;
     refs.aiListDiv.textContent = "";
 
-    if (availableModels.length === 0) {
-        refs.aiListDiv.innerHTML = `<em style="color:#666;padding:8px;display:block;">Loading models…</em>`;
+    const visible = availableModels.filter(m => m.toLowerCase().includes(filter.toLowerCase()));
+    if (visible.length === 0) {
+        refs.aiListDiv.innerHTML =
+            `<em style="color:#666;padding:8px;display:block;">No models found.</em>`;
         return;
     }
 
-    store.selectedModels = store.selectedModels.filter(m => availableModels.includes(m));
-    if (store.selectedModels.length === 0) store.selectedModels = [availableModels[0]];
-    saveEphorStore(store).then(r => {});
+    const isStage = !!stage;
+    const sel = isStage ? stage!.selectedModels : store.selectedModels;
 
-    for (const m of availableModels) {
+    for (const m of visible) {
         const label = document.createElement("label");
         const cb    = document.createElement("input");
-        cb.type   = "checkbox";
-        cb.value  = m;
-        cb.checked= store.selectedModels.includes(m);
+        cb.type    = "checkbox";
+        cb.value   = m;
+        cb.checked = sel.includes(m);
+
         cb.addEventListener("change", () => {
-            if (cb.checked) store.selectedModels.push(m);
-            else store.selectedModels = store.selectedModels.filter(x => x !== m);
+            if (cb.checked) sel.push(m);
+            else {
+                const idx = sel.indexOf(m);
+                if (idx !== -1) sel.splice(idx, 1);
+            }
+            /* persist */
             void saveEphorStore(store);
         });
+
         label.appendChild(cb);
         label.appendChild(document.createTextNode(m));
         refs.aiListDiv.appendChild(label);

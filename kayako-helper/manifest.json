@@ -24,6 +24,12 @@
       "type": "module"
     },
     {
+      "matches": ["https://*.ephor.ai/*", "https://ephor.ai/*"],
+      "js": ["dist/clerkTokenBridge.js"],
+      "run_at": "document_start",
+      "type": "module"
+    },
+    {
       "matches": ["https://*.kayako.com/*"],
       "js": ["dist/contentKayako.js"],
       "css": ["dist/content.css"],
@@ -78,18 +84,18 @@
   ],
 
   "permissions": [
-    "nativeMessaging",
     "tabs",
     "scripting",
     "storage",
     "activeTab",
     "clipboardWrite",
+    "nativeMessaging",
     "cookies"
   ],
 
   "web_accessible_resources": [
     {
-      "resources": ["dist/*"],
+      "resources": ["dist/*", "images/*"],
       "matches": [
         "https://*.kayako.com/*",
         "https://*.chatgpt.com/*",
