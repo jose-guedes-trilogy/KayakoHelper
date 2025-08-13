@@ -137,7 +137,10 @@ function createButton(cfg: buttonConfig): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.id        = cfg.id;
     btn.className = EXTENSION_SELECTORS.defaultButtonClass.replace(/^./,'');
-    btn.addEventListener('click', () => cfg.onClick(btn));
+    btn.addEventListener('click', (ev: MouseEvent) => {
+        ev.stopPropagation();            // prevent host UI from swallowing our click
+        cfg.onClick(btn);
+    });
     if (cfg.onContextMenu) {
         btn.addEventListener('contextmenu', ev => {
             ev.preventDefault(); cfg.onContextMenu!(ev, btn);

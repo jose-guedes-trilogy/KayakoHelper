@@ -7,6 +7,7 @@
 import { EphorClient } from "@/background/ephorClient.ts";
 import { EphorStore, saveEphorStore, CannedPrompt } from "./ephorStore.ts";
 import { Logger } from "@/background/ephor-client/logger.ts";
+import { currentKayakoTicketId } from "@/utils/kayakoIds.ts";
 
 /* ---------- timing / retry ---------- */
 const TIMEOUT_MS = 180_000; // 3 minutes
@@ -564,25 +565,47 @@ export async function runAiReplyWorkflow(
         if (progressEl)
             progressEl.textContent = `${label(stg.name)} · ${done}/${total} — sending`;
 
-        /* Ensure a real chat exists for STREAM mode (auto-create if needed) */
-        if (store.preferredMode === "stream" && !channelId) {
-            try {
-                const ts = new Date();
-                const nice =
-                    `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}-${String(ts.getDate()).padStart(2, "0")} ` +
-                    `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`;
-                const newName = `KH Run · ${nice}`;
-                tell(`No chat selected – creating "${newName}"…`);
-                const ch = await client.createChannel(projectId, newName);
-                channelId = String(ch?.id ?? ch?.channel_id ?? "");
-                if (!channelId) throw new Error("Channel creation returned no id");
-                store.selectedChannelId = channelId;
+        /* ────────────────────────────────────────────────────────────────
+         * Per-ticket channel mapping (Stream mode)
+         * If a mapping exists for this ticket, use it.
+         * Else, create a fresh channel and bind it to this ticket.
+         * Multiplexer mode keeps channelId = "".
+         * ──────────────────────────────────────────────────────────────── */
+        if (store.preferredMode === "stream") {
+            const ticketId = currentKayakoTicketId();
+            const mapKey = ticketId ? `${projectId}::${ticketId}` : "";
+
+            // use mapped channel if present
+            const mapped = mapKey ? store.channelIdByContext?.[mapKey] : undefined;
+            if (mapped) {
+                channelId = mapped;
+                store.selectedChannelId = mapped; // reflect in UI
                 await saveEphorStore(store);
-                tell(`Created chat ✓ (${channelId})`);
-                Logger.log("INFO", "WORKFLOW/STREAM auto-created channel", { channelId, name: newName });
-            } catch (err: any) {
-                Logger.log("ERR", "WORKFLOW/STREAM failed to create channel", err?.message ?? String(err));
-                throw new Error(`Unable to create a chat for stream mode – ${err?.message ?? String(err)}`);
+                tell(`Using mapped chat for ticket ${ticketId} ✓ (${channelId})`);
+                Logger.log("INFO", "WORKFLOW/STREAM using mapped channel", { ticketId, channelId });
+            } else if (!channelId) {
+                // create a new chat and map it to this ticket
+                try {
+                    const ts = new Date();
+                    const nice =
+                        `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}-${String(ts.getDate()).padStart(2, "0")} ` +
+                        `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`;
+                    const label = ticketId ? `KH · Ticket ${ticketId} · ${nice}` : `KH Run · ${nice}`;
+                    tell(`No chat selected – creating "${label}"…`);
+                    const ch = await client.createChannel(projectId, label);
+                    channelId = String(ch?.id ?? ch?.channel_id ?? "");
+                    if (!channelId) throw new Error("Channel creation returned no id");
+
+                    store.selectedChannelId = channelId;
+                    if (mapKey) store.channelIdByContext[mapKey] = channelId;
+                    await saveEphorStore(store);
+
+                    tell(`Created chat ✓ (${channelId})`);
+                    Logger.log("INFO", "WORKFLOW/STREAM auto-created & mapped channel", { ticketId, channelId, label });
+                } catch (err: any) {
+                    Logger.log("ERR", "WORKFLOW/STREAM failed to create channel", err?.message ?? String(err));
+                    throw new Error(`Unable to create a chat for stream mode – ${err?.message ?? String(err)}`);
+                }
             }
         }
 
@@ -619,3 +642,4 @@ export async function runAiReplyWorkflow(
     tell("Workflow finished ✅");
     return history.at(-1)?.combined ?? "";
 }
+

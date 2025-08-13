@@ -38,11 +38,11 @@ export async function bootEphorButton(): Promise<void> {
     (window as any).__khEphorBooted = true;
 
     store = await loadEphorStore();
-    misc  = (await chrome.storage.local.get("kh-ephor-misc"))["kh-ephor-misc"]
-        ?? { apiBase:"https://api.ephor.ai", token:"" };
+    const rawMisc = (await chrome.storage.local.get("kh-ephor-misc"))["kh-ephor-misc"] ?? {};
+    misc  = { apiBase:"https://api.ephor.ai", token:"", ...rawMisc };
 
     /* ─── 1.  Initialise client ───────────────────────────────────── */
-    client = new EphorClient({ apiBase: misc.apiBase });      // token managed via storage
+    client = new EphorClient({ apiBase: misc.apiBase || "https://api.ephor.ai" });      // token managed via storage
 
     /* ─── 2.  Pick sane default connection mode (if user never set) ─ */
     const auth      = (await chrome.storage.local.get("kh-ephor-auth"))["kh-ephor-auth"] ?? {};

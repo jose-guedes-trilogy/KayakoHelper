@@ -28,6 +28,8 @@ import { fetchTranscript } from "@/utils/api.js";
 import { openCannedPromptModal } from "./ephorCannedPromptModal.ts";
 
 import { attachPlaceholderRowHandler, rebuildPlaceholderRow } from "./modal/placeholderRow.ts";
+import { currentKayakoTicketId } from "@/utils/kayakoIds.ts";
+
 
 /* ------------------------------------------------------------------ */
 /* Entry-point                                                        */
@@ -53,6 +55,22 @@ export async function openEphorSettingsModal(
         hasProjects: false,
         availableModels: [],
     };
+
+    /* Preselect the mapped channel for the current ticket (Stream mode) so the UI highlights it */
+    try {
+        if (store.preferredMode === "stream" && store.selectedProjectId) {
+            const tid = currentKayakoTicketId();
+            if (tid) {
+                const key = `${store.selectedProjectId!}::${tid}`;
+                const mapped = store.channelIdByContext?.[key];
+                if (mapped && store.selectedChannelId !== mapped) {
+                    store.selectedChannelId = mapped;
+                    await saveEphorStore(store);
+                }
+            }
+        }
+    } catch { /* non-fatal */ }
+
 
     /* ────────────────────────────────────────────────────────────────
      * Keep every open modal in-sync when another tab edits the store
@@ -564,6 +582,22 @@ export async function openEphorSettingsModal(
         }
     });
 
+    /* Preselect the mapped channel for the current ticket (Stream mode) so the UI highlights it */
+    try {
+        if (store.preferredMode === "stream" && store.selectedProjectId) {
+            const tid = currentKayakoTicketId();
+            if (tid) {
+                // Narrow `string | null` to `string` for the IDE/type-checker.
+                const pid = store.selectedProjectId as string; // guarded above
+                const key = `${pid}::${tid}`;
+                const mapped = store.channelIdByContext?.[key];
+                if (mapped && store.selectedChannelId !== mapped) {
+                    store.selectedChannelId = mapped;
+                    await saveEphorStore(store);
+                }
+            }
+        }
+    } catch { /* non-fatal */ }
 
     /* ------------------------------------------------------------------ *
      * INITIAL DATA-FETCH                                                 *

@@ -1,4 +1,4 @@
-// Kayako Helper – ephorStore.ts (v2.3.0 – adds lastOutputs persistence, canned-prompts kept)
+// Kayako Helper – ephorStore.ts (v2.4.0 – adds channelIdByContext mapping)
 
 /* Full file replaces the existing one */
 
@@ -89,6 +89,9 @@ export interface EphorStore {
 
     /* 👇 NEW: caches the latest message id per channel (for correct parent_id) */
     lastMsgIdByChannel: Record<string, string>;
+
+    /* 👇 NEW: per-ticket channel mapping (key = `${projectId}::${ticketId}`) */
+    channelIdByContext: Record<string, string>;
 }
 
 const KEY = "kh-ephor-store";
@@ -158,9 +161,15 @@ export async function loadEphorStore(): Promise<EphorStore> {
         /* NEW ▸ outputs cache */
         lastOutputs: {},
         lastMsgIdByChannel: {},
+        channelIdByContext: {},
     };
-    return { ...defaults, ...saved, lastOutputs: saved?.lastOutputs ?? {},
-        lastMsgIdByChannel: saved?.lastMsgIdByChannel ?? {} };
+    return {
+        ...defaults,
+        ...saved,
+        lastOutputs: saved?.lastOutputs ?? {},
+        lastMsgIdByChannel: saved?.lastMsgIdByChannel ?? {},
+        channelIdByContext: saved?.channelIdByContext ?? {},
+    };
 }
 
 export async function saveEphorStore(store: EphorStore): Promise<void> {

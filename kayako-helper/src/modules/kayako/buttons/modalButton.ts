@@ -57,9 +57,6 @@ export function registerModalButton(cfg: ModalButtonConfig): void {
         groupId  : cfg.groupId ?? "kh-tools",
 
         onClick(btn)  {
-            /* stop tab-strip’s own closer */
-            (globalThis as any).event?.stopPropagation();
-
             (async () => {
             lastBtn ??= btn;      // remember for positioning
 
@@ -85,10 +82,6 @@ export function registerModalButton(cfg: ModalButtonConfig): void {
                 closeModal();
             }
             })().catch(console.error);
-
-            const willOpen = !modal?.classList.contains('open');
-
-            if (!willOpen) closeModal();
         },
     });
 }
