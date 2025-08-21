@@ -46,14 +46,25 @@ export function rebuildProjectList(state: ModalState, refs: ModalRefs, filter = 
 export function rebuildChannelList(state: ModalState, refs: ModalRefs, filter = "") {
     const { store, channels } = state;
 
-    /* Multiplexer ignores channel_id – grey-out UI */
-    if (store.preferredMode === "multiplexer") {
+    /* API mode ignores channel_id – grey-out UI */
+    const inApi = store.preferredMode === "multiplexer";
+    const usingWorkflow = refs.queryWorkflowRadio?.checked;
+    if (inApi || usingWorkflow) {
         refs.channelSearchInp.disabled = true;
+        const msg = inApi
+            ? "Connection Mode set to API"
+            : (usingWorkflow ? "Multi-stage mode autocreates chats." : "");
         refs.channelListDiv.innerHTML =
-            `<em style="color:#666;padding:8px;display:block;">Connection Mode set to API</em>`;
+            `<em style="color:#666;padding:8px;display:block;font-style:italic;">${msg}</em>`;
+        refs.channelListDiv.style.filter = "grayscale(1)";
+        refs.channelListDiv.style.opacity = "0.6";
+        refs.channelListDiv.style.background = "#f5f5f5";
         return;
     }
     refs.channelSearchInp.disabled = false;
+    refs.channelListDiv.style.filter = "";
+    refs.channelListDiv.style.opacity = "";
+    refs.channelListDiv.style.background = "";
 
     refs.channelListDiv.textContent = "";
     if (!store.selectedProjectId) {
@@ -61,7 +72,14 @@ export function rebuildChannelList(state: ModalState, refs: ModalRefs, filter = 
             `<em style="color:#666;padding:8px;display:block;">Select a project first.</em>`;
         return;
     }
-    const visible = channels.filter(c => (c.name ?? "").toLowerCase().includes(filter.toLowerCase()));
+    let visible = channels.filter(c => (c.name ?? "").toLowerCase().includes(filter.toLowerCase()));
+    const order = store.channelSortOrder ?? "alpha";
+    if (order === "alpha") {
+        visible.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    } else {
+        // newest first by created_at
+        visible.sort((a, b) => new Date(b.created_at || 0).valueOf() - new Date(a.created_at || 0).valueOf());
+    }
     if (visible.length === 0) {
         refs.channelListDiv.innerHTML =
             `<em style="color:#666;padding:8px;display:block;">No chats found.</em>`;

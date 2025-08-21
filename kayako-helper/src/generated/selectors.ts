@@ -134,6 +134,7 @@ export interface KayakoSelectors {
   reloadIcon: string;
   searchPageContainer: string;
   searchInput: string;
+  slaBreachIndicator: string;
 }
 
 export interface ExtensionSelectors {
@@ -391,6 +392,7 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   reloadIcon: "[class*=ko-cases-list_sidebar_item_reload-icon__reload-icon_]",
   searchPageContainer: "[class*=session_agent_search__container_]",
   searchInput: "[class*=session_agent_search__search-input_]",
+  slaBreachIndicator: "[class*=ko-sla__metric-breached_]",
 };
 export const EXTENSION_SELECTORS: ExtensionSelectors = {
   defaultButtonClass: ".kh-default-button",

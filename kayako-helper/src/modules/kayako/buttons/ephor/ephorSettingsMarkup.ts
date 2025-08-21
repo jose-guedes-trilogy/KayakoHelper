@@ -18,9 +18,13 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
                             cursor:pointer;border-radius:3px;}
     #kh-ephor-ai-list label:hover{background:#f0f0f0;}
 
-    /* ---------- stage bar buttons ---------- */
-    #kh-ephor-stage-bar button,#kh-ephor-stage-bar span{padding:4px 10px;border-radius:4px;cursor:pointer;}
+    /* ---------- stage bar ---------- */
+    #kh-ephor-stage-bar button,#kh-ephor-stage-bar > span{padding:4px 10px;border-radius:4px;cursor:pointer;}
     #kh-ephor-stage-bar .active{background:#2e73e9;color:#fff;}
+    #kh-ephor-stage-bar .kh-stage{position:relative;display:inline-flex;align-items:center;}
+    #kh-ephor-stage-bar .kh-del{font-weight:600;display:none;position:absolute;top:0;right:4px;width:16px;height:16px;border-radius:50%;
+                                 background:#fff;border:1px solid #bbb;color:#1a1a1a;line-height:14px;font-size:12px;text-align:center;cursor:pointer;}
+    #kh-ephor-stage-bar .kh-stage:hover .kh-del{display:block;}
 
     /* ---------- inputs ---------- */
     input[type="text"],input[type="search"],textarea{border:1px solid #ccc;border-radius:4px;}
@@ -29,7 +33,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
     #kh-ephor-log-verbose{position:relative;top:2px;}
 
     /* ---------- placeholder buttons ---------- */
-    .kh-ph-btn{padding:2px 6px;font-size:12px;border:1px solid #bbb;border-radius:3px;background:#f3f3f3;cursor:pointer;}
+    .kh-ph-btn{padding:2px 8px;font-size:12px;border:1px solid #bbb;border-radius:4px;background:#fff;cursor:pointer;}
     .kh-ph-btn[disabled]{opacity:.35;pointer-events:none;}
     .kh-ph-btn:hover:not([disabled]){background:#e8e8e8;}
 
@@ -61,10 +65,10 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
   </div>
 
   <!-- ===== Unified radio row ===== -->
-  <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:center;margin-bottom:6px;">
+  <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:center;margin-bottom:6px;background:hsl(213 20% 97% / 1);padding:8px 12px;margin-left:-12px;margin-right:-12px;border-top:1px solid hsl(213deg 15% 88.07%);border-bottom:1px solid hsl(213deg 15% 88.07%);">
     <span><strong>Connection:</strong>
-      <label><input type="radio" name="kh-ephor-mode" id="kh-ephor-mode-multiplexer" value="multiplexer"> Multiplexer</label>
-      <label><input type="radio" name="kh-ephor-mode" id="kh-ephor-mode-stream" value="stream"> Stream</label>
+      <label><input type="radio" name="kh-ephor-mode" id="kh-ephor-mode-multiplexer" value="multiplexer"> API</label>
+      <label><input type="radio" name="kh-ephor-mode" id="kh-ephor-mode-stream" value="stream"> Normal</label>
     </span>
     <span><strong>Workflow:</strong>
       <label><input type="radio" name="kh-query-mode" id="kh-query-single"  value="single"> Single stage</label>
@@ -83,7 +87,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
   </div>
 
   <!-- ===== Stage bar ===== -->
-  <div id="kh-ephor-stage-bar" style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;"></div>
+  <div id="kh-ephor-stage-bar" style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;background:hsl(213 20% 97% / 1);padding:2px 12px;margin-left:-12px;margin-right:-12px;border-top:1px solid hsl(213deg 15% 88.07%);border-bottom:1px solid hsl(213deg 15% 88.07%);"></div>
 
   <!-- ===== Pane: SETTINGS ===== -->
   <div id="kh-ephor-pane-settings">
@@ -99,7 +103,16 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
       </div>
       <!-- 2. Chats -->
       <div>
-        <p style="margin:0 0 4px;font-weight:600;">2. Select Chat</p>
+        <p style="margin:0 0 4px;font-weight:600;display:flex;align-items:center;gap:8px;">
+          <span>2. Select Chat</span>
+          <span style="margin-left:auto;font-weight:400;color:#333;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+            <label for="kh-ephor-chat-sort" style="font-weight:600;">Sort:</label>
+            <select id="kh-ephor-chat-sort" style="padding:2px 6px;">
+              <option value="alpha">A–Z</option>
+              <option value="created">Newest</option>
+            </select>
+          </span>
+        </p>
         <input id="kh-ephor-channel-search" type="search" placeholder="Search chats…"
                style="width:100%;padding:4px 6px;margin-bottom:8px;">
         <div id="kh-ephor-channel-list"
@@ -111,8 +124,24 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
         <input id="kh-ephor-model-search" type="search" placeholder="Search models…"
                style="width:100%;padding:4px 6px;margin-bottom:6px;">
         <div id="kh-ephor-ai-list"
-             style="height:178px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
+             style="height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
       </div>
+    </div>
+
+    <!-- per-ticket custom instructions (scope toggle) -->
+    <div style="margin-top:10px;">
+      <p style="margin:0 0 4px;font-weight:600;display:flex;align-items:center;gap:10px;">
+        <span id="kh-ephor-instr-label">4. Per-ticket Custom Instructions</span>
+        <label style="font-weight:normal;color:#333;">
+          <input type="checkbox" id="kh-ephor-instr-scope"> Per-ticket
+        </label>
+      </p>
+      <textarea id="kh-ephor-custom-instr"
+                style="width:100%;height:60px;padding:6px;border:1px solid #ddd;border-radius:4px;resize:vertical;"
+                placeholder="Optional: saved for this Kayako ticket. These lines will be prepended to prompts."></textarea>
+      <p style="margin:4px 0 0;color:#666;font-size:12px;">
+        Scope applies to workflow runs. When checked, the same instructions are used for all stages of the ticket.
+      </p>
     </div>
 
     <!-- prompt -->
@@ -120,7 +149,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
       <p style="margin:0 0 4px;font-weight:600;">4. Prompt</p>
 
       <!-- placeholder buttons + canned-prompt button -->
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;background:hsl(213 20% 97% / 1);padding:4px 12px;margin-left:-12px;margin-right:-12px;border-top:1px solid hsl(213deg 15% 88.07%);border-bottom:1px solid hsl(213deg 15% 88.07%);">
         <div id="kh-placeholder-row" style="display:flex;gap:6px;flex-wrap:wrap;">
           <span style="font-weight:600;">Insert:</span>
           <button class="kh-ph-btn" data-ph="@#PRV_RD_OUTPUT#@">@#PRV_RD_OUTPUT#@</button>
@@ -130,11 +159,14 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
           <button class="kh-ph-btn" data-ph="@#OUTPUT_RND_3_AI_<AI_NAME>#@">@#OUTPUT_RND_3_AI_<AI_NAME>#@</button>
         </div>
 
-        <button id="kh-ephor-canned-btn" class="kh-btn">📑 Canned Prompts…</button>
+        <button id="kh-ephor-canned-btn" class="kh-btn">📑 Custom Placeholders…</button>
       </div>
 
-      <textarea id="kh-ephor-prompt-input"
-                style="width:100%;height:90px;padding:6px;"></textarea>
+      <div id="kh-ephor-prompt-wrap" style="position:relative;">
+        <pre id="kh-ephor-prompt-highlight" style="position:absolute;inset:0;margin:0;border-radius:4px;padding:6px;pointer-events:none;white-space:pre-wrap;word-break:normal;overflow-wrap:anywhere;font-family:monospace;background:hsl(213 20% 99% / 1);color:transparent;"></pre>
+        <textarea id="kh-ephor-prompt-input"
+                  style="position:relative;z-index:1;width:100%;height:90px;padding:6px;background:transparent;"></textarea>
+      </div>
     </div>
 
     <!-- toolbar -->

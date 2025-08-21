@@ -1,4 +1,4 @@
-// Kayako Helper – ephorSettingsModal.ts (v7.7.0)
+// Kayako Helper – ephorSettingsModal.ts (v7.8.0 – per-stage custom instructions + ticket watcher)
 // • Accurate cross-workflow progress count (sum of models across stages).
 // • Prevents duplicate sends (re-entrancy guard).
 // • Outputs tab shows only selected AIs; marks finished models (✓) if saved.
@@ -71,6 +71,63 @@ export async function openEphorSettingsModal(
         }
     } catch { /* non-fatal */ }
 
+    /* ------------------------------------------------------------------ *
+     * Per-ticket Custom Instructions UI (now per-stage)                  *
+     * ------------------------------------------------------------------ */
+    const stageKeyFor = () => {
+        const tid = currentKayakoTicketId();
+        const pid = store.selectedProjectId || "";
+        const sid = currentStageId || "";
+        return tid && sid ? `${pid}::${tid}::${sid}` : "";
+    };
+
+    function refreshCustomInstr(): void {
+        const tid = currentKayakoTicketId();
+        const ta = refs.customInstrTa;
+        if (!tid || !currentStageId) {
+            ta.disabled = true;
+            ta.value = "";
+            ta.placeholder = "Open a Kayako ticket to use custom instructions.";
+            return;
+        }
+        ta.disabled = false;
+        const skey = stageKeyFor();
+        const tkey = (store.selectedProjectId && tid) ? `${store.selectedProjectId}::${tid}` : "";
+        const stageVal = skey ? store.customInstructionsByStage?.[skey] : "";
+        const ticketVal = tkey ? store.customInstructionsByContext?.[tkey] : "";
+        const useTicket = (store.instructionsScopeForWorkflow ?? "ticket") === "ticket";
+        refs.instrScopeCbx.checked = useTicket;
+        refs.instrScopeLabel.textContent = useTicket
+            ? "4. Per-ticket Custom Instructions"
+            : "4. Per-stage Custom Instructions";
+        ta.value = useTicket ? (ticketVal ?? "") : (stageVal ?? ticketVal ?? "");
+        ta.placeholder = useTicket
+            ? "Optional: saved for this Kayako ticket. These lines will be prepended to prompts."
+            : "Optional: saved for this Kayako ticket & stage. These lines will be prepended to prompts.";
+    }
+
+    refs.customInstrTa.addEventListener("input", () => {
+        const tid = currentKayakoTicketId();
+        const pid = store.selectedProjectId || "";
+        const tkey = (pid && tid) ? `${pid}::${tid}` : "";
+        const skey = stageKeyFor();
+        const useTicket = (store.instructionsScopeForWorkflow ?? "ticket") === "ticket";
+        if (useTicket) {
+            if (!tkey) return;
+            store.customInstructionsByContext = store.customInstructionsByContext || {} as any;
+            store.customInstructionsByContext[tkey] = refs.customInstrTa.value;
+        } else {
+            if (!skey) return;
+            store.customInstructionsByStage = store.customInstructionsByStage || {};
+            store.customInstructionsByStage[skey] = refs.customInstrTa.value;
+        }
+    });
+
+    refs.instrScopeCbx.addEventListener("change", async () => {
+        store.instructionsScopeForWorkflow = refs.instrScopeCbx.checked ? "ticket" : "stage";
+        await saveEphorStore(store);
+        refreshCustomInstr();
+    });
 
     /* ────────────────────────────────────────────────────────────────
      * Keep every open modal in-sync when another tab edits the store
@@ -81,11 +138,16 @@ export async function openEphorSettingsModal(
 
         // update the in-memory copy used by this modal
         store.preferredMode = newVal.preferredMode;
+        store.customInstructionsByStage = newVal.customInstructionsByStage ?? store.customInstructionsByStage;
+        store.customInstructionsByContext = newVal.customInstructionsByContext ?? store.customInstructionsByContext;
+        store.instructionsScopeForWorkflow = newVal.instructionsScopeForWorkflow ?? store.instructionsScopeForWorkflow;
 
         // reflect in the UI (radio buttons + channel list)
         refs.modeMultiplexer.checked = newVal.preferredMode === "multiplexer";
         refs.modeStream.checked = newVal.preferredMode === "stream";
         rebuildChannelList(state, refs); // greys/ungreys chat list as needed
+        // and refresh the per-ticket per-stage textarea if it changed externally
+        refreshCustomInstr();
     });
 
     /* ---------- logger hookup ---------- */
@@ -109,6 +171,30 @@ export async function openEphorSettingsModal(
         useWorkflow
             ? store.workflowStages.find(s => s.id === currentStageId)?.selectedModels ?? []
             : store.selectedModels;
+
+    /* ------------------------------------------------------------------ *
+     * Prompt placeholder highlighting                                    *
+     * ------------------------------------------------------------------ */
+    const promptTa = refs.promptInput;
+    const highlightPre = modal.querySelector<HTMLPreElement>("#kh-ephor-prompt-highlight");
+    const renderHighlight = () => {
+        if (!highlightPre) return;
+        let t = promptTa.value
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        // Bold @#PLACEHOLDER#@ and {{ PLACEHOLDER }} forms
+        t = t
+            .replace(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g, '<b style="color:#000">@$#$1#$@</b>')
+            .replace(/\{\{\s*([A-Z0-9_.-]+)\s*\}\}/g, '<b style="color:#000">{{$1}}</b>')
+            .replace(/@\$#\$/g, "@#") // revert temporary
+            .replace(/#\$@/g, "#@");
+        highlightPre.innerHTML = t;
+    };
+    if (highlightPre) {
+        renderHighlight();
+        promptTa.addEventListener("input", renderHighlight);
+    }
 
     /* ------------------------------------------------------------------ *
      * OUTPUT-tabs builder                                                *
@@ -206,6 +292,10 @@ export async function openEphorSettingsModal(
         void saveEphorStore(store);
         log(`Connection mode → ${store.preferredMode}`);
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
+        // The project context for the ticket key may change when switching mode/selection;
+        // reflect the current (projectId, ticketId) mapping.
+        // (refresh also happens on project selection below)
+        refreshCustomInstr();
     };
     refs.modeMultiplexer.addEventListener("change", onMode);
     refs.modeStream.addEventListener("change", onMode);
@@ -213,10 +303,13 @@ export async function openEphorSettingsModal(
     /* ------------------------------------------------------------------ *
      * QUERY-MODE (single vs workflow)                                    *
      * ------------------------------------------------------------------ */
-    refs.queryWorkflowRadio.checked = true;
+    refs.queryWorkflowRadio.checked = (store.preferredQueryMode ?? "workflow") === "workflow";
+    refs.querySingleRadio.checked = !refs.queryWorkflowRadio.checked;
 
     function updateQueryMode() {
         useWorkflow = refs.queryWorkflowRadio.checked;
+        store.preferredQueryMode = useWorkflow ? "workflow" : "single";
+        void saveEphorStore(store);
 
         /* stage bar visibility */
         refs.stageBarDiv.style.display = useWorkflow ? "" : "none";
@@ -240,6 +333,7 @@ export async function openEphorSettingsModal(
 
         rebuildOutputTabs();
         rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
+        rebuildChannelList(state, refs, refs.channelSearchInp.value);
     }
 
     refs.querySingleRadio.addEventListener("change", updateQueryMode);
@@ -262,14 +356,41 @@ export async function openEphorSettingsModal(
      * ------------------------------------------------------------------ */
     function rebuildStageBar(): void {
         refs.stageBarDiv.textContent = "";
+        const label = document.createElement("span");
+        label.style.fontWeight = "600";
+        label.textContent = "Stage:";
+        refs.stageBarDiv.appendChild(label);
         for (const s of store.workflowStages) {
+            const wrap = document.createElement("span");
+            wrap.className = "kh-stage";
             const tab = Object.assign(document.createElement("span"), { textContent: s.name });
             tab.className = "kh-bar-btn" + (s.id === currentStageId ? " active" : "");
             tab.addEventListener("click", () => {
                 currentStageId = s.id;
                 onStageChange();
             });
-            refs.stageBarDiv.appendChild(tab);
+            const del = document.createElement("span");
+            del.className = "kh-del";
+            del.textContent = "×";
+            del.title = "Delete stage";
+            del.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                const ok = confirm(`Delete stage "${s.name}"?`);
+                if (!ok) return;
+                const idx = store.workflowStages.findIndex(x => x.id === s.id);
+                if (idx !== -1) {
+                    store.workflowStages.splice(idx, 1);
+                    if (currentStageId === s.id) {
+                        currentStageId = store.workflowStages[0]?.id ?? "";
+                    }
+                    void saveEphorStore(store);
+                    rebuildStageBar();
+                    onStageChange();
+                }
+            });
+            wrap.appendChild(tab);
+            wrap.appendChild(del);
+            refs.stageBarDiv.appendChild(wrap);
         }
         refs.stageBarDiv.appendChild(refs.addStageBtn);
     }
@@ -304,6 +425,7 @@ export async function openEphorSettingsModal(
         rebuildStageBar();
         rebuildOutputTabs();
         rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
+        refreshCustomInstr(); // stage changed → swap to stage-specific instructions
     }
 
     /* keep prompt text isolated between single-stage and workflow */
@@ -375,6 +497,12 @@ export async function openEphorSettingsModal(
     refs.channelSearchInp.addEventListener("input", () =>
         rebuildChannelList(state, refs, refs.channelSearchInp.value),
     );
+    refs.chatSortSelect?.addEventListener("change", () => {
+        const v = refs.chatSortSelect!.value === "created" ? "created" : "alpha";
+        store.channelSortOrder = v;
+        void saveEphorStore(store);
+        rebuildChannelList(state, refs, refs.channelSearchInp.value);
+    });
 
     /* ------------------------------------------------------------------ *
      * Toolbar buttons                                                    *
@@ -389,8 +517,14 @@ export async function openEphorSettingsModal(
         log("REQUEST", `POST /projects/${store.selectedProjectId}/channels {name:"${name}"}`);
         try {
             const ch = await client.createChannel(store.selectedProjectId, name);
-            log("RESPONSE (new channel)", ch.channel_id ?? ch.id);
+            const newId = String((ch as any)?.conversation_id ?? (ch as any)?.id ?? (ch as any)?.channel_id ?? "");
+            log("RESPONSE (new channel)", newId || (ch as any)?.id);
             await fetchChannels(state, refs, log);
+            if (newId) {
+                store.selectedChannelId = newId;
+                await saveEphorStore(store);
+                rebuildChannelList(state, refs, refs.channelSearchInp.value);
+            }
         } catch (err: any) {
             log("ERROR creating chat", err.message);
         }
@@ -605,6 +739,8 @@ export async function openEphorSettingsModal(
     rebuildProjectList(state, refs);
     rebuildChannelList(state, refs);
     void refreshProjects(state, refs, log);
+    // Initialize custom-instructions textarea for current ticket/project context.
+    refreshCustomInstr();
 
     client
         .listModels()
@@ -627,6 +763,10 @@ export async function openEphorSettingsModal(
     onStageChange();
     rebuildOutputTabs();
     updateQueryMode();
+    // initialize chat sort select from persisted store
+    if (refs.chatSortSelect) {
+        refs.chatSortSelect.value = (store.channelSortOrder ?? "alpha") as any;
+    }
 
     /* ------------------------------------------------------------------ *
      * Placeholder-insert buttons (built-in and canned)                   *
@@ -649,6 +789,24 @@ export async function openEphorSettingsModal(
             btn.dataset.ph = cp.placeholder;
             btn.dataset.canned = "1";
             btn.textContent = cp.placeholder;
+            btn.title = (cp.title ? `${cp.title} — ` : "") + "Right-click to set its value from your clipboard";
+
+            /* NEW: right-click → set this custom placeholder’s body from clipboard, then save */
+            btn.addEventListener("contextmenu", async (e) => {
+                e.preventDefault();
+                try {
+                    const text = await navigator.clipboard.readText();
+                    const idx = store.cannedPrompts.findIndex(p => p.id === cp.id);
+                    if (idx !== -1) {
+                        store.cannedPrompts[idx] = { ...store.cannedPrompts[idx], body: text };
+                        await saveEphorStore(store);
+                        document.dispatchEvent(new CustomEvent("cannedPromptsChanged"));
+                        btn.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 180 });
+                    }
+                } catch {
+                    alert("Couldn’t read from clipboard. Please allow clipboard permission and try again.");
+                }
+            });
             refs.placeholderRow.appendChild(btn);
         }
     }
@@ -660,4 +818,33 @@ export async function openEphorSettingsModal(
 
     /* Open canned-prompt manager */
     refs.cannedBtn.addEventListener("click", () => openCannedPromptModal(store));
+
+    /* ------------------------------------------------------------------ *
+     * TICKET WATCHER – keep modal in sync when user navigates to
+     * another Kayako internal tab while the modal is open.
+     * ------------------------------------------------------------------ */
+    let lastTicketId = currentKayakoTicketId();
+    const ticketWatch = window.setInterval(async () => {
+        const now = currentKayakoTicketId();
+        if (now === lastTicketId) return;
+        lastTicketId = now;
+        refreshCustomInstr(); // swap instructions textarea to the new ticket
+        // In Stream mode, auto-select mapped chat for the new ticket if available.
+        try {
+            if (store.preferredMode === "stream" && store.selectedProjectId && now) {
+                const key = `${store.selectedProjectId}::${now}`;
+                const mapped = store.channelIdByContext?.[key];
+                if (mapped && store.selectedChannelId !== mapped) {
+                    store.selectedChannelId = mapped;
+                    await saveEphorStore(store);
+                    rebuildChannelList(state, refs, refs.channelSearchInp.value);
+                }
+            }
+        } catch { /* non-fatal */ }
+    }, 800);
+
+    // Cleanup watcher on modal close
+    refs.closeBtn.addEventListener("click", () => {
+        try { clearInterval(ticketWatch); } catch {}
+    });
 }

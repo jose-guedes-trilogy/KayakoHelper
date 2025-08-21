@@ -189,7 +189,10 @@
 
 
     "searchPageContainer"  : "[class*=session_agent_search__container_]",
-    "searchInput"          : "[class*=session_agent_search__search-input_]"
+    "searchInput"          : "[class*=session_agent_search__search-input_]",
+
+    // red SLA indicator that appears in ticket views in the Next Breach column
+    "slaBreachIndicator"   : "[class*=ko-sla__metric-breached_]"
 
   },
 

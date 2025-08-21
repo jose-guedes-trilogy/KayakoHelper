@@ -80,7 +80,18 @@
     "https://content-push.googleapis.com/upload/",
     "https://gemini.google.com/*",
     "https://ephor.ai/*",
-    "https://*.ephor.ai/*"
+    "https://*.ephor.ai/*",
+
+
+
+    "https://*.alpha.school/*",
+    "*://ftgwtrk63c.execute-api.us-east-1.amazonaws.com/*",
+    "*://api-js.mixpanel.com/*",
+    "*://o924797.ingest.sentry.io/*",
+    "*://api.iconify.design/*",
+    "https://cognito-identity.us-east-1.amazonaws.com/*",
+    "https://ftgwtrk63c.execute-api.us-east-1.amazonaws.com/*"
+
   ],
 
   "permissions": [

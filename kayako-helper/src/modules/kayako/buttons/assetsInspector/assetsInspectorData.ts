@@ -60,7 +60,7 @@ export const CATEGORY_LABELS = {
     salesforce     : 'Salesforce Links',
     netsuite       : 'NetSuite Links',
     kayako_article : 'Kayako Articles',
-    kayako         : 'Kayako Instances',
+    kayako         : 'Kayako Links',
     github         : 'GitHub Links',
     jira           : 'Jira Links',
     other          : 'Other Links',

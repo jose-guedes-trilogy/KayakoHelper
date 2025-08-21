@@ -663,3 +663,8 @@ $left-menu-hover-bg-color: hsl(268 18% 18% / 1);
 #{sel.$sideConversationIcon} {
   fill: hsl(203 40% 57% / 1) !important;
 }
+
+
+#{sel.$slaBreachIndicator} {
+  border-radius: 6px;
+}

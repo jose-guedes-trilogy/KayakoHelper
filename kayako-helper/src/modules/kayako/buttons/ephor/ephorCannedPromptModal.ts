@@ -77,7 +77,7 @@ export function openCannedPromptModal(store: EphorStore): void {
             Object.assign(del.style, { border:"none", background:"none", cursor:"pointer", padding:"0 4px" });
             del.addEventListener("click", ev => {
                 ev.stopPropagation();
-                if (!confirm(`Delete canned prompt “${cp.title}”?`)) return;
+                if (!confirm(`Delete custom placeholder “${cp.title || cp.placeholder}”?`)) return;
                 store.cannedPrompts = store.cannedPrompts.filter(p => p.id !== cp.id);
                 void saveEphorStore(store).then(() => {
                     rebuildList(); document.dispatchEvent(new CustomEvent("cannedPromptsChanged"));

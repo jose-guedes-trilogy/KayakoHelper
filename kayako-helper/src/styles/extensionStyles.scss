@@ -276,6 +276,11 @@
 
 .kh-date-select-wrapper {
   position: relative;
+
+  select {
+    min-width: 64px !important;
+    padding-left: 6px !important;
+  }
 }
 
 #{sel.$searchLabel} {
@@ -827,3 +832,36 @@
 #kh-ephor-btn .kh-ephor-text { line-height: 1; }
 
 #kh-ephor-send-btn { cursor: pointer; }
+
+
+#{sel.$textEditorHeader} button {
+  min-height: 28px;
+  max-height: 28px;
+}
+#{sel.$searchPageContainer} {
+  #{sel.$unifiedSearchElementsParentId}  {
+    padding-top: 20px;
+    border-bottom: none;
+  }
+
+  #{sel.$searchResultsButtonContainer}  {
+    padding-bottom: 0;
+  }
+}
+
+root {
+  --dark-mode-background-color: #2a2a2a;
+  --dark-mode-text-color: #cdcdcd;
+}
+
+
+#{sel.$newLinesButton}, #{sel.$copyChatButton}, #{sel.$createFolderButton}, #{sel.$copyPostButton}, #{sel.$scrollTopButton},
+#{sel.$exportChatButton}, #{sel.$exportChatButtonRight}, #{sel.$twoPartBtnLeftHalf}, #{sel.$twoPartBtnRightHalf},
+#{sel.$sendToQcButton} {
+  &.dark-mode {
+    color: var(--dark-mode-text-color) !important;
+
+    background: var(--dark-mode-background-color) !important;
+  }
+
+}

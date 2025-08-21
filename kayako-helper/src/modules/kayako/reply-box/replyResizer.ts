@@ -1,9 +1,12 @@
-/*  Kayako Helper – replyResizer.ts  (rev-v2)
+/*  Kayako Helper – replyResizer.ts  (rev-v3.1)
     ──────────────────────────────────────────────────────────────────
-    • Drag-to-resize bar (+ stored height per conversation)
-    • Auto-expand to hide the scrollbar when typing/pasting
-    • NEW: double-click the bar to collapse → MIN, or restore to a
-      “best fit” height (≤ DEFAULT_MAX) if already collapsed.          */
+    • Drag‑to‑resize bar (+ stored height per conversation)
+    • Auto‑expand to hide the scrollbar when typing/pasting
+    • Double‑click bar → collapse/expand
+    • Supports *multiple* simultaneous editors (main reply + side‑conversation)
+    • NEW (v3.1): "hot‑reload" safe – if a bar already exists but has
+      no listeners (e.g. extension reloaded), listeners are (re)attached
+      instead of injecting a duplicate bar.                                             */
 
 import {
     KAYAKO_SELECTORS,
@@ -19,6 +22,7 @@ export const MIN_HEIGHT  = 44;
 
 const BAR_CLASS      = 'ktx-resize-bar';
 const AUTO_SETUP_KEY = 'autoExpandSetup';
+const LISTENER_KEY   = 'resizeListeners';      // on the <div> bar itself
 
 let stored: Record<string, number> = {};
 let currentConv: string | null = null;
@@ -31,35 +35,46 @@ export function bootReplyResizer(): void {
     attachCollapseOnSend();
 }
 
-/* ───────────────  Main patch  ──────────────── */
+/* ───────────────  Core orchestration  ──────────────── */
 
 function ensureChrome(): void {
-    const chromeEl = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorContainerRoot);
-    const wrap     = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    const chromeEls = Array.from(
+        document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.textEditorContainerRoot)
+    );
 
-    if (!chromeEl || !wrap) {
-        requestAnimationFrame(ensureChrome);
-        return;
+    for (const chromeEl of chromeEls) {
+        const wrap = chromeEl.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+        if (!wrap) continue;                                 // editor not yet mounted
+
+        /* ───────── existing bar? just (re)attach listeners ───────── */
+        const existingBar = chromeEl.querySelector<HTMLElement>(`.${BAR_CLASS}`);
+        if (existingBar) {
+            if (existingBar.dataset[LISTENER_KEY] !== 'true') {
+                attachDrag(existingBar);
+                attachDoubleClick(existingBar);
+                existingBar.dataset[LISTENER_KEY] = 'true';
+            }
+        }
+        /* ───────── inject if missing ───────── */
+        else {
+            chromeEl.style.position = 'relative';
+            injectBar(chromeEl);
+            applyInitialSize(wrap);          // collapse by default
+        }
+
+        /* ───────── auto-expand handlers (idempotent) ───────── */
+        maybeAttachAutoExpand(chromeEl);
     }
 
-    /* ----- one-time bar injection per editor ----- */
-    if (chromeEl.dataset.resizerSetup !== 'true' &&
-        !chromeEl.querySelector(`.${BAR_CLASS}`)) {
-
-        chromeEl.dataset.resizerSetup = 'true';
-        injectBar(chromeEl);
-        applyInitialSize();
-    }
-
-    /* ----- auto-expand listeners (idempotent) ----- */
-    maybeAttachAutoExpand(wrap);
+    /* Continuous guard: re-run next frame so we reinject if the DOM re-renders
+       and removes our bar (common with Ember view swaps). Lightweight because
+       we bail early once bars exist. */
+    requestAnimationFrame(ensureChrome);
 }
 
 /* ───────────────────────── drag bar ───────────────────────── */
 
 function injectBar(chromeEl: HTMLElement): void {
-    chromeEl.style.position = 'relative';
-
     const bar = document.createElement('div');
     bar.className = BAR_CLASS;
     bar.style.cssText =
@@ -68,45 +83,47 @@ function injectBar(chromeEl: HTMLElement): void {
 
     chromeEl.prepend(bar);
     attachDrag(bar);
-    attachDoubleClick(bar);   // ← NEW
+    attachDoubleClick(bar);
+    bar.dataset[LISTENER_KEY] = 'true';
 }
-function toggleCollapseExpand(): void {
-    const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+
+function toggleCollapseExpand(bar: HTMLElement): void {
+    const chromeRoot = bar.parentElement as HTMLElement;
+    const wrap  = chromeRoot.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
     const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
     if (!wrap || !inner) return;
 
-    const curH = getCurrentHeight();
+    const curH = getCurrentHeight(wrap);
     const key  = currentConvId() ?? 'global';
 
-    if (curH > MIN_HEIGHT + 1) {                     // ① collapse
-        applySize(MIN_HEIGHT);
+    if (curH > MIN_HEIGHT + 1) {                     // collapse
+        applySize(MIN_HEIGHT, wrap, inner);
         stored[key] = MIN_HEIGHT;
         return;
     }
 
-    /* ② expand – use scrollHeight *unless* it’s too small,
-          then default to DEFAULT_MAX                         */
+    // expand → best‑fit capped at DEFAULT_MAX
     const fit     = inner.scrollHeight;
     const desired = fit > MIN_HEIGHT + 1 ? fit : DEFAULT_MAX;
     const newH    = Math.min(desired, DEFAULT_MAX);
 
-    applySize(newH);
+    applySize(newH, wrap, inner);
     stored[key] = newH;
 }
 
 function attachDrag(bar: HTMLElement): void {
     bar.addEventListener('mousedown', e => {
-        /* Fast double-click? handle & bail */
+        /* Fast double‑click? */
         if (e.detail === 2) {
             e.preventDefault();
-            toggleCollapseExpand();
+            toggleCollapseExpand(bar);
             return;
         }
 
-        /* Normal drag-to-resize below (unchanged) */
         e.preventDefault();
 
-        const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+        const chromeRoot = bar.parentElement as HTMLElement;
+        const wrap = chromeRoot.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
         if (!wrap) return;
 
         const startY = e.clientY;
@@ -114,13 +131,13 @@ function attachDrag(bar: HTMLElement): void {
 
         const onMove = (ev: MouseEvent) => {
             const newH = Math.max(MIN_HEIGHT, startH - (ev.clientY - startY));
-            applySize(newH);
+            applySize(newH, wrap);
         };
 
         const onUp = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup',   onUp);
-            stored[currentConvId() ?? 'global'] = getCurrentHeight();
+            stored[currentConvId() ?? 'global'] = getCurrentHeight(wrap);
         };
 
         document.addEventListener('mousemove', onMove);
@@ -128,44 +145,20 @@ function attachDrag(bar: HTMLElement): void {
     });
 }
 
-/* ───────────────────── NEW: dbl-click toggle ───────────────────── */
-
 function attachDoubleClick(bar: HTMLElement): void {
-    bar.addEventListener('dblclick', () => {
-        const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
-        const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
-        if (!wrap || !inner) return;
-
-        const curH = getCurrentHeight();
-        const key  = currentConvId() ?? 'global';
-
-        /* Collapse if taller than MIN; tolerate ±1 px rounding */
-        if (curH > MIN_HEIGHT + 1) {
-            applySize(MIN_HEIGHT);
-            stored[key] = MIN_HEIGHT;
-            return;
-        }
-
-        /* Already at MIN → expand:
-           – “Best fit” to content if ≤ DEFAULT_MAX
-           – Otherwise hard-cap at DEFAULT_MAX                        */
-        const desired  = Math.max(inner.scrollHeight, MIN_HEIGHT);
-        const newH     = desired <= DEFAULT_MAX ? desired : DEFAULT_MAX;
-
-        applySize(newH);
-        stored[key] = newH;
-    });
+    bar.addEventListener('dblclick', () => toggleCollapseExpand(bar));
 }
 
-/* ────────────────────── auto-expand (unchanged) ─────────────────────── */
+/* ────────────────────── auto‑expand ─────────────────────── */
 
-function maybeAttachAutoExpand(wrap: HTMLElement): void {
-    const inner = wrap.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
-    if (!inner || inner.dataset[AUTO_SETUP_KEY] === 'true') return;
+function maybeAttachAutoExpand(chromeRoot: HTMLElement): void {
+    const wrap  = chromeRoot.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
+    if (!wrap || !inner || inner.dataset[AUTO_SETUP_KEY] === 'true') return;
 
     inner.dataset[AUTO_SETUP_KEY] = 'true';
 
-    const scheduleCheck = () => requestAnimationFrame(checkOverflowAndExpand);
+    const scheduleCheck = () => requestAnimationFrame(() => checkOverflowAndExpand(wrap, inner));
 
     inner.addEventListener('input', scheduleCheck);
     inner.addEventListener('paste', scheduleCheck);
@@ -176,52 +169,44 @@ function maybeAttachAutoExpand(wrap: HTMLElement): void {
     scheduleCheck();
 }
 
-function checkOverflowAndExpand(): void {
-    const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
-    const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
-    if (!wrap || !inner) return;
+function checkOverflowAndExpand(wrap: HTMLElement, inner: HTMLElement): void {
+    const curH = getCurrentHeight(wrap);
+    if (curH >= DEFAULT_MAX) return;               // already maxed
 
-    const curH       = getCurrentHeight();
-    if (curH >= DEFAULT_MAX) return;                           // already maxed
+    const overflow = inner.scrollHeight - inner.clientHeight;
+    if (overflow <= 1) return;                     // no scrollbar
 
-    const overflow   = inner.scrollHeight - inner.clientHeight;
-    if (overflow <= 1) return;                                 // no scrollbar
+    const newHeight = Math.min(DEFAULT_MAX, curH + overflow);
 
-    const needed     = overflow;
-    const newHeight  = Math.min(DEFAULT_MAX, curH + needed);
-
-    applySize(newHeight);
+    applySize(newHeight, wrap, inner);
     stored[currentConvId() ?? 'global'] = newHeight;
 }
 
 /* ───────────────────── height helpers ───────────────────── */
 
-export function applySize(px: number): void {
-    const wrap  = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
-    const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
+export function applySize(px: number, wrap?: HTMLElement | null, inner?: HTMLElement | null): void {
+    wrap  = wrap  ?? document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    inner = inner ?? wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea) ?? null;
     if (!wrap) return;
 
-    wrap .style.maxHeight = `${px}px`;
-    wrap .style.minHeight = `${px}px`;
+    wrap.style.maxHeight = `${px}px`;
+    wrap.style.minHeight = `${px}px`;
     if (inner) {
         inner.style.maxHeight = `${px}px`;
         inner.style.minHeight = `${px}px`;
     }
 }
 
-function getCurrentHeight(): number {
-    const wrap = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
-    return wrap
-        ? parseInt(getComputedStyle(wrap).maxHeight, 10)
-        : DEFAULT_MAX;
+function getCurrentHeight(wrap?: HTMLElement | null): number {
+    wrap = wrap ?? document.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
+    return wrap ? (parseInt(getComputedStyle(wrap).maxHeight, 10) || MIN_HEIGHT) : DEFAULT_MAX;
 }
 
-function applyInitialSize(): void {
-    const key = currentConvId() ?? 'global';
-    applySize(MIN_HEIGHT);
+function applyInitialSize(wrap: HTMLElement): void {
+    applySize(MIN_HEIGHT, wrap);
 }
 
-/* ────────── conversation change watch (Kayako SPA) ───────── */
+/* ────────── conversation‑change watch (Kayako SPA) ───────── */
 
 function watchConversation(): void {
     const id = currentConvId() ?? 'global';
@@ -240,6 +225,10 @@ function attachCollapseOnSend(): void {
             .closest(KAYAKO_SELECTORS.sendButtonPublicReply) as Element | null;
         if (!btn) return;
 
-        setTimeout(() => applySize(MIN_HEIGHT), 50);
+        const chromeRoot = btn.closest(KAYAKO_SELECTORS.textEditorContainerRoot) as HTMLElement | null;
+        const wrap  = chromeRoot?.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper) || null;
+        const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea) || null;
+
+        setTimeout(() => applySize(MIN_HEIGHT, wrap, inner), 50);
     }, true);
 }

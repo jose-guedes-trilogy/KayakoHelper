@@ -25,6 +25,10 @@ const CL_CLOSE_BTN            = EXTENSION_SELECTORS.searchDropdownCloseButton.re
 
 const UI_PARENT_ID            = EXTENSION_SELECTORS.unifiedSearchElementsParentId.replace(/^#/, '');
 
+const UI_PARENT_ID_RESULTS_PAGE     = EXTENSION_SELECTORS.searchResultsButtonContainer.replace(/^#/, '');
+
+const RESULTS_PAGE_INPUT_SELECTOR = '[class*="session_agent_search__title_"] > input'
+
 /* ----------  TYPES  ------------------------------------------------------ */
 type ModKey =
     | 'in' | 'assignee' | 'team' | 'tag' | 'status' | 'subject' | 'body'
@@ -70,6 +74,9 @@ const refs: Partial<Record<ModKey, HTMLElement>> = {};
    so syncFromOriginal can ignore synthetic events it triggers. */
 let isSyncingToOriginal = false;
 
+
+
+
 /* ----------  ENTRY POINT  ------------------------------------------------ */
 export function bootSearchEnhancer(): void {
     new MutationObserver(injectUI).observe(document.body, { childList: true, subtree: true });
@@ -78,23 +85,60 @@ export function bootSearchEnhancer(): void {
 
 /* ----------  UI BUILD  --------------------------------------------------- */
 function injectUI(): void {
-    const host = document.querySelector<HTMLElement>(RESULTS_LIST_SELECTOR);
-    if (!host || host.querySelector(`#${QUERY_INPUT_ID}`)) return;
+    // 🔧 Remove the old global guard that blocked the second location:
+    // if (document.getElementById(QUERY_INPUT_ID)) return;
 
+    let host: HTMLElement | null = null;
+    let input: HTMLInputElement | null = null;
+    let isResultsPage = false;
+
+    // --- CONTEXT DETECTION ---
+    const unifiedSearchHost  = document.querySelector<HTMLElement>(RESULTS_LIST_SELECTOR);
+    const unifiedSearchInput = document.querySelector<HTMLInputElement>(ORIGINAL_INPUT_SELECTOR);
+
+    if (unifiedSearchHost && unifiedSearchInput) {
+        host = unifiedSearchHost;
+        input = unifiedSearchInput;
+        isResultsPage = false;
+    } else {
+        const resultsPageHost  = document.querySelector<HTMLElement>(`#${UI_PARENT_ID_RESULTS_PAGE}`);
+        const resultsPageInput = document.querySelector<HTMLInputElement>(RESULTS_PAGE_INPUT_SELECTOR);
+
+        if (resultsPageHost && resultsPageInput) {
+            host = resultsPageHost;
+            input = resultsPageInput;
+            isResultsPage = true;
+        }
+    }
+
+    // If no valid context, let the observer try again later.
+    if (!host || !input) return;
+
+    // ✅ If we already injected into THIS host, do nothing.
+    if (host.querySelector(`#${QUERY_INPUT_ID}`) || host.querySelector(`#${UI_PARENT_ID}`)) {
+        return;
+    }
+
+    // ♻️ If an instance exists in some other host, remove it so we can mount here.
+    const staleWrap = document.getElementById(UI_PARENT_ID);
+    if (staleWrap && !host.contains(staleWrap)) staleWrap.remove();
+
+    const staleQuery = document.getElementById(QUERY_INPUT_ID);
+    if (staleQuery && !host.contains(staleQuery)) staleQuery.remove();
+
+    // --- UI BUILDING ---
     /* keyword box */
-    const queryLi      = document.createElement('div');
-
+    const queryLi = document.createElement('div');
     queryLi.style.display = 'flex';
     queryLi.style.gap = '8px';
     queryLi.style.alignItems = 'center';
     queryLi.style.whiteSpace = 'nowrap';
     queryLi.style.marginBottom = '4px';
-
-    queryLi.innerHTML  =
+    queryLi.innerHTML =
         `<span class="kh-enhanced-search-label">Search terms</span> <input id="${QUERY_INPUT_ID}" class="${CL_QUERY_INPUT}" type="text" placeholder="Enter the terms you'd like to search for">`;
 
     /* controls row */
-    const controlsLi   = document.createElement('div');
+    const controlsLi = document.createElement('div');
     controlsLi.className = CL_CONTROLS;
     controlsLi.append(
         buildMultiIn(),
@@ -116,12 +160,19 @@ function injectUI(): void {
     /* container for our elements */
     const uiWrap = document.createElement('div');
     uiWrap.id = UI_PARENT_ID;
+    uiWrap.setAttribute('data-kh-enhanced-ui', '1'); // small marker to be explicit
     uiWrap.append(queryLi, controlsLi);
 
-    host.prepend(uiWrap);
+    // --- INJECTION & SETUP ---
+    originalInput = input; // set active “original” input for this instance
+
+    if (isResultsPage) {
+        host.append(uiWrap);   // after buttons on results page
+    } else {
+        host.prepend(uiWrap);  // at top in the unified search dropdown
+    }
 
     /* events */
-    originalInput = document.querySelector<HTMLInputElement>(ORIGINAL_INPUT_SELECTOR)!;
     const queryBox = document.getElementById(QUERY_INPUT_ID)! as HTMLInputElement;
 
     queryBox.addEventListener('input',  syncToOriginal);
@@ -129,8 +180,9 @@ function injectUI(): void {
     controlsLi.addEventListener('input',  syncToOriginal);
     controlsLi.addEventListener('change', syncToOriginal);
 
-    originalInput.addEventListener('input', syncFromOriginal);
-    originalInput.addEventListener('keyup',  syncFromOriginal);
+    // Pass the event so we can verify it came from the active input
+    originalInput.addEventListener('input',  syncFromOriginal);
+    originalInput.addEventListener('keyup',   syncFromOriginal);
 
     /* close dropdown on outside click */
     document.addEventListener('click', e => {
@@ -141,8 +193,9 @@ function injectUI(): void {
         }
     });
 
-    syncFromOriginal();
+    syncFromOriginal(); // initial sync
 }
+
 
 /* ----------  CONTROL BUILDERS  ------------------------------------------ */
 function buildLabel(t: string) {
@@ -366,9 +419,8 @@ function syncToOriginal(): void {
     /* ------------------------------------------------------------------ */
 }
 
-function syncFromOriginal(): void {
-    /* If this was triggered by syncToOriginal we ignore it,
-       so the user’s caret/spacing isn’t disturbed. */
+function syncFromOriginal(ev?: Event): void {
+    if (ev && ev.currentTarget && ev.currentTarget !== originalInput) return;
     if (isSyncingToOriginal || !originalInput) return;
 
     const raw = originalInput.value;

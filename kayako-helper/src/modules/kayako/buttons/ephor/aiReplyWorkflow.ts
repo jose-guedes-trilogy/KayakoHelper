@@ -1,8 +1,10 @@
-// modules/kayako/buttons/ephor/aiReplyWorkflow.ts (v3.9.0 – drop-in)
-// • Fix: Multi-stage STREAM workflow now auto-creates a chat if none is selected.
-// • Fix: Canned prompt placeholders are expanded alongside built-ins.
+// modules/kayako/buttons/ephor/aiReplyWorkflow.ts (v4.0.2 – RD_NTH + per-stage status)
+// • Change: Multi-stage workflow now auto-creates a new chat per stage named “<Ticket id> - <Stage name>”.
+// • Fix: Custom placeholders are expanded alongside built-ins.
 // • Keeps: timeout/retry, AbortSignal, quiet-finish, cost tooltips, persisted outputs, placeholders.
 // • Stream mode sends ONE request with selected_models (matches web app).
+// • NEW: RD_NTH_COMBINED placeholder supported; RD_n also accepts {{ RD_n_COMBINED }} form.
+// • NEW: Status pill shows per-stage AI progress (done/total for this stage).
 
 import { EphorClient } from "@/background/ephorClient.ts";
 import { EphorStore, saveEphorStore, CannedPrompt } from "./ephorStore.ts";
@@ -53,10 +55,16 @@ function applyPlaceholders(
             .replace(/({{\s*PRV_RD_OUTPUT\s*}}|@#\s*PRV_RD_OUTPUT\s*#@)/gi, prevCombined)
             .replace(/({{\s*TRANSCRIPT\s*}}|@#\s*TRANSCRIPT\s*#@)/gi, transcript)
 
-            // RD_n_COMBINED
+            // RD_NTH_COMBINED (always resolves to the latest completed round)
+            .replace(/({{\s*RD_NTH_COMBINED\s*}}|@#\s*RD_NTH_COMBINED\s*#@)/gi, prevCombined)
+
+            // RD_n_COMBINED – @# … #@ form
             .replace(/@#\s*RD_(\d+)_COMBINED\s*#@/gi, (_, d) => rounds[+d - 1]?.combined ?? "")
 
-            // RD_n_AI_MODEL
+            // RD_n_COMBINED – {{ … }} form
+            .replace(/{{\s*RD_(\d+)_COMBINED\s*}}/gi, (_m, d) => rounds[+d - 1]?.combined ?? "")
+
+            // RD_n_AI_MODEL (marker form)
             .replace(/@#\s*RD_(\d+)_AI_([A-Z0-9._-]+)\s*#@/gi, (_, d, m) => {
                 const r = rounds[+d - 1];
                 if (!r) return "";
@@ -293,6 +301,23 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
     const tell = (m: string) => opts.onStatus?.(m);
     await client.ready();
 
+    /* ── NEW: prepend per-ticket **per-stage** custom instructions.
+     * Primary key: `${projectId}::${ticketId}::${stageId}`
+     * Fallback (back-compat): `${projectId}::${ticketId}`
+     */
+    const ticketId = currentKayakoTicketId();
+    const ticketKey = ticketId ? `${projectId}::${ticketId}` : "";
+    const stageId = opts.persistStageId || "";
+    const stageKey = ticketId && stageId ? `${projectId}::${ticketId}::${stageId}` : "";
+    const preferTicket = (store.instructionsScopeForWorkflow ?? "ticket") === "ticket";
+    const prepend = preferTicket
+        ? (store.customInstructionsByContext?.[ticketKey] ?? (stageKey && store.customInstructionsByStage?.[stageKey]) ?? "")
+        : ((stageKey && store.customInstructionsByStage?.[stageKey]) ?? (store.customInstructionsByContext?.[ticketKey]) ?? "");
+    const trimmed = prepend.trim();
+    const finalPrompt = trimmed ? `${trimmed}\n\n${prompt}` : prompt;
+    // NOTE: We also pass `custom_instructions` in Stream payload for servers that support it.
+    const customInstructions = trimmed;
+
     const byModel: Record<string, string> = {};
     let combined = "";
     let totalCost = 0;
@@ -331,44 +356,23 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
             newest?.id ||
             crypto.randomUUID(); // fabricate for the first-ever message
 
-        // 3) CREATE the new *user* message that contains the current prompt.
-        let createdUserMsgId: string | null = null;
-        if (channelId) {
-            try {
-                tell("Creating user message…");
-                const created = await client.createMessage(projectId, channelId, {
-                    content: prompt,
-                    parent_id: userMsgParentId,
-                    role: "user",
-                    artifacts: [],
-                });
-                createdUserMsgId = String(created?.id || created?.message_id || "");
-                if (!createdUserMsgId) {
-                    // defensively fall back (should not happen, but remain resilient)
-                    createdUserMsgId = crypto.randomUUID();
-                }
-            } catch (err: any) {
-                // If POST fails, still attempt to stream (anchor to best-effort last *user* or newest)
-                tell(`User message create failed – proceeding to stream: ${err?.message || err}`);
-                createdUserMsgId = crypto.randomUUID(); // local anchor so polling has a key
-            }
-        } else {
-            // multiplexer path uses "", but we’re in stream mode; still guard
-            createdUserMsgId = crypto.randomUUID();
-        }
+        // 3) Fabricate a local user message ID. The streamInteraction endpoint will
+        //    implicitly create the user message with this ID as a side-effect,
+        //    bypassing the outdated POST /messages endpoint.
+        const createdUserMsgId = crypto.randomUUID();
 
         // 4) Build minimal past context oldest→newest and include the new prompt
         const pastCtx = [
             ...mapToPastCtx(history, 20),
-            { role: "user" as const, content: prompt },
+            { role: "user" as const, content: finalPrompt },
         ];
 
-        // 5) Prepare STREAM payload. Parent = **new user message id**.
+        // 5) Prepare STREAM payload. Parent = **newly created user message id** (never empty).
         const payload = {
             channel_id: channelId, // MUST be a real channel in stream mode
             message_id: crypto.randomUUID(), // unique message id for the assistant stream container
-            parent_id : createdUserMsgId,    // IMPORTANT: stream replies to the *new user message*
-            query     : prompt,
+            parent_id : createdUserMsgId,    // IMPORTANT: stream replies to the *new user message* (UUID if first message)
+            query     : finalPrompt,
             library_id: store.projects.find(p => p.project_id === projectId)?.library_id ?? "",
             top_k     : 12,
             past_messages: pastCtx,
@@ -378,7 +382,7 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
             metadata: { search_on_web_options: {} },
             project_id: projectId,
             shared_context: true,
-            custom_instructions: "",
+            custom_instructions: customInstructions,
             selected_mode: "default",
             selected_sources: ["library"],
             selected_models: selectedModels,
@@ -428,7 +432,7 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                     channelId,
                     createdUserMsgId,
                     selectedModels,
-                    10_000,
+                    120_000, // 2 minutes per-stage timeout
                     opts.abortSignal,
                     async (model, text) => {
                         byModel[model] = text;
@@ -477,7 +481,7 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
             message_id: crypto.randomUUID(),
             parent_id: null,
             project_id: projectId,
-            query: prompt,
+            query: finalPrompt,
             model,
         } as any;
 
@@ -543,69 +547,47 @@ export async function runAiReplyWorkflow(
     const history: StageResult[] = [];
     let channelId = store.preferredMode === "multiplexer" ? "" : (store.selectedChannelId ?? "");
 
-    /* cross-workflow progress */
+    /* cross-workflow progress (kept for internal counters; UI now shows per-stage) */
     const total = stages.reduce((acc, s) => acc + (s.selectedModels?.length ?? 0), 0);
     let done = 0;
     const label = (name: string) => name || "Stage";
-    let currentStageName = "";
-
-    const tick = (model: string, phase: "start" | "done" | "fail") => {
-        if (phase !== "start") done++;
-        if (progressEl)
-            progressEl.textContent = `${label(currentStageName)} · ${Math.min(done, total)}/${total}`;
-    };
-    if (progressEl) progressEl.textContent = `0/${total}`;
 
     for (let i = 0; i < stages.length; i++) {
         if (abortSignal?.aborted) throw new DOMException("Aborted", "AbortError");
 
         const stg = stages[i];
-        currentStageName = stg.name;
+        const aiTotalThisStage = Math.max(1, stg.selectedModels?.length ?? 0);
+        let aiDoneThisStage = 0;
+
         tell(`Stage ${i + 1}/${stages.length} – ${stg.name}`);
         if (progressEl)
-            progressEl.textContent = `${label(stg.name)} · ${done}/${total} — sending`;
+            progressEl.textContent = `${label(stg.name)} · 0/${aiTotalThisStage} — sending`;
 
         /* ────────────────────────────────────────────────────────────────
-         * Per-ticket channel mapping (Stream mode)
-         * If a mapping exists for this ticket, use it.
-         * Else, create a fresh channel and bind it to this ticket.
+         * Per-stage chat creation (Stream mode)
+         * Always create a fresh chat for this stage in the selected project.
+         * Name: "<Ticket id> - <Stage name>"
          * Multiplexer mode keeps channelId = "".
          * ──────────────────────────────────────────────────────────────── */
         if (store.preferredMode === "stream") {
-            const ticketId = currentKayakoTicketId();
-            const mapKey = ticketId ? `${projectId}::${ticketId}` : "";
+            try {
+                const tid = currentKayakoTicketId() || "";
+                const stageLabel = stg.name || "Stage";
+                const chatName = tid ? `${tid} - ${stageLabel}` : stageLabel;
+                tell(`Creating chat for stage “${stageLabel}”…`);
+                const ch = await client.createChannel(projectId, chatName);
+                channelId = String(ch?.id ?? ch?.channel_id ?? "");
+                if (!channelId) throw new Error("Channel creation returned no id");
 
-            // use mapped channel if present
-            const mapped = mapKey ? store.channelIdByContext?.[mapKey] : undefined;
-            if (mapped) {
-                channelId = mapped;
-                store.selectedChannelId = mapped; // reflect in UI
+                // reflect in UI for transparency
+                store.selectedChannelId = channelId;
                 await saveEphorStore(store);
-                tell(`Using mapped chat for ticket ${ticketId} ✓ (${channelId})`);
-                Logger.log("INFO", "WORKFLOW/STREAM using mapped channel", { ticketId, channelId });
-            } else if (!channelId) {
-                // create a new chat and map it to this ticket
-                try {
-                    const ts = new Date();
-                    const nice =
-                        `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}-${String(ts.getDate()).padStart(2, "0")} ` +
-                        `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`;
-                    const label = ticketId ? `KH · Ticket ${ticketId} · ${nice}` : `KH Run · ${nice}`;
-                    tell(`No chat selected – creating "${label}"…`);
-                    const ch = await client.createChannel(projectId, label);
-                    channelId = String(ch?.id ?? ch?.channel_id ?? "");
-                    if (!channelId) throw new Error("Channel creation returned no id");
 
-                    store.selectedChannelId = channelId;
-                    if (mapKey) store.channelIdByContext[mapKey] = channelId;
-                    await saveEphorStore(store);
-
-                    tell(`Created chat ✓ (${channelId})`);
-                    Logger.log("INFO", "WORKFLOW/STREAM auto-created & mapped channel", { ticketId, channelId, label });
-                } catch (err: any) {
-                    Logger.log("ERR", "WORKFLOW/STREAM failed to create channel", err?.message ?? String(err));
-                    throw new Error(`Unable to create a chat for stream mode – ${err?.message ?? String(err)}`);
-                }
+                tell(`Created chat ✓ (${channelId})`);
+                Logger.log("INFO", "WORKFLOW/STREAM created per-stage channel", { ticketId: tid, channelId, label: chatName });
+            } catch (err: any) {
+                Logger.log("ERR", "WORKFLOW/STREAM failed to create per-stage channel", err?.message ?? String(err));
+                throw new Error(`Unable to create a chat for stage “${stg.name}” – ${err?.message ?? String(err)}`);
             }
         }
 
@@ -627,7 +609,14 @@ export async function runAiReplyWorkflow(
             selectedModels: stg.selectedModels,
             progressEl,
             onStatus: m => tell(`[${stg.name}] ${m}`),
-            onProgressTick: tick,
+            onProgressTick: (_model, phase) => {
+                if (phase !== "start") {
+                    aiDoneThisStage++;
+                    done++; // keep overall counter in sync (even if not shown)
+                }
+                if (progressEl)
+                    progressEl.textContent = `${label(stg.name)} · ${Math.min(aiDoneThisStage, aiTotalThisStage)}/${aiTotalThisStage} — ${aiDoneThisStage >= aiTotalThisStage ? "done" : "sending"}`;
+            },
             persistStageId: stg.id,
             abortSignal,
         });
@@ -642,4 +631,3 @@ export async function runAiReplyWorkflow(
     tell("Workflow finished ✅");
     return history.at(-1)?.combined ?? "";
 }
-

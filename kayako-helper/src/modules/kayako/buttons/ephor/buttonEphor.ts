@@ -38,11 +38,11 @@ export async function bootEphorButton(): Promise<void> {
     (window as any).__khEphorBooted = true;
 
     store = await loadEphorStore();
-    const rawMisc = (await chrome.storage.local.get("kh-ephor-misc"))["kh-ephor-misc"] ?? {};
-    misc  = { apiBase:"https://api.ephor.ai", token:"", ...rawMisc };
+    misc  = (await chrome.storage.local.get("kh-ephor-misc"))["kh-ephor-misc"]
+        ?? { apiBase:"https://api.ephor.ai", token:"" };
 
     /* ─── 1.  Initialise client ───────────────────────────────────── */
-    client = new EphorClient({ apiBase: misc.apiBase || "https://api.ephor.ai" });      // token managed via storage
+    client = new EphorClient({ apiBase: misc.apiBase });      // token managed via storage
 
     /* ─── 2.  Pick sane default connection mode (if user never set) ─ */
     const auth      = (await chrome.storage.local.get("kh-ephor-auth"))["kh-ephor-auth"] ?? {};
@@ -63,10 +63,10 @@ export async function bootEphorButton(): Promise<void> {
         slot: HeaderSlot.SECOND,
         /* HTML label: inline SVG + text (HTML-aware in manager) */
         label: () => `${ICON_SVG}<span class="kh-ephor-text" style="margin-left:.35em;">Ephor</span>`,
-        onClick  : () => { void onMainClick(); },
+        onClick  : () => { void openEphorSettingsModal(store, client); },
         onContextMenu: ev => {
             ev.preventDefault(); ev.stopPropagation();
-            void openEphorSettingsModal(store, client);
+            void onMainClick();
         },
     });
 }

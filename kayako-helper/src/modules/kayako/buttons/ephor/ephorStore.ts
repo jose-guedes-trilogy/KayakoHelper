@@ -1,4 +1,4 @@
-// Kayako Helper – ephorStore.ts (v2.4.0 – adds channelIdByContext mapping)
+// Kayako Helper – ephorStore.ts (v2.5.0 – adds per-stage custom instructions)
 
 /* Full file replaces the existing one */
 
@@ -81,6 +81,9 @@ export interface EphorStore {
     /* multi-stage workflow */
     workflowStages    : WorkflowStage[];
 
+    /* query mode preference */
+    preferredQueryMode?: "single" | "workflow";
+
     /* NEW ▸ user-defined canned prompts */
     cannedPrompts     : CannedPrompt[];
 
@@ -92,6 +95,21 @@ export interface EphorStore {
 
     /* 👇 NEW: per-ticket channel mapping (key = `${projectId}::${ticketId}`) */
     channelIdByContext: Record<string, string>;
+
+    /* 👇 NEW (legacy): per-ticket custom instructions (key = `${projectId}::${ticketId}`) */
+    customInstructionsByContext: Record<string, string>;
+
+    /* 👇 NEW: per-ticket **per-stage** custom instructions
+       key = `${projectId}::${ticketId}::${stageId}` */
+    customInstructionsByStage: Record<string, string>;
+
+    /* 👇 NEW: governs which scope to use for workflow custom instructions
+       "ticket" → one set per ticket across all stages
+       "stage"  → distinct set per ticket per stage */
+    instructionsScopeForWorkflow?: "ticket" | "stage";
+
+    /* chat list sort order */
+    channelSortOrder?: "alpha" | "created";
 }
 
 const KEY = "kh-ephor-store";
@@ -154,6 +172,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         runMode           : "automatic",
 
         workflowStages    : defaultStages,
+        preferredQueryMode: "workflow",
 
         /* NEW ▸ canned-prompts default empty list */
         cannedPrompts     : [],
@@ -162,6 +181,10 @@ export async function loadEphorStore(): Promise<EphorStore> {
         lastOutputs: {},
         lastMsgIdByChannel: {},
         channelIdByContext: {},
+        customInstructionsByContext: {},
+        customInstructionsByStage: {},
+        instructionsScopeForWorkflow: "ticket",
+        channelSortOrder: "alpha",
     };
     return {
         ...defaults,
@@ -169,6 +192,11 @@ export async function loadEphorStore(): Promise<EphorStore> {
         lastOutputs: saved?.lastOutputs ?? {},
         lastMsgIdByChannel: saved?.lastMsgIdByChannel ?? {},
         channelIdByContext: saved?.channelIdByContext ?? {},
+        customInstructionsByContext: saved?.customInstructionsByContext ?? {},
+        customInstructionsByStage: saved?.customInstructionsByStage ?? {},
+        instructionsScopeForWorkflow: saved?.instructionsScopeForWorkflow ?? "ticket",
+        preferredQueryMode: saved?.preferredQueryMode ?? "workflow",
+        channelSortOrder: saved?.channelSortOrder ?? "alpha",
     };
 }
 

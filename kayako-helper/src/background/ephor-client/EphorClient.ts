@@ -63,10 +63,15 @@ export class EphorClient {
         role?: "user" | "assistant" | "system";
         artifacts?: any[];
     }) {
+        // Ensure we NEVER send an empty parent_id – fabricate if missing/blank.
+        const payload: any = { role: "user", parent_id: "", artifacts: [], ...body };
+        if (!payload.parent_id || (typeof payload.parent_id === "string" && payload.parent_id.trim() === "")) {
+            payload.parent_id = crypto.randomUUID();
+        }
         return this.request(`/api/v1/projects/${projectId}/channels/${channelId}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role: "user", parent_id: "", artifacts: [], ...body }),
+            body: JSON.stringify(payload),
         });
     }
 
@@ -75,7 +80,8 @@ export class EphorClient {
      * Constructor
      * ------------------------------------------------------------------ */
     constructor(opts: EphorClientOpts) {
-        this.apiBase = opts.apiBase.replace(/\/$/, "");
+        this.apiBase = (opts.apiBase || "https://api.ephor.ai").replace(/\/$/, "");
+
         this.tabId = opts.tabId;
         this.hiddenTab = new HiddenEphorTab(this.tabId);
 
@@ -143,18 +149,33 @@ export class EphorClient {
      * ------------------------------------------------------------------ */
     static updateAuthToken(jwt: string): void {
         const exp = decodeJwtExp(jwt);
+
         for (const inst of EphorClient._instances) {
             inst.jwtToken = jwt;
             inst.expiresAt = exp;
             inst.saveAuth().catch(() => {});
         }
-        chrome.storage.local
-            .set({
-                [AUTH_KEY]: { token: "", jwtToken: jwt, refreshToken: "", expiresAt: exp, serverId: "default" },
-            })
-            .catch(() => {});
+
+        // Preserve any existing API key and fields when persisting the JWT.
+        (async () => {
+            try {
+                const raw = await chrome.storage.local.get(AUTH_KEY);
+                const prev = (raw[AUTH_KEY] ?? {}) as Partial<StoredAuth>;
+                await chrome.storage.local.set({
+                    [AUTH_KEY]: {
+                        ...prev,
+                        jwtToken: jwt,
+                        expiresAt: exp,
+                    },
+                });
+            } catch {
+                /* non-fatal */
+            }
+        })();
+
         Logger.log("INFO", "Clerk JWT hot-swapped & persisted");
     }
+
 
     /* ------------------------------------------------------------------
      * STREAM-JWT acquisition
@@ -175,7 +196,7 @@ export class EphorClient {
                 this._streamJwt = this.jwtToken;
                 this._streamJwtExp = exp;
                 return;
-             }
+            }
         }
 
         /* 2️⃣ background HiddenEphorTab */
@@ -289,7 +310,7 @@ export class EphorClient {
         const allow = new Set(["text","assistant","answer","completion"]);
         let output = "";
 
-// NEW: soft end state
+        // NEW: soft end state
         let firstTokAt = 0;
         let lastTokAt  = 0;
         let etaMs: number | null = null;
@@ -297,7 +318,7 @@ export class EphorClient {
         const IDLE_MS  = 1500;
         let sawTerminal = false;
 
-// helper to decide early finish
+        // helper to decide early finish
         const shouldFinish = () => {
             const now = Date.now();
             const started    = firstTokAt > 0;
@@ -306,7 +327,7 @@ export class EphorClient {
             return sawTerminal || (etaElapsed && idle) || (started && idle && etaMs == null);
         };
 
-// parse one SSE frame’s data lines
+        // parse one SSE frame’s data lines
         const handleFrame = (frame: string) => {
             frame.trim().split(/\r?\n/).forEach(line => {
                 if (!line.startsWith("data:")) return;
@@ -362,7 +383,7 @@ export class EphorClient {
                 }
             }
         }
-// tail
+        // tail
         if (buffer.trim()) handleFrame(buffer);
 
         return { output };
@@ -389,8 +410,8 @@ export class EphorClient {
             let sawTerminal = false;
 
             const GRACE_MS       = 600;     // buffer beyond ETA
-            const IDLE_MS        = 1500;    // idle after tokens → finish
-            const QUIET_OPEN_MS  = 4000;    // nothing at all → finish
+            const IDLE_MS        = 3000;    // idle after tokens → finish -- INCREASED FROM 1500
+            const QUIET_OPEN_MS  = 15000;   // nothing at all → finish -- INCREASED FROM 4000
 
             let finished = false;
             const finish = (err?: string) => {
@@ -484,9 +505,9 @@ export class EphorClient {
 
 
 
-/* ------------------------------------------------------------------
- * Basic API helpers (no auth changes here)
- * ------------------------------------------------------------------ */
+    /* ------------------------------------------------------------------
+     * Basic API helpers (no auth changes here)
+     * ------------------------------------------------------------------ */
     async listProjects() {
         return this.request("/api/v1/projects", { method: "GET" });
     }
@@ -723,20 +744,27 @@ export class EphorClient {
     }
 
     private async saveAuth() {
+        // Merge with what's already stored so we never wipe a previously saved API key.
+        const prevRaw = (await chrome.storage.local.get(AUTH_KEY))[AUTH_KEY] as Partial<StoredAuth> | undefined;
+
         const stored: StoredAuth = {
-            token: this.token,
-            jwtToken: this.jwtToken,
-            refreshToken: this.refreshToken,
-            expiresAt: this.expiresAt,
-            serverId: this.serverId,
+            token       : this.token        ?? prevRaw?.token        ?? "",
+            jwtToken    : this.jwtToken     ?? prevRaw?.jwtToken     ?? "",
+            refreshToken: this.refreshToken ?? prevRaw?.refreshToken ?? "",
+            expiresAt   : this.expiresAt    ?? prevRaw?.expiresAt    ?? 0,
+            serverId    : this.serverId     ?? prevRaw?.serverId     ?? "default",
         };
+
         await chrome.storage.local.set({ [AUTH_KEY]: stored });
 
-        const misc = (await chrome.storage.local.get(MISC_KEY))[MISC_KEY] ?? {};
-        misc.token = this.token;
-        misc.jwtToken = this.jwtToken;
+        // Only overwrite misc fields when we actually have values.
+        const miscRaw = await chrome.storage.local.get(MISC_KEY);
+        const misc = miscRaw[MISC_KEY] ?? {};
+        if (this.token)    misc.token = this.token;
+        if (this.jwtToken) misc.jwtToken = this.jwtToken;
         await chrome.storage.local.set({ [MISC_KEY]: misc });
     }
+
 
     /* ------------------------------------------------------------------
      * Static helpers

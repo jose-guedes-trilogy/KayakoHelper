@@ -18,6 +18,11 @@ export const decodeJwtExp = (t: string): number => {
  * Extend here whenever the backend introduces a new field.
  */
 export function pickToken(ev: any): string | undefined {
+    /* ⓪ Handle metadata events without logging warnings */
+    if (ev?.type_id === "sources" || ev?.type_id === "context_analysis") {
+        return undefined;
+    }
+
     /* ① Legacy flat { delta:"H" } */
     if (typeof ev?.delta === "string") return ev.delta;
 
@@ -27,6 +32,14 @@ export function pickToken(ev: any): string | undefined {
     /* ③ OpenAI style { choices:[{ delta:{ content:"H" } }] } */
     if (typeof ev?.choices?.[0]?.delta?.content === "string")
         return ev.choices[0].delta.content;
+
+    /* ③b OpenAI completion (non-stream) { choices:[{ text:"H" }] } */
+    if (typeof ev?.choices?.[0]?.text === "string")
+        return ev.choices[0].text;
+
+    /* ③c OpenAI chat completion (non-stream) { choices:[{ message:{ content:"H" } }] } */
+    if (typeof ev?.choices?.[0]?.message?.content === "string")
+        return ev.choices[0].message.content;
 
     /* ④ Simple flat { content:"H" }                           */
     if (typeof ev?.content === "string") return ev.content;
@@ -81,6 +94,3 @@ export function extractTimeToCompleteMs(ev: any): number | null {
     }
     return null;
 }
-
-
-

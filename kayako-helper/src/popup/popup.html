@@ -30,6 +30,13 @@
         /* pagination */
         #kh-pagination button{ margin:0 .25rem;padding:.15rem .5rem;border:1px solid #ccc;background:#f8f8f8;cursor:pointer; }
         #kh-pagination button[disabled]{ opacity:.4;cursor:default; }
+
+        /* inner settings tabs */
+        #kh-settings-tabs{ display:flex;border-bottom:1px solid #ddd;margin:-.2rem 0 .6rem; }
+        #kh-settings-tabs button{ flex:1;padding:.4rem 0;border:0;background:#f8f8f8;font-weight:600;cursor:pointer; }
+        #kh-settings-tabs button.active{ background:#fff;border-bottom:2px solid dodgerblue; }
+        #kh-settings-panels .settings-subsection{ display:none; }
+        #kh-settings-panels .settings-subsection.active{ display:block; }
     </style>
 </head>
 <body>
@@ -74,30 +81,58 @@
 
 <!-- SETTINGS -->
 <section id="tab-settings">
-    <div class="kh-popup-setting">
-        <label><input type="checkbox" id="kh-training-mode-checkbox" /> Training mode <small>(warn before public replies)</small></label>
+    <!-- inner settings tabs -->
+    <div id="kh-settings-tabs">
+        <button class="setting-tab active" data-settings="general">General</button>
+        <button class="setting-tab"        data-settings="ui">UI</button>
     </div>
-    <div class="kh-popup-setting">
-        <label><input type="checkbox" id="kh-toggle-styles-checkbox" /> Enable Kayako Helper styles</label>
-    </div>
-    <hr />
-    <div class="kh-popup-setting">
-        <label for="kh-send-in-chunks-wpm-limit">Max words per minute&nbsp;</label>
 
-        <input type="number" id="kh-send-in-chunks-wpm-limit"
-               value="200" min="50" max="800" step="10"
-               style="width:6rem;padding:.2rem" />
+    <div id="kh-settings-panels">
+        <!-- GENERAL (existing contents, except style toggle moved) -->
+        <div id="kh-sub-general" class="settings-subsection active">
+            <div class="kh-popup-setting">
+                <label><input type="checkbox" id="kh-training-mode-checkbox" /> Training mode <small>(warn before public replies)</small></label>
+            </div>
+            <hr />
+            <div class="kh-popup-setting">
+                <label for="kh-send-in-chunks-wpm-limit">Max words per minute&nbsp;</label>
 
-        <!-- Ephor API token -->
-        <div class="kh-popup-setting">
-            <label for="kh-ephor-api-token">Ephor API token</label><br>
-            <input type="password"
-                   id="kh-ephor-api-token"
-                   placeholder="Paste token here"
-                   style="width:100%;padding:.3rem" />
-            <small style="color:#666">Stored only in Chrome local storage</small>
+                <input type="number" id="kh-send-in-chunks-wpm-limit"
+                       value="200" min="50" max="800" step="10"
+                       style="width:6rem;padding:.2rem" />
+            </div>
+
+            <!-- Ephor API token -->
+            <div class="kh-popup-setting">
+                <label for="kh-ephor-api-token">Ephor API token</label><br>
+                <input type="password"
+                       id="kh-ephor-api-token"
+                       placeholder="Paste token here"
+                       style="width:100%;padding:.3rem" />
+                <small style="color:#666">Stored only in Chrome local storage</small>
+            </div>
         </div>
 
+        <!-- UI (new tab) -->
+        <div id="kh-sub-ui" class="settings-subsection">
+            <div class="kh-popup-setting">
+                <label><input type="checkbox" id="kh-toggle-styles-checkbox" /> Enable OmniHelper styles</label>
+            </div>
+
+            <div class="kh-popup-setting">
+                <label><input type="checkbox" id="kh-ui-dark-compat-checkbox" /> Dark mode compatibility for OmniHelper buttons</label>
+            </div>
+
+            <div class="kh-popup-setting">
+                <label for="kh-ui-dark-text-color">Dark mode text color</label><br>
+                <input type="color" id="kh-ui-dark-text-color" value="#EAEAEA" />
+            </div>
+
+            <div class="kh-popup-setting">
+                <label for="kh-ui-dark-bg-color">Dark mode background color</label><br>
+                <input type="color" id="kh-ui-dark-bg-color" value="#1E1E1E" />
+            </div>
+        </div>
     </div>
 </section>
 

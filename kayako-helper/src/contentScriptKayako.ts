@@ -19,16 +19,19 @@ import { bootSearchEnhancer }       from '@/modules/kayako/searchEnhancer.ts';
 import { bootCopyTicketURL }        from "@/modules/kayako/conversation-window-header/copyTicketURL.ts";
 import { bootSendToQcButton }       from "@/modules/kayako/buttons/sendToQCButton.ts";
 import { bootExtraPostButtons }     from "@/modules/kayako/extraPostButtons.ts";
-import { bootTagCleaner }           from "@/modules/kayako/ui-clean-up/tagCleaner";
+import { bootTagCleaner }           from "@/modules/kayako/ui-enhancement/tagCleaner";
 import { bootExportChatButton }     from "@/modules/kayako/buttons/export-chat/exportChatButton.ts";
 import { bootCopySearchChats }      from "@/modules/kayako/buttons/copy-search/copySearchChats.ts";
 import { bootSendChunks }           from "@/modules/kayako/reply-box/sendInChunks.ts";
 import { bootAssetsInspector }      from "@/modules/kayako/buttons/assets-inspector/assetsInspectorIndex.ts";
 import { bootEmbeddingsSearch }     from "@/modules/kayako/embeddingsSearch.ts";
-import { bootTargetBlankLinks }     from "@/modules/kayako/ui-clean-up/targetBlankLinks.ts";
+import { bootTargetBlankLinks }     from "@/modules/kayako/ui-enhancement/targetBlankLinks.ts";
 import {bootHoverTicketPreview} from "@/modules/kayako/hoverTicketPreview.ts";
 import {bootEphorButton} from "@/modules/kayako/buttons/ephor/buttonEphor.ts";
 import "@/modules/ephor/clerkTokenInjector.ts";
+
+import {bootCredProbeClient, bootRequestReplicator} from "@/modules/alpha/dash/RequestReplicator.ts";
+import {bootUiAesthetics} from "@/modules/kayako/ui-enhancement/uiAesthetics.ts";
 
 /* ---------- Global UI ---------- */
 setUpUI();
@@ -58,8 +61,14 @@ bootEphorButton().then(r => {});
 
 bootCopySearchChats();
 
-bootSendChunks();
+//bootSendChunks();
 bootAssetsInspector();
 
-bootEmbeddingsSearch();
+//bootEmbeddingsSearch();
 bootHoverTicketPreview();
+
+
+bootUiAesthetics();
+
+//bootRequestReplicator();
+//bootCredProbeClient().then(r => {});

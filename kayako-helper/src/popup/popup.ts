@@ -3,7 +3,14 @@
 import type { ToBackground, FromBackground } from '@/utils/messageTypes';
 import { TicketData } from '@/background/replyDataBg.ts';
 
-interface Prefs { trainingMode?: boolean; allStyles?: boolean; sendChunksWPM?: number; }
+interface Prefs {
+    trainingMode?: boolean;
+    allStyles?: boolean;
+    sendChunksWPM?: number;
+    uiDarkCompat?: boolean;
+    uiDarkTextColor?: string;
+    uiDarkBgColor?: string;
+}
 
 /* ─ constants & state ─ */
 const ITEMS_PER_PAGE = 10;
@@ -18,10 +25,18 @@ const refs = {
     tabButtons : Array.from(document.querySelectorAll<HTMLButtonElement>('nav .tab')),
     panels     : Array.from(document.querySelectorAll<HTMLElement>('section')),
 
+    /* inner settings tabs */
+    settingsTabButtons : Array.from(document.querySelectorAll<HTMLButtonElement>('#kh-settings-tabs .setting-tab')),
+    settingsPanels     : Array.from(document.querySelectorAll<HTMLElement>('#kh-settings-panels .settings-subsection')),
+
     /* settings controls */
     chkTraining: document.getElementById('kh-training-mode-checkbox') as HTMLInputElement,
     chkStyles  : document.getElementById('kh-toggle-styles-checkbox') as HTMLInputElement,
     inpWpm     : document.getElementById('kh-send-in-chunks-wpm-limit') as HTMLInputElement,
+
+    chkDarkCompat: document.getElementById('kh-ui-dark-compat-checkbox') as HTMLInputElement,
+    inpDarkText  : document.getElementById('kh-ui-dark-text-color') as HTMLInputElement,
+    inpDarkBg    : document.getElementById('kh-ui-dark-bg-color') as HTMLInputElement,
 
     /* current ticket read-outs */
     lblId     : document.getElementById('kh-popup-ticket-info-id')       as HTMLElement,
@@ -50,6 +65,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }),
     );
 
+    /* inner settings sub-tabs (General / UI) */
+    refs.settingsTabButtons.forEach(btn =>
+        btn.addEventListener('click', () => {
+            refs.settingsTabButtons.forEach(b => b.classList.toggle('active', b === btn));
+            const target = btn.dataset.settings;
+            refs.settingsPanels.forEach(p => p.classList.toggle('active', p.id === 'kh-sub-' + target));
+        }),
+    );
+
     /* sub-tabs (Saved / Visited) */
     refs.listTabButtons.forEach(btn =>
         btn.addEventListener('click', () => {
@@ -61,11 +85,22 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     /* prefs */
-    chrome.storage.sync.get(['trainingMode', 'allStyles', 'sendChunksWPM'] as const, res => {
-        const { trainingMode, allStyles, sendChunksWPM } = res as Prefs;
+    chrome.storage.sync.get([
+        'trainingMode',
+        'allStyles',
+        'sendChunksWPM',
+        'uiDarkCompat',
+        'uiDarkTextColor',
+        'uiDarkBgColor',
+    ] as const, res => {
+        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor } = res as Prefs;
         refs.chkTraining.checked = !!trainingMode;
         refs.chkStyles.checked   = allStyles       ?? true;
         refs.inpWpm.value        = (sendChunksWPM ?? 200).toString();
+
+        refs.chkDarkCompat.checked = !!uiDarkCompat;
+        refs.inpDarkText.value     = uiDarkTextColor ?? '#EAEAEA';
+        refs.inpDarkBg.value       = uiDarkBgColor   ?? '#1E1E1E';
     });
 
     refs.chkTraining.addEventListener('change', () => {
@@ -82,6 +117,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const wpm = Math.max(50, Math.min(800, Number(refs.inpWpm.value) || 200));
         refs.inpWpm.value = wpm.toString();
         chrome.storage.sync.set({ sendChunksWPM: wpm });
+    });
+
+    /* ------- UI Dark Mode compatibility ------- */
+    refs.chkDarkCompat.addEventListener('change', () => {
+        chrome.storage.sync.set({ uiDarkCompat: refs.chkDarkCompat.checked });
+    });
+    // live updates while dragging the color picker
+    refs.inpDarkText.addEventListener('input', () => {
+        const val = refs.inpDarkText.value || '#EAEAEA';
+        chrome.storage.sync.set({ uiDarkTextColor: val });
+    });
+    refs.inpDarkText.addEventListener('change', () => {
+        const val = refs.inpDarkText.value || '#EAEAEA';
+        chrome.storage.sync.set({ uiDarkTextColor: val });
+    });
+    refs.inpDarkBg.addEventListener('input', () => {
+        const val = refs.inpDarkBg.value || '#1E1E1E';
+        chrome.storage.sync.set({ uiDarkBgColor: val });
+    });
+    refs.inpDarkBg.addEventListener('change', () => {
+        const val = refs.inpDarkBg.value || '#1E1E1E';
+        chrome.storage.sync.set({ uiDarkBgColor: val });
     });
 
     /* ------- Ephor API token ------- */

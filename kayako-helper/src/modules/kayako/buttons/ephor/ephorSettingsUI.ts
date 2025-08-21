@@ -36,11 +36,15 @@ export interface ModalRefs {
     channelSearchInp: HTMLInputElement;
     projectListDiv: HTMLDivElement;
     channelListDiv: HTMLDivElement;
+    chatSortSelect?: HTMLSelectElement;
 
     modelSearchInp: HTMLInputElement;
     aiListDiv: HTMLDivElement;
 
     promptInput: HTMLTextAreaElement;
+    customInstrTa: HTMLTextAreaElement; /* NEW */
+    instrScopeCbx: HTMLInputElement; /* NEW */
+    instrScopeLabel: HTMLSpanElement; /* NEW */
 
     refreshBtn: HTMLButtonElement;
     newChatBtn: HTMLButtonElement;
@@ -171,11 +175,15 @@ export function createSettingsModal() {
         channelSearchInp: $("#kh-ephor-channel-search"),
         projectListDiv: $("#kh-ephor-project-list"),
         channelListDiv: $("#kh-ephor-channel-list"),
+        chatSortSelect: $("#kh-ephor-chat-sort") as HTMLSelectElement,
 
         modelSearchInp: $("#kh-ephor-model-search"),
         aiListDiv: $("#kh-ephor-ai-list"),
 
         promptInput: $("#kh-ephor-prompt-input") as HTMLTextAreaElement,
+        customInstrTa: $("#kh-ephor-custom-instr") as HTMLTextAreaElement,
+        instrScopeCbx: $("#kh-ephor-instr-scope") as HTMLInputElement,
+        instrScopeLabel: $("#kh-ephor-instr-label") as HTMLSpanElement,
 
         refreshBtn: $("#kh-ephor-refresh-projects") as HTMLButtonElement,
         newChatBtn: $("#kh-ephor-new-chat") as HTMLButtonElement,
