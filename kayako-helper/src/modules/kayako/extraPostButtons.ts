@@ -8,6 +8,7 @@ import { KAYAKO_SELECTORS, EXTENSION_SELECTORS } from '@/generated/selectors.ts'
 
 const MESSAGE_SEL       = KAYAKO_SELECTORS.messageOrNote;
 const MESSAGE_INNER_SEL       = KAYAKO_SELECTORS.timelineItemContent;
+const MESSAGE_INNER_CONTENT_SEL       = KAYAKO_SELECTORS.timelineItemContentInner;
 const MENU_WRAPPER_SEL  = KAYAKO_SELECTORS.timelineItemActionButtonsWrapper;
 const FEED_MENU_SEL     = KAYAKO_SELECTORS.feedItemMenu;
 
@@ -48,8 +49,8 @@ function observeForLazyLoadedPosts(): void {
 
 function addButtons(post: HTMLElement): void {
     /* avoid double-insertion */
-    if (post.dataset.khButtonsReady) return;
-    post.dataset.khButtonsReady = 'yes';
+    if (post.dataset['khButtonsReady']) return;
+    post.dataset['khButtonsReady'] = 'yes';
 
     /* ensure positioning context for the absolute button */
     if (getComputedStyle(post).position === 'static') {
@@ -66,7 +67,8 @@ function addButtons(post: HTMLElement): void {
         post.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    post.querySelector(MESSAGE_INNER_SEL).append(scrollBtn);
+    const messageInner = post.querySelector<HTMLElement>(MESSAGE_INNER_SEL);
+    messageInner?.append(scrollBtn);
 
     /* ───── copy-post button (in the timeline menu) ───── */
     const menuWrapper = post.querySelector<HTMLElement>(MENU_WRAPPER_SEL);
@@ -89,17 +91,48 @@ function addButtons(post: HTMLElement): void {
     `;
     copyBtn.addEventListener('click', e => {
         e.stopPropagation();
-        navigator.clipboard
-            .writeText(extractVisibleText(post))
-            .catch(console.error);
+        const contentEl = post.querySelector<HTMLElement>(MESSAGE_INNER_CONTENT_SEL);
+        const text = (contentEl?.textContent ?? '').trim();
+        navigator.clipboard.writeText(text).catch(console.error);
+    });
+
+    // ───── scroll-to-bottom button (next to copy button) ─────
+    const scrollDownBtn = document.createElement('div');
+    scrollDownBtn.className = `${nativeClass} kh-scroll-bottom-btn`.trim();
+    scrollDownBtn.setAttribute('role', 'button');
+    scrollDownBtn.setAttribute('aria-label', 'Scroll to bottom of post');
+    scrollDownBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" stroke="#838D94" fill="transparent" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19l-7-7m7 7l7-7m-7 7V5" />
+        </svg>
+    `;
+    scrollDownBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        post.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
 
     feedMenu.append(copyBtn);
-}
+    feedMenu.append(scrollDownBtn);
 
-function extractVisibleText(post: HTMLElement): string {
-    /* clone & strip menu elements so only the content is copied */
-    const clone = post.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll(MENU_WRAPPER_SEL).forEach(el => el.remove());
-    return clone.innerText.trim();
+    // ───── intelligent visibility based on post height ─────
+    const MIN_HEIGHT_FOR_SCROLL_BUTTONS = 350; // px – hide when not tall enough
+    const getContentInner = () => post.querySelector<HTMLElement>(MESSAGE_INNER_CONTENT_SEL);
+
+    const updateButtonsVisibility = () => {
+        const inner = getContentInner();
+        const isTall = !!inner && inner.getBoundingClientRect().height >= MIN_HEIGHT_FOR_SCROLL_BUTTONS;
+
+        const display = isTall ? '' : 'none';
+        scrollBtn.style.display = display;
+        scrollDownBtn.style.display = display;
+        scrollBtn.setAttribute('aria-hidden', String(!isTall));
+        scrollDownBtn.setAttribute('aria-hidden', String(!isTall));
+    };
+
+    // Observe size changes and run an initial check
+    const ro = new ResizeObserver(updateButtonsVisibility);
+    const innerNow = getContentInner();
+    if (innerNow) ro.observe(innerNow);
+    window.addEventListener('resize', updateButtonsVisibility, { passive: true });
+    updateButtonsVisibility();
 }

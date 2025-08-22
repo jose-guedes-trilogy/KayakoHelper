@@ -56,3 +56,74 @@ export async function fetchTranscript(limit = 100): Promise<string> {
     const json: ApiResponse = await res.json();
     return cleanConversation(json.data);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Side Conversations API                                             */
+/* ------------------------------------------------------------------ */
+
+export interface SideConversationsResponse {
+    status: number;
+    data: SideConversationItem[];
+    resource: string;        // "side_conversation"
+    offset: number;
+    limit: number;
+    total_count: number;
+    logs?: unknown[];
+    session_id?: string;
+}
+
+export interface SideConversationItem {
+    id: number | string;
+    uuid?: string;
+    subject?: string;
+    first_message?: {
+        id?: number | string;
+        uuid?: string;
+        subject?: string;
+        body_text?: string;
+        body_html?: string;
+        recipients?: unknown;  // string[] | {email?: string, fullname?: string}[] | mixed
+        fullname?: string;
+        email?: string;
+        creator?: unknown;
+        identity?: unknown;
+        mailbox?: unknown;
+        attachments?: unknown[];
+        download_all?: string;
+        locale?: string;
+        response_time?: unknown;
+        created_at?: string;
+        updated_at?: string;
+        resource_type?: string;
+        resource_url?: string;
+    };
+    message_count?: number;
+    created_at?: string;
+    updated_at?: string;
+    status?: string;         // "open"
+    resource_type?: string;  // "side_conversation"
+    resource_url?: string;
+}
+
+const BASE = "https://central-supportdesk.kayako.com/api/v1";
+
+export async function fetchSideConversations(
+    caseId: number | string,
+    offset = 0,
+    limit = 1000,
+    include = "*",
+): Promise<SideConversationsResponse> {
+    const url = `${BASE}/cases/${caseId}/side-conversations?caseId=${caseId}&offset=${offset}&limit=${limit}&include=${encodeURIComponent(include)}`;
+    const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+            Accept: 'application/json',
+            // Add your auth header here, e.g. "Authorization": `Bearer ${token}`
+        },
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        throw new Error(`fetchSideConversations failed: ${res.status} ${res.statusText}`);
+    }
+    return res.json();
+}

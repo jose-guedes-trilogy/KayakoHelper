@@ -10,6 +10,9 @@ interface Prefs {
     uiDarkCompat?: boolean;
     uiDarkTextColor?: string;
     uiDarkBgColor?: string;
+    searchInRemember?: boolean;
+    searchInDefaults?: string[];
+    searchResultsAutoUpdate?: boolean;
 }
 
 /* ─ constants & state ─ */
@@ -38,6 +41,17 @@ const refs = {
     inpDarkText  : document.getElementById('kh-ui-dark-text-color') as HTMLInputElement,
     inpDarkBg    : document.getElementById('kh-ui-dark-bg-color') as HTMLInputElement,
 
+    /* Search in settings */
+    chkSearchInRemember : document.getElementById('kh-searchin-remember') as HTMLInputElement,
+    defConv : document.getElementById('kh-searchin-def-conv') as HTMLInputElement,
+    defUsers: document.getElementById('kh-searchin-def-users') as HTMLInputElement,
+    defOrgs : document.getElementById('kh-searchin-def-orgs') as HTMLInputElement,
+    defArts : document.getElementById('kh-searchin-def-articles') as HTMLInputElement,
+    defNone : document.getElementById('kh-searchin-def-none') as HTMLInputElement,
+
+    /* search results auto-update */
+    chkSearchResultsAuto: document.getElementById('kh-search-results-autoupdate') as HTMLInputElement,
+
     /* current ticket read-outs */
     lblId     : document.getElementById('kh-popup-ticket-info-id')       as HTMLElement,
     lblSubj   : document.getElementById('kh-popup-ticket-info-subject')  as HTMLElement,
@@ -53,6 +67,9 @@ const refs = {
     pager     : document.getElementById('kh-pagination')      as HTMLElement,
 
     ephorToken : document.getElementById('kh-ephor-api-token') as HTMLInputElement,
+
+    /* copy open tabs button */
+    copyOpenTabsBtn: document.getElementById('kh-copy-open-tabs-btn') as HTMLButtonElement,
 };
 
 
@@ -92,8 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'uiDarkCompat',
         'uiDarkTextColor',
         'uiDarkBgColor',
+        'searchInRemember',
+        'searchInDefaults',
+        'searchResultsAutoUpdate',
     ] as const, res => {
-        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor } = res as Prefs;
+        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate } = res as Prefs;
         refs.chkTraining.checked = !!trainingMode;
         refs.chkStyles.checked   = allStyles       ?? true;
         refs.inpWpm.value        = (sendChunksWPM ?? 200).toString();
@@ -101,6 +121,23 @@ document.addEventListener('DOMContentLoaded', () => {
         refs.chkDarkCompat.checked = !!uiDarkCompat;
         refs.inpDarkText.value     = uiDarkTextColor ?? '#EAEAEA';
         refs.inpDarkBg.value       = uiDarkBgColor   ?? '#1E1E1E';
+
+        // Search in settings
+        const remember = !!searchInRemember;
+        refs.chkSearchInRemember.checked = remember;
+        toggleDefaultWrapVisibility(remember);
+
+        const defs = Array.isArray(searchInDefaults) ? searchInDefaults : ['Conversations'];
+
+        // None means no others checked
+        const none = defs.length === 0;
+        refs.defConv.checked  = !none && defs.includes('Conversations');
+        refs.defUsers.checked = !none && defs.includes('Users');
+        refs.defOrgs .checked = !none && defs.includes('Organizations');
+        refs.defArts .checked = !none && defs.includes('Articles');
+
+        // Search results auto-update (default: true)
+        refs.chkSearchResultsAuto.checked = typeof searchResultsAutoUpdate === 'boolean' ? searchResultsAutoUpdate : true;
     });
 
     refs.chkTraining.addEventListener('change', () => {
@@ -139,6 +176,25 @@ document.addEventListener('DOMContentLoaded', () => {
     refs.inpDarkBg.addEventListener('change', () => {
         const val = refs.inpDarkBg.value || '#1E1E1E';
         chrome.storage.sync.set({ uiDarkBgColor: val });
+    });
+
+    /* ------- Search in settings ------- */
+    refs.chkSearchInRemember?.addEventListener('change', () => {
+        const remember = !!refs.chkSearchInRemember.checked;
+        chrome.storage.sync.set({ searchInRemember: remember });
+        toggleDefaultWrapVisibility(remember);
+    });
+
+    [refs.defConv, refs.defUsers, refs.defOrgs, refs.defArts].forEach(cb => {
+        cb?.addEventListener('change', () => {
+            saveDefaultInSelection();
+        });
+    });
+
+    /* ------- Results page auto-update setting ------- */
+    refs.chkSearchResultsAuto?.addEventListener('change', () => {
+        const enabled = !!refs.chkSearchResultsAuto.checked;
+        chrome.storage.sync.set({ searchResultsAutoUpdate: enabled });
     });
 
     /* ------- Ephor API token ------- */
@@ -180,6 +236,24 @@ document.addEventListener('DOMContentLoaded', () => {
     /* ticket list */
     chrome.runtime.sendMessage<ToBackground>({ action: 'getAllTickets' });
     refs.searchBox.addEventListener('input', () => { currentPage = 0; renderList(); });
+
+    /* copy all open Kayako ticket URLs/IDs */
+    refs.copyOpenTabsBtn?.addEventListener('click', (ev) => {
+        const asCsv = !!(ev as MouseEvent).ctrlKey;
+        collectOpenKayakoTabs().then(({ urls }) => {
+            const text = asCsv ? urls.join(',') : urls.join('\n');
+            copyToClipboard(text);
+        });
+    });
+    // Right-click: copy IDs (newline separated)
+    refs.copyOpenTabsBtn?.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        collectOpenKayakoTabs().then(({ ids }) => {
+            const text = ids.join('\n');
+            copyToClipboard(text);
+        });
+        return false;
+    });
 });
 
 /* ─ background messages ─ */
@@ -276,4 +350,77 @@ function getCurrentTabTicketId(): Promise<string | null> {
             resolve(m ? m[1] : null);
         });
     });
+}
+
+/* ─ copy open Kayako tabs helpers ─ */
+async function collectOpenKayakoTabs(): Promise<{ urls: string[]; ids: string[] }> {
+    return new Promise(resolve => {
+        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+            const tabId = tabs[0]?.id;
+            if (!tabId) return resolve({ urls: [], ids: [] });
+
+            chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => {
+                    try {
+                        const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('[class*=ko-tab-strip_tab__link_]'));
+                        const seen = new Set<string>();
+                        const urls: string[] = [];
+                        const ids: string[] = [];
+                        anchors.forEach(a => {
+                            const href = a.getAttribute('href') || '';
+                            if (!/\/agent\/conversations\//i.test(href)) return;
+                            const full = `${location.origin}${href}`;
+                            if (seen.has(full)) return;
+                            seen.add(full);
+                            urls.push(full);
+                            const m = href.match(/(\d+)(?:\/?$)/);
+                            if (m) ids.push(m[1]);
+                        });
+                        return { urls, ids };
+                    } catch (_e) {
+                        return { urls: [], ids: [] };
+                    }
+                },
+            }, (results) => {
+                const data = results && results[0] && results[0].result ? results[0].result as { urls: string[]; ids: string[] } : { urls: [], ids: [] };
+                resolve(data);
+            });
+        });
+    });
+}
+
+function copyToClipboard(text: string): void {
+    if (!text) return;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else {
+        fallbackCopy(text);
+    }
+}
+function fallbackCopy(text: string): void {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+}
+
+/* ─ helpers for settings ─ */
+function toggleDefaultWrapVisibility(remember: boolean): void {
+    const wrap = document.getElementById('kh-searchin-defaults-wrap');
+    if (!wrap) return;
+    wrap.style.display = remember ? 'none' : '';
+}
+
+function saveDefaultInSelection(): void {
+    const defs: string[] = [];
+    if (refs.defConv?.checked)  defs.push('Conversations');
+    if (refs.defUsers?.checked) defs.push('Users');
+    if (refs.defOrgs?.checked)  defs.push('Organizations');
+    if (refs.defArts?.checked)  defs.push('Articles');
+    chrome.storage.sync.set({ searchInDefaults: defs });
 }

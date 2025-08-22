@@ -86,7 +86,7 @@ function getOrCreateButtonArea(): HTMLElement | null {
     }
 
     if (conv.children[1] !== area) {
-        if (conv.children.length >= 1) conv.insertBefore(area, conv.children[1]);
+        if (conv.children.length >= 1) conv.insertBefore(area, conv.children[1] ?? null);
         else                           conv.appendChild(area);
     }
     return area;
@@ -104,14 +104,14 @@ function getOrCreateGroupArea(
     let group = root.querySelector<HTMLElement>(`[data-group-id="${groupId}"]`);
     if (!group) {
         group = document.createElement('span');
-        group.dataset.groupId    = groupId;
-        group.dataset.groupOrder = String(groupOrder ?? '');
+        group.dataset['groupId']    = groupId;
+        group.dataset['groupOrder'] = String(groupOrder ?? '');
         group.className          = BUTTON_GROUP_CLASS;
 
         if (groupOrder !== undefined) {
             const before = Array.from(root.querySelectorAll<HTMLElement>('[data-group-id]'))
                 .find(g => {
-                    const o = Number(g.dataset.groupOrder);
+                    const o = Number(g.dataset['groupOrder']);
                     return !Number.isNaN(o) && o > groupOrder;
                 });
             root.insertBefore(group, before as Node ?? null);
@@ -294,9 +294,11 @@ interface BaseHeaderCfg {
     id: string;
     type: 'simple' | 'split';
     slot: HeaderSlot;
-    label: string | (() => string);
+    label: string | ((header: HTMLElement) => string);
     onClick: (btn: HTMLButtonElement) => void | Promise<void>;
     onContextMenu?: (ev: MouseEvent, btn: HTMLButtonElement) => void;
+    /* Optional filter to decide which editor headers should host this control */
+    headerFilter?: (headerEl: HTMLElement) => boolean;
 }
 export interface SimpleHeaderButtonCfg extends BaseHeaderCfg { type:'simple' }
 export interface SplitHeaderButtonCfg  extends BaseHeaderCfg {
@@ -316,6 +318,15 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
         document.querySelectorAll<HTMLElement>(
             KAYAKO_SELECTORS.textEditorHeader,
         ).forEach(header => {
+            /* If a filter is provided and this header is not accepted, ensure any
+               previous wrapper for this control is removed and skip. */
+            if (cfg.headerFilter && !cfg.headerFilter(header)) {
+                const existing = header.querySelector<HTMLElement>(
+                    `[data-kh-wrap="${cfg.id}"]`,
+                );
+                if (existing) existing.remove();
+                return;
+            }
             /* wrapper lookup / creation */
             const existingWrap = header.querySelector<HTMLElement>(
                 `[data-kh-wrap="${cfg.id}"]`,
@@ -323,14 +334,14 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
             let wrap = existingWrap;
             if (!wrap) {
                 wrap = document.createElement('div');
-                wrap.dataset.khWrap = cfg.id;
+                wrap.dataset['khWrap'] = cfg.id;
                 wrap.style.cssText = 'display:flex;align-items:center;';
                 /* slot insertion */
                 if (cfg.slot === HeaderSlot.AFTER_LAST ||
                     cfg.slot >= header.children.length) {
                     header.appendChild(wrap);
                 } else {
-                    header.insertBefore(wrap, header.children[cfg.slot]);
+                    header.insertBefore(wrap, header.children[cfg.slot] ?? null);
                 }
             }
 
@@ -338,7 +349,7 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
             if (cfg.type === 'simple') {
                 let btn = wrap.querySelector<HTMLElement>(`${cfg.id}`) as HTMLButtonElement | null;
                 if (!btn) {
-                    btn = createHeaderBtn(cfg.id, cfg.label);
+                    btn = createHeaderBtn(cfg.id, cfg.label, header);
                     btn.addEventListener('click', () => cfg.onClick(btn!));
                     if (cfg.onContextMenu) {
                         btn.addEventListener('contextmenu', ev => {
@@ -347,7 +358,7 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                     }
                     wrap.appendChild(btn);
                 } else {
-                    const newLabel = typeof cfg.label==='function' ? cfg.label() : cfg.label;
+                    const newLabel = typeof cfg.label==='function' ? cfg.label(header) : cfg.label;
                     setHtmlIfChanged(btn, newLabel);    // HTML-aware & stable
                 }
                 return; // simple done
@@ -360,7 +371,7 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
             let right = wrap.querySelector<HTMLButtonElement>(`${RIGHT_ID}`);
 
             if (!left) {
-                left = createHeaderBtn(cfg.id, cfg.label);
+                left = createHeaderBtn(cfg.id, cfg.label, header);
                 left.classList.add(EXTENSION_SELECTORS.twoPartBtnLeftHalf.slice(1));
                 left.addEventListener('click', () => sCfg.onClick(left!));
                 if (sCfg.onContextMenu) {
@@ -370,12 +381,12 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                 }
                 wrap.appendChild(left);
             } else {
-                const newLabel = typeof cfg.label==='function' ? cfg.label() : cfg.label;
+                const newLabel = typeof cfg.label==='function' ? cfg.label(header) : cfg.label;
                 setHtmlIfChanged(left, newLabel);       // HTML-aware & stable
             }
 
             if (!right) {
-                right = createHeaderBtn(RIGHT_ID, sCfg.rightLabel);
+                right = createHeaderBtn(RIGHT_ID, sCfg.rightLabel, header);
                 right.classList.add(EXTENSION_SELECTORS.twoPartBtnRightHalf.slice(1));
                 wrap.appendChild(right);
 
@@ -407,12 +418,16 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
 }
 
 /* tiny creator shared by both variants */
-function createHeaderBtn(id: string, lbl: string | (()=>string)): HTMLButtonElement {
+function createHeaderBtn(
+    id: string,
+    lbl: string | ((header: HTMLElement) => string),
+    header: HTMLElement,
+): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.id        = id.replace(/^#/, '');
     btn.type      = 'button';
     btn.className = EXTENSION_SELECTORS.defaultButtonClass.replace(/^./,'');
-    const html = typeof lbl==='function' ? lbl() : lbl;
+    const html = typeof lbl==='function' ? lbl(header) : lbl;
     setHtmlIfChanged(btn, html);   // initial cache
     return btn;
 }

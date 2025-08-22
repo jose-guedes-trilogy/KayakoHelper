@@ -3,8 +3,11 @@
    – chronological (oldest → newest)
    – includes Product name extracted from the info‑bar
    – includes Ticket ID extracted from the current URL
+   – includes Requester Email extracted from the sidebar
    – each line: timestamp, author, role, kind (Reply / Note)
    – posts separated by a clear divider                              */
+
+import { KAYAKO_SELECTORS } from '@/generated/selectors.ts';
 
 const SEPARATOR = "\n[——— Post separator ———]\n";
 
@@ -137,11 +140,50 @@ function detectTicketId(): string {
 }
 
 /* ------------------------------------------------------------------ */
+/** Read the requester email from the requester identities area */
+function detectRequesterEmail(): string {
+    try {
+        const el = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.requesterEmail);
+        const text = el?.textContent?.trim() || "";
+        return text || "Unknown email";
+    } catch (err) {
+        console.error("[cleanConversation] detectRequesterEmail failed", err);
+        return "Unknown email";
+    }
+}
+
+function detectTicketSubject(): string {
+    try {
+        const el = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.ticketSubject);
+        const text = el?.textContent?.trim() || "";
+        return text || "Unknown subject";
+    } catch (err) {
+        console.error("[cleanConversation] detectTicketSubject failed", err);
+        return "Unknown subject";
+    }
+}
+
+function detectTicketOrganization(): string {
+    try {
+        const el = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.requesterOrganization);
+        const text = el?.textContent?.trim() || "";
+        return text || "Unknown organization";
+    } catch (err) {
+        console.error("[cleanConversation] detectTicketOrganization failed", err);
+        return "Unknown organization";
+    }
+}
+
+/* ------------------------------------------------------------------ */
 export function cleanConversation(posts: Post[]): string {
     const ticketID = `Ticket ID: ${detectTicketId()}`;
     const ticketProduct = `Product: ${detectProduct()}`;
+    const requesterEmail = `Requester Email: ${detectRequesterEmail()}`;
+    const requesterOrganization = `Requester Organization: ${detectTicketOrganization()}`;
+    const ticketSubject = `Subject: ${detectTicketSubject()}`;
 
     const ticketInformation = `${ticketID} - ${ticketProduct}`;
+    const header = `${ticketSubject}\n${requesterEmail}\n${requesterOrganization}\n${ticketInformation}`;
 
     const lines = posts
         .sort(
@@ -162,5 +204,5 @@ export function cleanConversation(posts: Post[]): string {
             return `[${ts}] ${who} (${role}, ${kind}):\n${body}`;
         });
 
-    return [ticketInformation, ...lines].join(SEPARATOR);
+    return [header, ...lines].join(SEPARATOR);
 }

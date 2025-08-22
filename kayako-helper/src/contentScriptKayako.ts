@@ -29,6 +29,8 @@ import { bootTargetBlankLinks }     from "@/modules/kayako/ui-enhancement/target
 import {bootHoverTicketPreview} from "@/modules/kayako/hoverTicketPreview.ts";
 import {bootEphorButton} from "@/modules/kayako/buttons/ephor/buttonEphor.ts";
 import "@/modules/ephor/clerkTokenInjector.ts";
+import { bootSideConversations } from '@/modules/kayako/sideConversations.ts';
+import { bootQcerFeatures } from '@/modules/kayako/qcerFeatures.ts';
 
 import {bootCredProbeClient, bootRequestReplicator} from "@/modules/alpha/dash/RequestReplicator.ts";
 import {bootUiAesthetics} from "@/modules/kayako/ui-enhancement/uiAesthetics.ts";
@@ -53,6 +55,7 @@ bootTagCleaner();
 bootTargetBlankLinks();
 
 bootExtraPostButtons();
+bootQcerFeatures();
 bootDownloadManager();
 bootCopyChatButton();
 bootSendToQcButton();
@@ -66,6 +69,8 @@ bootAssetsInspector();
 
 //bootEmbeddingsSearch();
 bootHoverTicketPreview();
+
+bootSideConversations();
 
 
 bootUiAesthetics();

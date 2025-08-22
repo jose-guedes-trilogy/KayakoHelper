@@ -128,7 +128,8 @@
   display: flex;            /* we want two rows inside: results + “see more” */
 }
 
-#{sel.$unifiedSearchElementsParentId} {
+#{sel.$unifiedSearchElementsParentId},
+[id^="kh-enhanced-search-ui-elements--"] {
   padding: 10px 14px 20px;
 
   display: flex;
@@ -834,12 +835,22 @@
 #kh-ephor-send-btn { cursor: pointer; }
 
 
+#{sel.$searchField} > div > div  {
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  gap: 6px;
+}
+
+
+
 #{sel.$textEditorHeader} button {
   min-height: 28px;
   max-height: 28px;
 }
 #{sel.$searchPageContainer} {
-  #{sel.$unifiedSearchElementsParentId}  {
+  #{sel.$unifiedSearchElementsParentId},
+  [id="kh-enhanced-search-ui-elements--results"]  {
     padding-top: 20px;
     border-bottom: none;
   }

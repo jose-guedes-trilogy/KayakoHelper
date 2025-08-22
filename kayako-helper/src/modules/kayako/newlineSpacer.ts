@@ -217,7 +217,12 @@ export function bootNewlineSpacer(): void {
         id   : BTN_ID,
         type : 'simple',
         slot : HeaderSlot.SECOND,
-        label: 'Add newlines',
+        label: (header) => {
+            const isSide = !!header.closest('[class*=side-conversations-panel_]');
+            return isSide
+                ? '<span style="font-weight:700">\\n</span>'
+                : 'Add newlines';
+        },
         onClick(btn) {
             const header  = btn.closest(KAYAKO_SELECTORS.textEditorHeader);
             const editor  = header?.parentElement

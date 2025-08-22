@@ -54,6 +54,13 @@ export function bootSendToQcButton(): void {
         type : 'simple',
         slot : HeaderSlot.THIRD,
         label,
+        headerFilter: (headerEl: HTMLElement) => {
+            const inSidePanel = !!headerEl.closest(KAYAKO_SELECTORS.sc_detail_content);
+            if (inSidePanel) return false;
+            const inReplyArea  = !!headerEl.closest(KAYAKO_SELECTORS.editorChrome);
+            const inTextEditor = !!headerEl.closest(KAYAKO_SELECTORS.textEditorContainerRoot);
+            return inReplyArea && inTextEditor;
+        },
         async onClick(btn) {
             const setState = (s: UiState) => { uiState=s; btn.textContent=label(); };
             await handleClick(btn, setState);

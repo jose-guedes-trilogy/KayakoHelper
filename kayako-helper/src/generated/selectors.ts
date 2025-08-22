@@ -16,6 +16,7 @@ export interface KayakoSelectors {
   requesterName: string;
   requesterEmail: string;
   ticketSubject: string;
+  requesterOrganization: string;
   conversationWindowContainer: string;
   conversationWindowHeader: string;
   conversationWindowHeaderInner: string;
@@ -31,7 +32,10 @@ export interface KayakoSelectors {
   feedItemMenu: string;
   timelineItem: string;
   timelineItemContent: string;
+  timelineItemContentInner: string;
   timelineItemDate: string;
+  timelineItemSubtitle: string;
+  timelineItemTime: string;
   timelineItemInner: string;
   timelineItemHover: string;
   timelineItemStatusIcon: string;
@@ -89,6 +93,7 @@ export interface KayakoSelectors {
   selectedTab: string;
   activeTab: string;
   inactiveTab: string;
+  tabStripLink: string;
   inboxTicketCountLeftMenu: string;
   inboxTicketCountConversationsView: string;
   inboxTicketCountConversationsViewItem: string;
@@ -103,6 +108,7 @@ export interface KayakoSelectors {
   ticketCompleted: string;
   tooltipContainer: string;
   tooltipContent: string;
+  timelineActivityTime: string;
   updateBar: string;
   updateBarButton: string;
   downloadAllButton: string;
@@ -135,6 +141,18 @@ export interface KayakoSelectors {
   searchPageContainer: string;
   searchInput: string;
   slaBreachIndicator: string;
+  sc_list_header: string;
+  sc_list_title: string;
+  sc_list_addBtn: string;
+  sc_detail_content: string;
+  sc_hidden: string;
+  sc_detail_header: string;
+  sc_detail_title: string;
+  sc_recipients_row: string;
+  sc_recipient: string;
+  sc_senderEmail: string;
+  sc_timestamp: string;
+  sc_list_time: string;
 }
 
 export interface ExtensionSelectors {
@@ -147,12 +165,14 @@ export interface ExtensionSelectors {
   makeTabActiveButton: string;
   scrollTopButton: string;
   copyPostButton: string;
+  qcerButton: string;
   createFolderButton: string;
   copyChatButton: string;
   newLinesButton: string;
   sendToQcButton: string;
   exportChatButton: string;
   exportChatButtonRight: string;
+  ephorButton: string;
   twoPartBtnLeftHalf: string;
   twoPartBtnRightHalf: string;
   twoPartBtnParentElement: string;
@@ -238,6 +258,8 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
     "[class*=ko-agent-content_sidebar_requester-info-card__requester-name_] [class*=ko-editable-text__emphasizedText]",
   requesterEmail: "[class*=ko-identities_identity_trigger__name_]",
   ticketSubject: "[class*=ko-tabs_case__subject_]",
+  requesterOrganization:
+    "[class*=ko-agent-content_sidebar_requester-info-card__organization-row_]",
   conversationWindowContainer: "[class*=ko-agent-content_layout__content_]",
   conversationWindowHeader: "[class*=ko-agent-content_layout__heading_]",
   conversationWindowHeaderInner: "[class*=ko-tabs__tabs_]",
@@ -256,7 +278,10 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   timelineItem:
     "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_], [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_] .attachment-container-flap-hide",
   timelineItemContent: "[class*=ko-timeline-2_list_item__body_]",
+  timelineItemContentInner: "[class*=ko-timeline-2_list_item__content_]",
   timelineItemDate: "[class*=ko-timeline-2_list_item__side-time_]",
+  timelineItemSubtitle: "[class*=ko-timeline-2_list_item__subtitle_]",
+  timelineItemTime: "[class*=ko-timeline-2_list_item__time_]",
   timelineItemInner: "[class*=ko-timeline-2_list_item__item_]",
   timelineItemHover:
     "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover, [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover .attachment-container-flap-hide",
@@ -334,6 +359,7 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
     "[class*=ko-tabs_tab__link_].active:not(.ember-transitioning-out), [class*=ko-tabs_tab__link_].ember-transitioning-in",
   activeTab: "[class*=ko-tab-strip_tab__active-tab_]",
   inactiveTab: "[class*=ko-tab-strip_tab__inactive-tab_]",
+  tabStripLink: "[class*=ko-tab-strip_tab__link_]",
   inboxTicketCountLeftMenu: "[class*=session__case-count-pill_]",
   inboxTicketCountConversationsView:
     "[class*=ko-cases-list_sidebar_item__inbox_]",
@@ -352,6 +378,8 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   ticketCompleted: "[class*=ko-timeline-2_list_activity_large__completed_]",
   tooltipContainer: "[class*=ko-tooltip__tooltip_] [class*=tooltipster-box]",
   tooltipContent: "[class*=ko-tooltip__tooltip_] .tooltipster-content",
+  timelineActivityTime:
+    "[class*=ko-timeline-2_list_activity_standard__activity-time_]",
   updateBar: "[class*=app-version-notifier__app-version-notifier_]",
   updateBarButton: "[class*=app-version-notifier__button_]",
   downloadAllButton: "[class*=ko-attachments__download-all_]",
@@ -393,6 +421,29 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   searchPageContainer: "[class*=session_agent_search__container_]",
   searchInput: "[class*=session_agent_search__search-input_]",
   slaBreachIndicator: "[class*=ko-sla__metric-breached_]",
+  sc_list_header:
+    "[class*='side-conversations-panel_conversations-list__side-panel-header']",
+  sc_list_title:
+    "[class*='side-conversations-panel_conversations-list__title']",
+  sc_list_addBtn:
+    "[class*='side-conversations-panel_conversations-list__add-button']",
+  sc_detail_content:
+    "[class*='side-conversations-panel_individual-conversation__content']",
+  sc_hidden: "[class*='side-conversations-panel__hidden']",
+  sc_detail_header:
+    "[class*='side-conversations-panel_individual-conversation__side-panel-header']",
+  sc_detail_title:
+    "[class*='side-conversations-panel_individual-conversation__title']",
+  sc_recipients_row:
+    "[class*='side-conversations-panel_message-timeline__message-recipients']",
+  sc_recipient:
+    "[class*='side-conversations-panel_message-timeline__recipient_']",
+  sc_senderEmail:
+    "[class*='side-conversations-panel_message-timeline__sender-email_']",
+  sc_timestamp:
+    "[class*='side-conversations-panel_message-timeline__message-timestamp_']",
+  sc_list_time:
+    "[class*='side-conversations-panel_conversations-list__conversation-time_']",
 };
 export const EXTENSION_SELECTORS: ExtensionSelectors = {
   defaultButtonClass: ".kh-default-button",
@@ -405,12 +456,14 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   makeTabActiveButton: "#kh-make-tab-active-btn",
   scrollTopButton: ".kh-scroll-top-btn",
   copyPostButton: ".kh-copy-post-btn",
+  qcerButton: ".kh-qcer-btn",
   createFolderButton: "#kh-create-folder-btn",
   copyChatButton: "#kh-copy-chat-btn",
   newLinesButton: "#kh-newlines-btn",
   sendToQcButton: "#kh-send-to-qc-btn",
   exportChatButton: "#kh-export-chat-btn",
   exportChatButtonRight: "#kh-export-chat-btn-right",
+  ephorButton: "#kh-export-chat-btn-right",
   twoPartBtnLeftHalf: ".kh-two-part-btn-left-half",
   twoPartBtnRightHalf: ".kh-two-part-btn-right-half",
   twoPartBtnParentElement: ".kh-two-part-btn-parent",

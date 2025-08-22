@@ -22,6 +22,7 @@
     "requesterName": "[class*=ko-agent-content_sidebar_requester-info-card__requester-name_] [class*=ko-editable-text__emphasizedText]",
     "requesterEmail": "[class*=ko-identities_identity_trigger__name_]",
     "ticketSubject": "[class*=ko-tabs_case__subject_]",
+    "requesterOrganization": "[class*=ko-agent-content_sidebar_requester-info-card__organization-row_]",
 
     /* Conversation Window Header */
     "conversationWindowContainer": "[class*=ko-agent-content_layout__content_]",
@@ -47,7 +48,12 @@
 
     "timelineItem": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_], [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_] .attachment-container-flap-hide",
     "timelineItemContent": "[class*=ko-timeline-2_list_item__body_]",
+    "timelineItemContentInner": "[class*=ko-timeline-2_list_item__content_]",
     "timelineItemDate": "[class*=ko-timeline-2_list_item__side-time_]",
+    // Subtitle line under timeline item header (container)
+    "timelineItemSubtitle": "[class*=ko-timeline-2_list_item__subtitle_]",
+    // The time element within the subtitle; often has a tooltip
+    "timelineItemTime": "[class*=ko-timeline-2_list_item__time_]",
     "timelineItemInner": "[class*=ko-timeline-2_list_item__item_]",
     "timelineItemHover": "[class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover, [class*=ko-timeline-2_list_item__post_][class*=ko-timeline-2_list_item__no-menus-open_]:hover .attachment-container-flap-hide",
     "timelineItemStatusIcon": "[class*=ko-timeline-2_list_item_status__icon_]",
@@ -55,10 +61,18 @@
     "timelineItemNote": "[class*=ko-timeline-2_list_item__note_]",
 
     "timelineItemAttachment": "[class*=ko-timeline-2_list_item_attachment__attachment_]",
+    // Attachment preview button within an attachment row
+    "timelineItemAttachmentPreview": "[class*=ko-timeline-2_list_item_attachment__preview_]",
+    // Thumbnail <img> element inside an attachment
+    "timelineItemAttachmentSmallImage": "img[class*=ko-timeline-2_list_item_attachment__small_]",
+    // Download link within an attachment row
+    "timelineItemAttachmentDownload": "[class*=ko-timeline-2_list_item_attachment__download_]",
 
     "timelineItemAttachmentNoteFlap": "[class*=ko-timeline-2_list_item__note_] .attachment-container-flap-hide",
 
     "timelineItemPostLarge": "[class*=ko-timeline-2_list_post__large_]", // for "completed" and "SLA missed" messages
+
+
 
     "modeSelectorContainer": "[class*=ko-text-editor__group_]",
 
@@ -124,6 +138,7 @@
     "selectedTab": "[class*=ko-tabs_tab__link_].active:not(.ember-transitioning-out), [class*=ko-tabs_tab__link_].ember-transitioning-in",
     "activeTab": "[class*=ko-tab-strip_tab__active-tab_]",
     "inactiveTab": "[class*=ko-tab-strip_tab__inactive-tab_]",
+    "tabStripLink": "[class*=ko-tab-strip_tab__link_]",
 
     "inboxTicketCountLeftMenu": "[class*=session__case-count-pill_]",
     "inboxTicketCountConversationsView": "[class*=ko-cases-list_sidebar_item__inbox_]",
@@ -145,6 +160,13 @@
 
     "tooltipContainer": "[class*=ko-tooltip__tooltip_] [class*=tooltipster-box]",
     "tooltipContent": "[class*=ko-tooltip__tooltip_] .tooltipster-content",
+    // Tooltip outer root (used to override inline size limits)
+    "tooltipRoot": "[class*=ko-tooltip__tooltip_]",
+
+    // Activity line time container (holds a tooltipstered child)
+    "timelineActivityTime": "[class*=ko-timeline-2_list_activity_standard__activity-time_]",
+    // Day separator date span for adding relative tooltip
+    "daySeparatorDate": "[class*=ko-timeline-2_list_days__day-separator__date_]",
 
     "updateBar": "[class*=app-version-notifier__app-version-notifier_]",
     "updateBarButton": "[class*=app-version-notifier__button_]",
@@ -192,7 +214,31 @@
     "searchInput"          : "[class*=session_agent_search__search-input_]",
 
     // red SLA indicator that appears in ticket views in the Next Breach column
-    "slaBreachIndicator"   : "[class*=ko-sla__metric-breached_]"
+    "slaBreachIndicator"   : "[class*=ko-sla__metric-breached_]",
+
+    // ───────────── Side Conversations (SC) selectors ─────────────
+    // Header that contains the title and the (+) button in the list pane
+    "sc_list_header": "[class*='side-conversations-panel_conversations-list__side-panel-header']",
+    // The 'Side Conversations' title element inside the header
+    "sc_list_title": "[class*='side-conversations-panel_conversations-list__title']",
+    // The (+) button container inside the header
+    "sc_list_addBtn": "[class*='side-conversations-panel_conversations-list__add-button']",
+
+    // Detail pane content container (we anchor the second button here)
+    "sc_detail_content": "[class*='side-conversations-panel_individual-conversation__content']",
+
+    // Visibility helpers
+    "sc_hidden": "[class*='side-conversations-panel__hidden']",
+    "sc_detail_header": "[class*='side-conversations-panel_individual-conversation__side-panel-header']",
+
+    // Timeline / fingerprint helpers
+    "sc_detail_title": "[class*='side-conversations-panel_individual-conversation__title']",
+    "sc_recipients_row": "[class*='side-conversations-panel_message-timeline__message-recipients']",
+    "sc_recipient": "[class*='side-conversations-panel_message-timeline__recipient_']",
+    "sc_senderEmail": "[class*='side-conversations-panel_message-timeline__sender-email_']",
+    "sc_timestamp": "[class*='side-conversations-panel_message-timeline__message-timestamp_']",
+    // List-row time in the SC conversation list
+    "sc_list_time": "[class*='side-conversations-panel_conversations-list__conversation-time_']"
 
   },
 
@@ -213,6 +259,10 @@
 
     "scrollTopButton": ".kh-scroll-top-btn",
     "copyPostButton": ".kh-copy-post-btn",
+    // QCer: Per-post button to extract PR into reply. Bold "QC" label.
+    // Placed next to copy-post and before scroll-to-bottom; class-based selector
+    // to be resilient to DOM structure changes.
+    "qcerButton": ".kh-qcer-btn",
 
     "createFolderButton": "#kh-create-folder-btn",
     "copyChatButton": "#kh-copy-chat-btn",
@@ -220,6 +270,7 @@
     "sendToQcButton": "#kh-send-to-qc-btn",
     "exportChatButton": "#kh-export-chat-btn",
     "exportChatButtonRight": "#kh-export-chat-btn-right",
+    "ephorButton": "#kh-export-chat-btn-right",
 
 
     "twoPartBtnLeftHalf"         : ".kh-two-part-btn-left-half",         // left half of the new split “Export” control

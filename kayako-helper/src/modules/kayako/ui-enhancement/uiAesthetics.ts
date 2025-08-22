@@ -9,7 +9,7 @@
    - Reacts live to storage changes and to DOM mutations.
 */
 
-import { EXTENSION_SELECTORS } from '@/generated/selectors.ts';
+import { EXTENSION_SELECTORS, KAYAKO_SELECTORS } from '@/generated/selectors.ts';
 
 /** Storage keys */
 const KEY_COMPAT = 'uiDarkCompat';
@@ -58,10 +58,29 @@ function ensureStyleTag(): HTMLStyleElement {
     }
     // Compose the CSS exactly as requested (SASS-like snippet translated to CSS)
     const joined = TARGET_SELECTORS.map(s => `${s}.dark-mode`).join(',\n');
+    const tipRoot = (KAYAKO_SELECTORS as any).tooltipRoot || '[class*=ko-tooltip__tooltip_]';
+    const tipBox = KAYAKO_SELECTORS.tooltipContainer || '[class*=ko-tooltip__tooltip_] [class*=tooltipster-box]';
+    const tipContent = KAYAKO_SELECTORS.tooltipContent || '[class*=ko-tooltip__tooltip_] .tooltipster-content';
     style.textContent = `
 ${joined} {
   color: var(--dark-mode-text-color) !important;
   background: var(--dark-mode-background-color) !important;
+}
+
+/* Keep Kayako tooltips on one line and allow full width */
+${tipRoot} {
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+}
+${tipBox} {
+  max-width: none !important;
+}
+${tipContent} {
+  white-space: nowrap !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
   `.trim();
     return style;
@@ -195,6 +214,9 @@ export function bootUiAesthetics(): void {
     if (!TARGET_SELECTORS.length) return;
     init();
     initTimestampTooltips();
+    initSideConversationTimestamps();
+    initHoverTimeTooltips();
+    initDaySeparatorTooltips();
 }
 
 /* ============================================================================
@@ -223,49 +245,44 @@ function findActivityBox(root: ParentNode): HTMLElement | null {
 
 function parseEpochToDateString(epochText: string): string | null {
     const trimmed = epochText.trim();
-    console.log('[OH-Timestamps] Checking text:', JSON.stringify(trimmed));
-    
+
     if (!/^\d{10,13}$/.test(trimmed)) {
-        console.log('[OH-Timestamps] Not a valid timestamp format (10-13 digits)');
         return null;
     }
     
     const num = Number(trimmed);
     if (!Number.isFinite(num)) {
-        console.log('[OH-Timestamps] Not a finite number');
         return null;
     }
     
     const ms = trimmed.length === 13 ? num : num * 1000;
     const d = new Date(ms);
     if (isNaN(d.getTime())) {
-        console.log('[OH-Timestamps] Invalid date');
         return null;
     }
     
     const humanDate = d.toLocaleString();
-    console.log('[OH-Timestamps] Converted', trimmed, 'to', humanDate);
     return humanDate;
 }
 
 function convertTimestampsInContainer(container: HTMLElement): void {
-    console.log('[OH-Timestamps] Processing container:', container);
 
     const boldElements = container.querySelectorAll<HTMLElement>('b, strong');
-    console.log('[OH-Timestamps] Found', boldElements.length, 'bold/strong elements');
 
     boldElements.forEach(el => {
         const txt = el.textContent ?? '';
-        console.log('[OH-Timestamps] Processing element with text:', JSON.stringify(txt));
 
         const human = parseEpochToDateString(txt);
         if (human) {
             const originalEpoch = txt.trim();
-            // Make human-readable visible; keep machine-readable in title
-            el.title = originalEpoch;
+            const num = Number(originalEpoch);
+            const ms = originalEpoch.length === 13 ? num : num * 1000;
+            const d = new Date(ms);
+            const rel = formatRelativeTimeFromDate(d);
+            // Visible: human date; Tooltip: "Time passed - Machine readable time"
+            el.title = `${rel} - ${originalEpoch}`;
             el.textContent = human;
             (el as HTMLElement).dataset['ohTsDone'] = '1';
-            console.log('[OH-Timestamps] Updated element → title(epoch):', originalEpoch, ' visible(human):', human);
             return;
         }
 
@@ -274,15 +291,18 @@ function convertTimestampsInContainer(container: HTMLElement): void {
         if (/^\d{10,13}$/.test(txt.trim()) && titleText && !/^\d{10,13}$/.test(titleText)) {
             const human2 = parseEpochToDateString(txt);
             if (human2) {
-                el.title = txt.trim();
+                const epoch = txt.trim();
+                const num = Number(epoch);
+                const ms = epoch.length === 13 ? num : num * 1000;
+                const d = new Date(ms);
+                const rel = formatRelativeTimeFromDate(d);
+                el.title = `${rel} - ${epoch}`;
                 el.textContent = human2;
                 (el as HTMLElement).dataset['ohTsDone'] = '1';
-                console.log('[OH-Timestamps] Migrated old mapping → title(epoch):', txt.trim(), ' visible(human):', human2);
             }
             return;
         }
 
-        console.log('[OH-Timestamps] No valid timestamp found in element');
     });
 }
 
@@ -321,3 +341,177 @@ function initTimestampTooltips(): void {
 
 /* Optional: auto-boot if this file is included standalone. */
 bootUiAesthetics();
+
+/* ============================================================================
+ * Additional time tooltip enhancers
+ * ----------------------------------------------------------------------------
+ * 1) Side-conversation timestamps: create tooltip showing relative time
+ * 2) Timeline time/tooltips (tooltipstered): replace tooltip content with
+ *    "Full Date - How Much Time Has Passed"
+ * ---------------------------------------------------------------------------- */
+
+function formatRelativeTimeFromDate(date: Date): string {
+    try {
+        const now = Date.now();
+        const then = date.getTime();
+        const diffMs = then - now;
+        const absMs = Math.abs(diffMs);
+
+        const dayMs = 24 * 60 * 60 * 1000;
+        const hourMs = 60 * 60 * 1000;
+        const minuteMs = 60 * 1000;
+
+        let days = Math.floor(absMs / dayMs);
+        let remainder = absMs % dayMs;
+        let hours = Math.floor(remainder / hourMs);
+        remainder = remainder % hourMs;
+        let minutes = Math.floor(remainder / minuteMs);
+
+        // Clamp tiny values
+        if (days === 0 && hours === 0 && minutes === 0) minutes = 1;
+
+        const parts: string[] = [];
+        if (days > 0) parts.push(`${days} day${days === 1 ? '' : 's'}`);
+        if (hours > 0) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+        if (minutes > 0) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+
+        const content = parts.length === 1
+            ? parts[0]
+            : parts.length === 2
+                ? `${parts[0]} and ${parts[1]}`
+                : `${parts[0]}, ${parts[1]} and ${parts[2]}`;
+
+        return diffMs > 0 ? `in ${content}` : `${content} ago`;
+    } catch {
+        return '';
+    }
+}
+
+function parseDateFromTextLoose(text: string): Date | null {
+    const t = (text || '').trim();
+    if (!t) return null;
+    // Try to normalize common patterns like ": at 04:17" inside the date
+    const normalized = t
+        .replace(/\bat\s+/i, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const d = new Date(normalized);
+    if (!isNaN(d.getTime())) return d;
+    return null;
+}
+
+function enhanceSideConversationTimestamp(el: HTMLElement): void {
+    try {
+        if ((el as HTMLElement).dataset['ohTimeAug'] === '1') return;
+        const text = el.textContent || '';
+        const d = parseDateFromTextLoose(text);
+        if (!d) return;
+        const rel = formatRelativeTimeFromDate(d);
+        if (!rel) return;
+        el.setAttribute('title', rel);
+        (el as HTMLElement).dataset['ohTimeAug'] = '1';
+        // Logging per user request
+        try { console.debug('[OH time-tooltips] SC timestamp enhanced:', { text, rel }); } catch {}
+    } catch {}
+}
+
+function initSideConversationTimestamps(): void {
+    try {
+        const SC_TS = KAYAKO_SELECTORS.sc_timestamp || "[class*='side-conversations-panel_message-timeline__message-timestamp_']";
+        const SC_CONTENT = KAYAKO_SELECTORS.sc_detail_content || "[class*='side-conversations-panel_individual-conversation__content']";
+        const SC_LIST_TIME = (KAYAKO_SELECTORS as any).sc_list_time || "[class*='side-conversations-panel_conversations-list__conversation-time_']";
+
+        document.querySelectorAll<HTMLElement>(SC_TS).forEach(enhanceSideConversationTimestamp);
+        document.querySelectorAll<HTMLElement>(SC_LIST_TIME).forEach(enhanceSideConversationTimestamp);
+
+        const obs = new MutationObserver(muts => {
+            muts.forEach(m => {
+                m.addedNodes.forEach(n => {
+                    if (!(n instanceof HTMLElement)) return;
+                    if (n.matches(SC_TS)) {
+                        enhanceSideConversationTimestamp(n);
+                    } else if (n.matches(SC_LIST_TIME)) {
+                        enhanceSideConversationTimestamp(n);
+                    } else {
+                        n.querySelectorAll?.<HTMLElement>(SC_TS).forEach(enhanceSideConversationTimestamp);
+                        n.querySelectorAll?.<HTMLElement>(SC_LIST_TIME).forEach(enhanceSideConversationTimestamp);
+                    }
+                });
+            });
+        });
+        const container = document.querySelector(SC_CONTENT) || document.body;
+        obs.observe(container!, { childList: true, subtree: true });
+    } catch {}
+}
+
+function initHoverTimeTooltips(): void {
+    try {
+        // New sanitized selectors (fallback to string to avoid type churn until regenerated)
+        const TOOLTIP_CONTENT_SEL_PRIMARY = KAYAKO_SELECTORS.tooltipContent || "[class*=ko-tooltip__tooltip_] .tooltipster-content";
+        const TOOLTIP_CONTENT_SEL_FALLBACK = "[class*=tooltipster-content]";
+
+        // Observe tooltip creation and rewrite content
+        const tipObs = new MutationObserver(muts => {
+            for (const m of muts) {
+                m.addedNodes.forEach(node => {
+                    if (!(node instanceof HTMLElement)) return;
+                    const candidates = [
+                        ...(node.matches(TOOLTIP_CONTENT_SEL_PRIMARY) ? [node] : Array.from(node.querySelectorAll(TOOLTIP_CONTENT_SEL_PRIMARY))),
+                        ...(node.matches(TOOLTIP_CONTENT_SEL_FALLBACK) ? [node] : Array.from(node.querySelectorAll(TOOLTIP_CONTENT_SEL_FALLBACK)))
+                    ] as HTMLElement[];
+                    candidates.forEach(content => {
+                        if ((content as HTMLElement).dataset['ohTimeAug'] === '1') return;
+                        const full = content.textContent?.trim() || '';
+                        if (!full) return;
+                        const d = parseDateFromTextLoose(full);
+                        if (!d) return;
+                        const rel = formatRelativeTimeFromDate(d);
+                        if (!rel) return;
+                        content.textContent = `${full} - ${rel}`;
+                        (content as HTMLElement).dataset['ohTimeAug'] = '1';
+                        try { console.debug('[OH time-tooltips] Tooltip enhanced:', { full, rel }); } catch {}
+                    });
+                });
+            }
+        });
+        tipObs.observe(document.body, { childList: true, subtree: true });
+    } catch {}
+}
+
+function initDaySeparatorTooltips(): void {
+    try {
+        const DAY_SEP_SEL = KAYAKO_SELECTORS.daySeparatorText || "[class*=ko-timeline-2_list_days__day-separator__text_]";
+        const DATE_WITHIN_SEL = (KAYAKO_SELECTORS as any).daySeparatorDate || "[class*=ko-timeline-2_list_days__day-separator__date_]";
+
+        function enhance(el: HTMLElement): void {
+            try {
+                if ((el as HTMLElement).dataset['ohTimeAug'] === '1') return;
+                const dateEl = el.querySelector<HTMLElement>(DATE_WITHIN_SEL) || el;
+                const txt = dateEl.textContent || '';
+                const d = parseDateFromTextLoose(txt);
+                if (!d) return;
+                const rel = formatRelativeTimeFromDate(d);
+                if (!rel) return;
+                el.setAttribute('title', rel);
+                (el as HTMLElement).dataset['ohTimeAug'] = '1';
+                try { console.debug('[OH time-tooltips] Day separator enhanced:', { txt, rel }); } catch {}
+            } catch {}
+        }
+
+        document.querySelectorAll<HTMLElement>(DAY_SEP_SEL).forEach(enhance);
+
+        const obs = new MutationObserver(muts => {
+            muts.forEach(m => {
+                m.addedNodes.forEach(n => {
+                    if (!(n instanceof HTMLElement)) return;
+                    if (n.matches(DAY_SEP_SEL)) {
+                        enhance(n);
+                    } else {
+                        n.querySelectorAll?.<HTMLElement>(DAY_SEP_SEL).forEach(enhance);
+                    }
+                });
+            });
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+    } catch {}
+}

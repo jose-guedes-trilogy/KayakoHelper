@@ -49,6 +49,12 @@
 
 <!-- MAIN -->
 <section id="tab-main" class="active">
+    <button id="kh-copy-open-tabs-btn"
+            title="Left click: copy URLs. Right-click: copy IDs. Ctrl+Click: CSV"
+            style="margin:.6rem 0 .4rem .5rem;padding:.4rem .6rem;border:1px solid #ccc;background:#f8f8f8;font-weight:600;cursor:pointer">
+        Copy all ticket URLs in this tab
+    </button>
+
     <h4>This ticket</h4>
     <div id="kh-ticket-info">
         <div class="kh-ticket-info-label">ID:</div>              <div><span id="kh-popup-ticket-info-id">-</span></div>
@@ -131,6 +137,28 @@
             <div class="kh-popup-setting">
                 <label for="kh-ui-dark-bg-color">Dark mode background color</label><br>
                 <input type="color" id="kh-ui-dark-bg-color" value="#1E1E1E" />
+            </div>
+
+            <hr />
+
+            <!-- Results page auto-update -->
+            <div class="kh-popup-setting">
+                <label><input type="checkbox" id="kh-search-results-autoupdate" checked /> Auto-update results while typing (results page)</label>
+            </div>
+
+            <!-- Search in behavior -->
+            <div class="kh-popup-setting">
+                <label><input type="checkbox" id="kh-searchin-remember" /> Remember 'Search in' choices</label>
+            </div>
+
+            <div class="kh-popup-setting" id="kh-searchin-defaults-wrap">
+                <div style="margin-bottom:.25rem">Default 'Search in' when not remembering:</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <label><input type="checkbox" id="kh-searchin-def-conv" /> Conversations</label>
+                    <label><input type="checkbox" id="kh-searchin-def-users" /> Users</label>
+                    <label><input type="checkbox" id="kh-searchin-def-orgs" /> Organizations</label>
+                    <label><input type="checkbox" id="kh-searchin-def-articles" /> Articles</label>
+                </div>
             </div>
         </div>
     </div>

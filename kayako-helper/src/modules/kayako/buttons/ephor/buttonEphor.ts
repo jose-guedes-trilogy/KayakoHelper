@@ -15,6 +15,7 @@ import { runAiReplyWorkflow }               from "@/modules/kayako/buttons/ephor
 import {
     HeaderSlot, registerEditorHeaderButton,
 }                                           from "@/modules/kayako/buttons/buttonManager.ts";
+import { KAYAKO_SELECTORS }                 from "@/generated/selectors.ts";
 
 const BTN_ID  = "#kh-ephor-btn";
 
@@ -61,8 +62,13 @@ export async function bootEphorButton(): Promise<void> {
         id: BTN_ID,
         type: "simple",
         slot: HeaderSlot.SECOND,
-        /* HTML label: inline SVG + text (HTML-aware in manager) */
-        label: () => `${ICON_SVG}<span class="kh-ephor-text" style="margin-left:.35em;">Ephor</span>`,
+        /* HTML label: compact inside side-conversation panel only */
+        label: (header) => {
+            const isSide = !!header.closest('[class*=side-conversations-panel_]');
+            return isSide
+                ? `${ICON_SVG}`
+                : `${ICON_SVG}<span class="kh-ephor-text" style="margin-left:.35em;">Ephor</span>`;
+        },
         onClick  : () => { void openEphorSettingsModal(store, client); },
         onContextMenu: ev => {
             ev.preventDefault(); ev.stopPropagation();
