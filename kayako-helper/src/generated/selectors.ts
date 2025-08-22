@@ -41,6 +41,9 @@ export interface KayakoSelectors {
   timelineItemStatusIcon: string;
   timelineItemNote: string;
   timelineItemAttachment: string;
+  timelineItemAttachmentPreview: string;
+  timelineItemAttachmentSmallImage: string;
+  timelineItemAttachmentDownload: string;
   timelineItemAttachmentNoteFlap: string;
   timelineItemPostLarge: string;
   modeSelectorContainer: string;
@@ -108,7 +111,9 @@ export interface KayakoSelectors {
   ticketCompleted: string;
   tooltipContainer: string;
   tooltipContent: string;
+  tooltipRoot: string;
   timelineActivityTime: string;
+  daySeparatorDate: string;
   updateBar: string;
   updateBarButton: string;
   downloadAllButton: string;
@@ -289,6 +294,12 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   timelineItemNote: "[class*=ko-timeline-2_list_item__note_]",
   timelineItemAttachment:
     "[class*=ko-timeline-2_list_item_attachment__attachment_]",
+  timelineItemAttachmentPreview:
+    "[class*=ko-timeline-2_list_item_attachment__preview_]",
+  timelineItemAttachmentSmallImage:
+    "img[class*=ko-timeline-2_list_item_attachment__small_]",
+  timelineItemAttachmentDownload:
+    "[class*=ko-timeline-2_list_item_attachment__download_]",
   timelineItemAttachmentNoteFlap:
     "[class*=ko-timeline-2_list_item__note_] .attachment-container-flap-hide",
   timelineItemPostLarge: "[class*=ko-timeline-2_list_post__large_]",
@@ -378,8 +389,10 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   ticketCompleted: "[class*=ko-timeline-2_list_activity_large__completed_]",
   tooltipContainer: "[class*=ko-tooltip__tooltip_] [class*=tooltipster-box]",
   tooltipContent: "[class*=ko-tooltip__tooltip_] .tooltipster-content",
+  tooltipRoot: "[class*=ko-tooltip__tooltip_]",
   timelineActivityTime:
     "[class*=ko-timeline-2_list_activity_standard__activity-time_]",
+  daySeparatorDate: "[class*=ko-timeline-2_list_days__day-separator__date_]",
   updateBar: "[class*=app-version-notifier__app-version-notifier_]",
   updateBarButton: "[class*=app-version-notifier__button_]",
   downloadAllButton: "[class*=ko-attachments__download-all_]",

@@ -31,6 +31,16 @@ import {HeaderSlot, registerEditorHeaderButton} from "@/modules/kayako/buttons/b
 
 const BTN_ID = EXTENSION_SELECTORS.sendToQcButton;   // <─ CHANGED
 
+/* Settings keys (sync storage) */
+const STORAGE_KEYS = {
+    enableBtn   : 'qcButtonEnabled',
+    templateOnly: 'qcTemplateOnly',
+} as const;
+
+/* Live flags (updated from storage) */
+let qcBtnEnabled: boolean = true;       // default: show button
+let qcTemplateOnly: boolean = false;    // default: include clipboard
+
 // const ICON     = { idle: '📤', work: '⏳', ok: '✅', err: '❌' } as const;
 // type UiState   = keyof typeof ICON;
 type UiState = 'idle' | 'work' | 'ok' | 'err'; // keep type but without icons
@@ -41,6 +51,38 @@ const RESET_MS = 2_000;
 /* ------------------------------------------------------------------ */
 
 export function bootSendToQcButton(): void {
+    try {
+        // Load initial settings
+        chrome.storage.sync.get({ [STORAGE_KEYS.enableBtn]: true, [STORAGE_KEYS.templateOnly]: false }, res => {
+            qcBtnEnabled   = !!res[STORAGE_KEYS.enableBtn];
+            qcTemplateOnly = !!res[STORAGE_KEYS.templateOnly];
+            console.info('[KH][SendToQC] Settings loaded', { qcBtnEnabled, qcTemplateOnly });
+            triggerEnsure();
+        });
+
+        // React to changes
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area !== 'sync') return;
+            let touched = false;
+            if (STORAGE_KEYS.enableBtn in changes) {
+                qcBtnEnabled = !!changes[STORAGE_KEYS.enableBtn]!.newValue;
+                console.info('[KH][SendToQC] qcButtonEnabled →', qcBtnEnabled);
+                // If disabling, proactively remove existing controls
+                if (!qcBtnEnabled) {
+                    document.querySelectorAll<HTMLElement>(`[data-kh-wrap="${BTN_ID}"]`).forEach(el => el.remove());
+                }
+                touched = true;
+            }
+            if (STORAGE_KEYS.templateOnly in changes) {
+                qcTemplateOnly = !!changes[STORAGE_KEYS.templateOnly]!.newValue;
+                console.info('[KH][SendToQC] qcTemplateOnly →', qcTemplateOnly);
+                touched = true;
+            }
+            if (touched) triggerEnsure();
+        });
+    } catch (err) {
+        console.warn('[KH][SendToQC] Storage not available yet:', err);
+    }
     let uiState: UiState = 'idle';
     const label = () =>
         // `${ICON[uiState]} ${
@@ -55,6 +97,7 @@ export function bootSendToQcButton(): void {
         slot : HeaderSlot.THIRD,
         label,
         headerFilter: (headerEl: HTMLElement) => {
+            if (!qcBtnEnabled) return false;
             const inSidePanel = !!headerEl.closest(KAYAKO_SELECTORS.sc_detail_content);
             if (inSidePanel) return false;
             const inReplyArea  = !!headerEl.closest(KAYAKO_SELECTORS.editorChrome);
@@ -83,11 +126,13 @@ async function handleClick(
     setState('work');
 
     try {
-        const clipHtml = await readClipboardHtml();
+        console.debug('[KH][SendToQC] Clicked. Settings:', { qcTemplateOnly });
+        const clipHtml = qcTemplateOnly ? null : await readClipboardHtml();
         const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, ' ');
         const editor = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
         if (!editor) throw new Error('Reply editor not found');
         editor.innerHTML = html;
+        console.debug('[KH][SendToQC] Inserted template', { templateOnly: qcTemplateOnly });
         addNewlines(editor);
 
         const noteBtn = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.activateNoteModeButton);
@@ -187,8 +232,10 @@ function normalizeParagraphs(fragment: string): string {
     return tmp.innerHTML;
 }
 
-function buildTemplate(clip: string): string {
-    const body = normalizeParagraphs(clip || '<i>(clipboard empty)</i>');
+function buildTemplate(clip: string | null): string {
+    const body = (clip === null)
+        ? ''
+        : normalizeParagraphs(clip || '<i>(clipboard empty)</i>');
     return (
         `What is your proposed action?<br><br>
 • Send to customer<br><br>
@@ -211,6 +258,13 @@ function simulateClick(el: HTMLElement): void {
     ['mousedown', 'mouseup', 'click'].forEach(type =>
         el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }))
     );
+}
+
+/* Internal: nudge ButtonManager's observer to re-run ensures */
+function triggerEnsure(): void {
+    try {
+        document.body.setAttribute('data-kh-qcbtn-ensure', String(Date.now()));
+    } catch {}
 }
 
 /* ------------------------------------------------------------------ */

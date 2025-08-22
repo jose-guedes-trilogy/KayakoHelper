@@ -827,6 +827,10 @@
   white-space: normal;           // allow wrapping
 }
 
+#{sel.$qcerButton} {
+  color: hsl(0 0% 55% / 1);
+}
+
 
 /* Ensure icon inherits text color and aligns nicely */
 #kh-ephor-btn .kh-ephor-icon svg { width: 1em; height: 1em; display:inline-block; }

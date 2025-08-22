@@ -13,6 +13,8 @@ interface Prefs {
     searchInRemember?: boolean;
     searchInDefaults?: string[];
     searchResultsAutoUpdate?: boolean;
+    qcButtonEnabled?: boolean;
+    qcTemplateOnly?: boolean;
 }
 
 /* ─ constants & state ─ */
@@ -36,6 +38,10 @@ const refs = {
     chkTraining: document.getElementById('kh-training-mode-checkbox') as HTMLInputElement,
     chkStyles  : document.getElementById('kh-toggle-styles-checkbox') as HTMLInputElement,
     inpWpm     : document.getElementById('kh-send-in-chunks-wpm-limit') as HTMLInputElement,
+
+    /* Send to QC settings */
+    chkQcBtnEnabled : document.getElementById('kh-setting-qc-btn-enabled') as HTMLInputElement,
+    chkQcTemplateOnly: document.getElementById('kh-setting-qc-template-only') as HTMLInputElement,
 
     chkDarkCompat: document.getElementById('kh-ui-dark-compat-checkbox') as HTMLInputElement,
     inpDarkText  : document.getElementById('kh-ui-dark-text-color') as HTMLInputElement,
@@ -112,8 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
         'searchInRemember',
         'searchInDefaults',
         'searchResultsAutoUpdate',
+        'qcButtonEnabled',
+        'qcTemplateOnly',
     ] as const, res => {
-        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate } = res as Prefs;
+        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate, qcButtonEnabled, qcTemplateOnly } = res as Prefs;
         refs.chkTraining.checked = !!trainingMode;
         refs.chkStyles.checked   = allStyles       ?? true;
         refs.inpWpm.value        = (sendChunksWPM ?? 200).toString();
@@ -138,6 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Search results auto-update (default: true)
         refs.chkSearchResultsAuto.checked = typeof searchResultsAutoUpdate === 'boolean' ? searchResultsAutoUpdate : true;
+        // Send to QC settings
+        if (refs.chkQcBtnEnabled)  refs.chkQcBtnEnabled.checked   = typeof qcButtonEnabled === 'boolean' ? qcButtonEnabled : true;
+        if (refs.chkQcTemplateOnly) refs.chkQcTemplateOnly.checked = !!qcTemplateOnly;
     });
 
     refs.chkTraining.addEventListener('change', () => {
@@ -154,6 +165,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const wpm = Math.max(50, Math.min(800, Number(refs.inpWpm.value) || 200));
         refs.inpWpm.value = wpm.toString();
         chrome.storage.sync.set({ sendChunksWPM: wpm });
+    });
+
+    /* ------- Send to QC settings ------- */
+    refs.chkQcBtnEnabled?.addEventListener('change', () => {
+        const enabled = !!refs.chkQcBtnEnabled.checked;
+        chrome.storage.sync.set({ qcButtonEnabled: enabled });
+    });
+    refs.chkQcTemplateOnly?.addEventListener('change', () => {
+        const only = !!refs.chkQcTemplateOnly.checked;
+        chrome.storage.sync.set({ qcTemplateOnly: only });
     });
 
     /* ------- UI Dark Mode compatibility ------- */

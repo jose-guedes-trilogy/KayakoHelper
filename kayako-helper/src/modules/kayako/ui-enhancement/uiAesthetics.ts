@@ -261,8 +261,8 @@ function parseEpochToDateString(epochText: string): string | null {
         return null;
     }
     
-    const humanDate = d.toLocaleString();
-    return humanDate;
+    // return human-readable date
+    return d.toLocaleString();
 }
 
 function convertTimestampsInContainer(container: HTMLElement): void {
@@ -483,7 +483,7 @@ function initDaySeparatorTooltips(): void {
         const DAY_SEP_SEL = KAYAKO_SELECTORS.daySeparatorText || "[class*=ko-timeline-2_list_days__day-separator__text_]";
         const DATE_WITHIN_SEL = (KAYAKO_SELECTORS as any).daySeparatorDate || "[class*=ko-timeline-2_list_days__day-separator__date_]";
 
-        function enhance(el: HTMLElement): void {
+        const enhance = (el: HTMLElement): void => {
             try {
                 if ((el as HTMLElement).dataset['ohTimeAug'] === '1') return;
                 const dateEl = el.querySelector<HTMLElement>(DATE_WITHIN_SEL) || el;
@@ -496,7 +496,7 @@ function initDaySeparatorTooltips(): void {
                 (el as HTMLElement).dataset['ohTimeAug'] = '1';
                 try { console.debug('[OH time-tooltips] Day separator enhanced:', { txt, rel }); } catch {}
             } catch {}
-        }
+        };
 
         document.querySelectorAll<HTMLElement>(DAY_SEP_SEL).forEach(enhance);
 
