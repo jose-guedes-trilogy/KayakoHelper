@@ -238,7 +238,11 @@
     "sc_senderEmail": "[class*='side-conversations-panel_message-timeline__sender-email_']",
     "sc_timestamp": "[class*='side-conversations-panel_message-timeline__message-timestamp_']",
     // List-row time in the SC conversation list
-    "sc_list_time": "[class*='side-conversations-panel_conversations-list__conversation-time_']"
+    "sc_list_time": "[class*='side-conversations-panel_conversations-list__conversation-time_']",
+
+    // Messenger widget container (hideable)
+    // Prefer id when present, fall back to a resilient class contains selector.
+    "messenger": "#kayako-messenger, [id='kayako-messenger'], [class*='kayako-messenger']"
 
   },
 

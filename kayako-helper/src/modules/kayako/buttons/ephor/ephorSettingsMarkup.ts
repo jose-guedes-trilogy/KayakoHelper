@@ -288,7 +288,6 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
     .kh-split-row {
         display: flex;
         margin-left: -16px;
-        margin-bottom: 6px;
     }
     
     .kh-split-left {
@@ -368,7 +367,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
 
   <!-- ===== Settings row (segmented) ===== -->
   <div class="kh-split-row" style="display:flex;align-items:center;gap:8px;">
-    <div class="kh-seg-label"><strong>Settings</strong></div>
+    <div class="kh-seg-label"><strong>Mode</strong></div>
     <span class="kh-seg">
       <label><input type="radio" name="kh-ephor-mode" id="kh-ephor-mode-multiplexer" value="multiplexer"> API</label>
       <label><input type="radio" name="kh-ephor-mode" id="kh-ephor-mode-stream" value="stream"> Normal</label>
@@ -388,8 +387,8 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
 
   <!-- ===== Main tabs ===== -->
   <div style="display:flex;gap:6px;">
-    <button id="kh-ephor-tab-settings" class="kh-bar-btn active">Settings</button>
-    <button id="kh-ephor-tab-outputs"  class="kh-bar-btn">Outputs</button>
+    <button id="kh-ephor-tab-settings" class="kh-bar-btn active">Prompt Setup</button>
+    <button id="kh-ephor-tab-outputs"  class="kh-bar-btn">AI Outputs</button>
   </div>
 
   <!-- ===== Workflows row (save/load/delete/switch) ===== -->
@@ -409,10 +408,10 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
   </div>
 
   <!-- ===== Stage bar (split) ===== -->
-  <div class="kh-split-row" style="margin-top:0;">
+  <div class="kh-split-row" style="margin-top:0;margin-bottom: 6px;">
     <div class="kh-split-left"><strong>Stages</strong></div>
     <div class="kh-split-right">
-      <div id="kh-ephor-stage-bar" style="margin-bottom: 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 12px;"></div>
+      <div id="kh-ephor-stage-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding: 0 2px;"></div>
     </div>
   </div>
 
@@ -481,7 +480,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
 
     <!-- per-ticket custom instructions (scope toggle) -->
     <div style="margin-top:10px;">
-      <p style="margin:0 0 4px;font-weight:600;display:flex;align-items:center;gap:10px;">
+      <p style="margin:0 0 4px;font-weight:600;display:flex;align-items:center;gap:10px;justify-content: space-between;">
         <span id="kh-ephor-instr-label">4. Per-ticket Instructions</span>
         <label style="font-weight:normal;color:#333;">
           <input type="checkbox" id="kh-ephor-instr-scope" style="position:relative;top:2px;"> Save instructions per-stage instead

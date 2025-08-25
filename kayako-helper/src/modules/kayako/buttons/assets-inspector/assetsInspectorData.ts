@@ -112,6 +112,7 @@ export async function loadAssets(limit: number): Promise<void> {
                 if (isProbablyImage(u)) cache.images.push({ url: u, post: p.id });
             });
 
+            let hasNonImageAttachment = false;
             for (const att of p.attachments ?? []) {
                 const dl = att.url_download ?? att.url;
                 if (!dl) continue;
@@ -120,9 +121,11 @@ export async function loadAssets(limit: number): Promise<void> {
                     cache.images.push({ url: dl, post: p.id });
                 } else {
                     cache.attachments.push({ url: dl, post: p.id });
+                    hasNonImageAttachment = true;
                 }
             }
-            if (p.download_all)
+            // Only include download_all when there is at least one non-image attachment
+            if (hasNonImageAttachment && p.download_all)
                 cache.attachments.push({ url: p.download_all, post: p.id });
         }
 

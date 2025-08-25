@@ -15,6 +15,7 @@ interface Prefs {
     searchResultsAutoUpdate?: boolean;
     qcButtonEnabled?: boolean;
     qcTemplateOnly?: boolean;
+    hideMessenger?: boolean;
 }
 
 /* ─ constants & state ─ */
@@ -36,6 +37,7 @@ const refs = {
 
     /* settings controls */
     chkTraining: document.getElementById('kh-training-mode-checkbox') as HTMLInputElement,
+    chkHideMessenger: document.getElementById('kh-hide-messenger-checkbox') as HTMLInputElement,
     chkStyles  : document.getElementById('kh-toggle-styles-checkbox') as HTMLInputElement,
     inpWpm     : document.getElementById('kh-send-in-chunks-wpm-limit') as HTMLInputElement,
 
@@ -120,9 +122,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'searchResultsAutoUpdate',
         'qcButtonEnabled',
         'qcTemplateOnly',
+        'hideMessenger',
     ] as const, res => {
-        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate, qcButtonEnabled, qcTemplateOnly } = res as Prefs;
+        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate, qcButtonEnabled, qcTemplateOnly, hideMessenger } = res as Prefs;
         refs.chkTraining.checked = !!trainingMode;
+        if (refs.chkHideMessenger) refs.chkHideMessenger.checked = !!hideMessenger;
         refs.chkStyles.checked   = allStyles       ?? true;
         refs.inpWpm.value        = (sendChunksWPM ?? 200).toString();
 
@@ -155,6 +159,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const enabled = refs.chkTraining.checked;
         chrome.runtime.sendMessage<ToBackground>({ action: 'setTrainingMode', enabled });
         chrome.storage.sync.set({ trainingMode: enabled });
+    });
+    refs.chkHideMessenger?.addEventListener('change', () => {
+        const hide = !!refs.chkHideMessenger.checked;
+        try { console.debug('[KH] Setting hideMessenger ->', hide); } catch {}
+        chrome.storage.sync.set({ hideMessenger: hide });
     });
     refs.chkStyles.addEventListener('change', () => {
         const enabled = refs.chkStyles.checked;

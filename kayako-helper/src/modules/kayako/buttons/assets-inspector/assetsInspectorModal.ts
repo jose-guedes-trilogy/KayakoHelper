@@ -98,6 +98,19 @@ const createCopyIconSvg = () => {
     return svg;
 };
 
+// Sanitized link icon for "Copy URL" (from provided SVG)
+const createLinkIconSvg = () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 18 20');
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('fill', '#212121');
+    path.setAttribute('d', 'M9.8,0c1.2,0,2.1,0.9,2.2,2l1.8,0c1.2,0,2.2,0.9,2.2,2.1l0,0.2v6 c0,0.4-0.3,0.8-0.8,0.8c-0.4,0-0.7-0.3-0.7-0.6l0-0.1v-6c0-0.4-0.3-0.7-0.6-0.7l-0.1,0l-2.1,0c-0.4,0.6-1.1,1-1.9,1H6.2 c-0.8,0-1.5-0.4-1.9-1l-2.1,0c-0.4,0-0.7,0.3-0.7,0.6l0,0.1v13.5c0,0.4,0.3,0.7,0.6,0.7l0.2,0c0.4,0,0.6,0.4,0.6,0.7 C3,19.7,2.7,20,2.3,20c-1.2,0-2.2-0.9-2.2-2.1l0-0.2V4.3C0,3.1,0.9,2.1,2.1,2l0.2,0L4,2c0.1-1.1,1.1-2,2.2-2H9.8z M13.3,12.5h1 c2.1,0,3.7,1.7,3.7,3.8c0,2-1.6,3.6-3.5,3.7l-0.2,0l-1,0c-0.4,0-0.8-0.3-0.8-0.7c0-0.4,0.3-0.7,0.6-0.7l0.1,0l1,0 c1.2,0,2.2-1,2.2-2.3c0-1.2-0.9-2.2-2.1-2.2l-0.2,0h-1c-0.4,0-0.8-0.3-0.8-0.8c0-0.4,0.3-0.7,0.6-0.7L13.3,12.5h1H13.3z M8.3,12.5 h1c0.4,0,0.8,0.3,0.8,0.8c0,0.4-0.3,0.7-0.6,0.7l-0.1,0h-1C7,14,6,15,6,16.3c0,1.2,0.9,2.2,2.1,2.2l0.2,0h1c0.4,0,0.8,0.3,0.8,0.8 c0,0.4-0.3,0.7-0.6,0.7l-0.1,0h-1c-2.1,0-3.8-1.7-3.8-3.8c0-2,1.6-3.6,3.6-3.7L8.3,12.5h1H8.3z M8.3,15.5h6c0.4,0,0.8,0.3,0.8,0.8 c0,0.4-0.3,0.7-0.6,0.7l-0.1,0h-6c-0.4,0-0.8-0.3-0.8-0.8c0-0.4,0.3-0.7,0.6-0.7L8.3,15.5h6H8.3z M9.8,1.5H6.2 c-0.4,0-0.7,0.3-0.7,0.7S5.8,3,6.2,3h3.5c0.4,0,0.7-0.3,0.7-0.7S10.2,1.5,9.8,1.5z');
+    svg.appendChild(path);
+    return svg;
+};
+
 const copyToClipboard = async (text: string) => {
     try {
         if (navigator.clipboard?.writeText) {
@@ -141,7 +154,7 @@ const injectStyles = (modal: HTMLElement) => {
     style.className = 'kh-assets-style';
     /* 14px base, Ephor-like container, cards, refined lists, buttons */
     style.textContent = `
-      ${MODAL_SEL} { font-size: 14px; background:#fff; border:1px solid hsl(213deg 15% 88.07%); border-radius: 8px; padding: 10px 12px; box-shadow:0 6px 24px rgba(17,24,39,.12); display:flex; flex-direction:column; max-width: 900px; max-height: min(80vh, 720px); overflow: hidden; }
+      ${MODAL_SEL} { font-size: 14px; background:#fff; border:1px solid hsl(213deg 15% 88.07%); border-radius: 8px; padding: 10px 12px; box-shadow:0 6px 24px rgba(17,24,39,.12); display:none; flex-direction:column; max-width: 900px; max-height: min(80vh, 720px); overflow: hidden; }
       ${MODAL_SEL}.open { display:flex; }
       ${MODAL_SEL} .kh-assets-headerbar { position: relative; display:flex; align-items:center; gap:12px; margin-bottom:8px; }
       ${MODAL_SEL} .kh-assets-headerbar h2 { flex:1 1 auto; text-align:center; margin:0; font-size:16px; color:#1f2937; }
@@ -276,7 +289,7 @@ const buildGrid = (items: { url:string; post:number }[]) => {
             const link = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', textContent: url });
             const tools = document.createElement('span'); tools.style.display = 'inline-flex'; tools.style.gap = '6px'; tools.style.marginLeft = '8px';
             const copyBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
-            copyBtn.appendChild(createCopyIconSvg());
+            copyBtn.appendChild(createLinkIconSvg());
             copyBtn.addEventListener('click', async () => { log('Copy link URL', { post, url }); await copyToClipboard(url); });
             tools.appendChild(copyBtn);
             contentCell.append(link, tools);
@@ -348,7 +361,7 @@ const buildAttachmentGroups = (items: { url:string; post:number }[]) => {
 
             const right = document.createElement('div');
             const copyBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
-            copyBtn.appendChild(createCopyIconSvg());
+            copyBtn.appendChild(createLinkIconSvg());
             copyBtn.addEventListener('click', async () => { log('Copy attachment URL', { post, url }); await copyToClipboard(url); });
 
             right.appendChild(copyBtn);
@@ -446,15 +459,12 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
             actions.style.display = 'inline-flex';
             actions.style.gap = '4px';
             const copyUrlBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
-            copyUrlBtn.appendChild(createCopyIconSvg());
+            copyUrlBtn.appendChild(createLinkIconSvg());
             copyUrlBtn.addEventListener('click', async () => { log('Copy image URL', { post, url }); await copyToClipboard(url); });
 
             const copyImgBtn = Object.assign(document.createElement('button'), { className: 'kh-assets-copy-img', title: 'Copy image to clipboard' });
-            // Different icon for image copy (camera)
-            const cam = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            cam.setAttribute('viewBox', '0 0 24 24'); cam.setAttribute('width', '16'); cam.setAttribute('height', '16');
-            cam.innerHTML = '<path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z" fill="#5b6570"></path>';
-            copyImgBtn.appendChild(cam);
+            // Use the old copy icon for image copy
+            copyImgBtn.appendChild(createCopyIconSvg());
             copyImgBtn.addEventListener('click', async () => {
                 try {
                     log('Copy image BLOB', { post, url });
