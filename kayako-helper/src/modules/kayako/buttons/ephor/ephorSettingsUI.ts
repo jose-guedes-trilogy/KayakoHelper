@@ -41,6 +41,17 @@ export interface ModalRefs {
     modelSearchInp: HTMLInputElement;
     aiListDiv: HTMLDivElement;
 
+    /* NEW ▸ AI selections toolbar */
+    aiSelRow: HTMLDivElement;
+    aiSelGearBtn: HTMLButtonElement;
+
+    /* NEW ▸ workflows row */
+    wfSelect: HTMLSelectElement;
+    wfNameInp: HTMLInputElement;
+    wfSaveBtn: HTMLButtonElement;
+    wfLoadBtn: HTMLButtonElement;
+    wfDeleteBtn: HTMLButtonElement;
+
     promptInput: HTMLTextAreaElement;
     customInstrTa: HTMLTextAreaElement; /* NEW */
     instrScopeCbx: HTMLInputElement; /* NEW */
@@ -67,7 +78,7 @@ export function createSettingsModal() {
     const modal = Object.assign(document.createElement("div"), { id: "kh-ephor-settings-modal" });
     modal.style.cssText = `
       position:fixed;top:90px;left:50%;transform:translateX(-50%);
-      min-width:980px;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;
+      min-width:980px;background:#fff;border:1px solid #ccc;border-radius:6px;padding:16px 20px;
       z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.2);
       max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;
       font-family:system-ui;font-size:13px;display:flex;flex-direction:column;gap:12px;`;
@@ -180,6 +191,17 @@ export function createSettingsModal() {
         modelSearchInp: $("#kh-ephor-model-search"),
         aiListDiv: $("#kh-ephor-ai-list"),
 
+        /* NEW ▸ AI selections toolbar */
+        aiSelRow: $("#kh-ai-sel-row"),
+        aiSelGearBtn: $("#kh-ai-sel-gear") as HTMLButtonElement,
+
+        /* NEW ▸ workflows row */
+        wfSelect: document.querySelector("#kh-workflow-select") as HTMLSelectElement,
+        wfNameInp: document.querySelector("#kh-workflow-name") as HTMLInputElement,
+        wfSaveBtn: document.querySelector("#kh-workflow-save") as HTMLButtonElement,
+        wfLoadBtn: document.querySelector("#kh-workflow-load") as HTMLButtonElement,
+        wfDeleteBtn: document.querySelector("#kh-workflow-delete") as HTMLButtonElement,
+
         promptInput: $("#kh-ephor-prompt-input") as HTMLTextAreaElement,
         customInstrTa: $("#kh-ephor-custom-instr") as HTMLTextAreaElement,
         instrScopeCbx: $("#kh-ephor-instr-scope") as HTMLInputElement,
@@ -196,7 +218,20 @@ export function createSettingsModal() {
         cannedBtn: $("#kh-ephor-canned-btn") as HTMLButtonElement,
     };
 
-    refs.stageBarDiv.appendChild(refs.addStageBtn);
+    // Move the Add Stage button outside the grey container: render it after the stage bar row.
+    try {
+        const stageRow = modal.querySelector<HTMLDivElement>("#kh-ephor-stage-bar")?.parentElement;
+        if (stageRow && stageRow.parentElement) {
+            const holder = document.createElement("div");
+            holder.style.cssText = "display:flex;gap:6px;align-items:center;justify-content:flex-start;padding:4px 0;";
+            holder.appendChild(refs.addStageBtn);
+            stageRow.parentElement.insertBefore(holder, stageRow.nextSibling);
+        } else {
+            refs.stageBarDiv.appendChild(refs.addStageBtn);
+        }
+    } catch {
+        refs.stageBarDiv.appendChild(refs.addStageBtn);
+    }
 
     return { modal, refs };
 }

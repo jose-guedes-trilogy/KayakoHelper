@@ -36,7 +36,11 @@ export function rebuildProjectList(state: ModalState, refs: ModalRefs, filter = 
         el.dataset.projectId = p.project_id;
         el.style.cssText = "padding:6px 8px;cursor:pointer;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
         if (p.project_id === store.selectedProjectId) {
-            el.style.background = "hsl(203 100% 95%)";
+            el.style.position = "relative";
+            el.style.border = "1px solid #a7bee7";
+            el.style.background = "white";
+            el.style.boxShadow = "0 1px 3px 0 #00000017";
+            el.style.color = "hsl(0 0% 26% / 1)";
             el.style.fontWeight = "600";
         }
         refs.projectListDiv.appendChild(el);
@@ -90,7 +94,14 @@ export function rebuildChannelList(state: ModalState, refs: ModalRefs, filter = 
         el.textContent = c.name || `(created ${new Date(c.created_at).toLocaleDateString()})`;
         el.dataset.channelId = c.id;
         el.style.cssText = "padding:6px 8px;cursor:pointer;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-        if (c.id === store.selectedChannelId) { el.style.background="hsl(203 100% 95%)"; el.style.fontWeight="600"; }
+        if (c.id === store.selectedChannelId) {
+            el.style.position = "relative";
+            el.style.border = "1px solid #a7bee7";
+            el.style.background = "white";
+            el.style.boxShadow = "0 1px 3px 0 #00000017";
+            el.style.color = "hsl(0 0% 26% / 1)";
+            el.style.fontWeight = "600";
+        }
         refs.channelListDiv.appendChild(el);
     }
 }

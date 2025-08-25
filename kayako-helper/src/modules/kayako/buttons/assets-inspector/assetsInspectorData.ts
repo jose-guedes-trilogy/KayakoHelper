@@ -21,19 +21,24 @@ export interface PostWithAssets extends Post {
 const IMG_EXT_RE      = /\.(png|jpe?g|gif|webp|svg)$/i;
 const KAYAKO_MEDIA_RE = /\/media\/url\//i;
 
-const extractUrls = (html = ''): string[] => {
+const extractUrls = (html?: string): string[] => {
+    const src = html ?? '';
     const out = new Set<string>();
     const re  = /https?:\/\/[^\s"'\\\]]+/gi;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(html))) out.add(m[0]);
+    while ((m = re.exec(src))) out.add(m[0]);
     return [...out];
 };
 
-const grabInlineImageSrc = (html = ''): string[] => {
+const grabInlineImageSrc = (html?: string): string[] => {
+    const src = html ?? '';
     const urls: string[] = [];
     const re = /\[img[^][]*?\s+src\s*=\s*"([^"]+)"[^]]*]/gi;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(html))) urls.push(m[1]);
+    while ((m = re.exec(src))) {
+        const captured = m[1] ?? '';
+        if (captured) urls.push(captured);
+    }
     return urls;
 };
 
@@ -110,9 +115,12 @@ export async function loadAssets(limit: number): Promise<void> {
             for (const att of p.attachments ?? []) {
                 const dl = att.url_download ?? att.url;
                 if (!dl) continue;
-                cache.attachments.push({ url: dl, post: p.id });
-                if (att.type?.startsWith('image/'))
+                if (att.type?.startsWith('image/')) {
+                    // Image attachments should appear only in Images, not in Attachments
                     cache.images.push({ url: dl, post: p.id });
+                } else {
+                    cache.attachments.push({ url: dl, post: p.id });
+                }
             }
             if (p.download_all)
                 cache.attachments.push({ url: p.download_all, post: p.id });

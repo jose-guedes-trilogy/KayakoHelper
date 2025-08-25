@@ -4,7 +4,8 @@ import {
     EXTENSION_SELECTORS,
 } from '@/generated/selectors.ts';
 
-import { getState, CATEGORY_LABELS, classify, PAGE_LIMIT } from './assetsInspectorData.ts';
+import { getState, PAGE_LIMIT } from './assetsInspectorData.ts';
+import JSZip from 'jszip';
 
 const {
     assetsModal          : MODAL_SEL,
@@ -21,6 +22,19 @@ const {
     assetsFetchAllBtn    : FETCH_ALL_SEL,
 } = EXTENSION_SELECTORS;
 
+/* Local selectors for the new elaborate UI (also added to selectors.jsonc) */
+const POST_GROUP_SEL = '.kh-assets-post-group';
+const GROUP_HEADER_SEL = '.kh-assets-group-header';
+const FILENAME_SEL = '.kh-assets-filename';
+const FILE_ROW_SEL = '.kh-assets-file-row';
+const COPY_URL_BTN_SEL = '.kh-assets-copy-url';
+const DL_ALL_ATTACH_BTN_SEL = '.kh-assets-dl-all-attach';
+const DL_IMG_POST_ZIP_BTN_SEL = '.kh-assets-dl-post-zip';
+const DL_IMG_POST_INDIV_BTN_SEL = '.kh-assets-dl-post-indiv';
+const DL_IMG_ALL_ZIP_BTN_SEL = '.kh-assets-dl-all-zip';
+const DL_IMG_ALL_INDIV_BTN_SEL = '.kh-assets-dl-all-indiv';
+const DL_ATTACH_ALL_TICKET_ZIP_SEL = '.kh-assets-dl-attach-all-zip';
+
 /* Jump-to-post helper (unchanged logic) */
 import { KAYAKO_SELECTORS } from '@/generated/selectors.ts';
 const TIMELINE_SEL = KAYAKO_SELECTORS.timeline;
@@ -32,10 +46,137 @@ const jumpToPost = (id: number) => {
         const el = document.querySelector<HTMLElement>(`[data-id="${id}"]`);
         if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
         if (++tries >= max) return;
-        ('scrollTo' in container ? (container as any).scrollTo({ top: 0 }) : container.scrollTo?.({ top: 0 }));
+        (container as any).scrollTo?.({ top: 0 });
         setTimeout(seek, 400);
     };
     seek();
+};
+
+/* Utilities */
+const log = (...args: unknown[]) => console.log('[AssetsInspector]', ...args);
+
+const cssEscape = (s: string) => (window as any).CSS?.escape?.(s) ?? s.replace(/"/g, '\\"');
+
+const fileNameFromUrl = (url: string) => {
+    try {
+        const href = (typeof location !== 'undefined' && location && location.href) ? location.href : undefined as unknown as string;
+        const u = href ? new URL(url, href) : new URL(url);
+        const last = u.pathname.split('/').filter(Boolean).pop() || '';
+        const clean = last.replace(/\.download$/i, '');
+        return decodeURIComponent(clean || 'file');
+    } catch {
+        const raw = (url ?? '').toString();
+        const b = raw.split('?')[0] || '';
+        const last = b ? (b.includes('/') ? b.substring(b.lastIndexOf('/') + 1) : b) : '';
+        return decodeURIComponent(last || 'file');
+    }
+};
+
+const findAttachmentFilenameInDom = (url: string, postId: number): string | null => {
+    try {
+        const postEl = document.querySelector<HTMLElement>(`[data-id="${postId}"]`);
+        if (!postEl) return null;
+        const a = postEl.querySelector<HTMLAnchorElement>(`a[href="${cssEscape(url)}"]`);
+        if (!a) return null;
+        const container = a.closest<HTMLElement>('[class*="list_item_attachment__attachment_"]')
+            || a.closest<HTMLElement>('[class*="list_item_attachment__attachment-container_"]');
+        if (!container) return null;
+        const nameEl = container.querySelector<HTMLElement>('[class*="__name-element_"]');
+        const txt = nameEl?.textContent?.trim();
+        return txt || null;
+    } catch {
+        return null;
+    }
+};
+
+const createCopyIconSvg = () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    svg.innerHTML = '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="#5b6570" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1" stroke="#5b6570" fill="none" stroke-width="2"></rect>';
+    return svg;
+};
+
+const copyToClipboard = async (text: string) => {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        log('Copied to clipboard', text);
+    } catch (err) {
+        console.error('[AssetsInspector] Copy failed', err);
+    }
+};
+
+const fetchBlob = async (url: string): Promise<Blob> => {
+    const resp = await fetch(url, { credentials: 'include' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
+    return await resp.blob();
+};
+
+const downloadBlob = (blob: Blob, filename: string) => {
+    const a = document.createElement('a');
+    const href = URL.createObjectURL(blob);
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+};
+
+const injectStyles = (modal: HTMLElement) => {
+    if (modal.querySelector('style.kh-assets-style')) return;
+    const style = document.createElement('style');
+    style.className = 'kh-assets-style';
+    /* 14px base, Ephor-like container, cards, refined lists, buttons */
+    style.textContent = `
+      ${MODAL_SEL} { font-size: 14px; background:#fff; border:1px solid hsl(213deg 15% 88.07%); border-radius: 8px; padding: 10px 12px; box-shadow:0 6px 24px rgba(17,24,39,.12); display:flex; flex-direction:column; max-width: 900px; max-height: min(80vh, 720px); overflow: hidden; }
+      ${MODAL_SEL}.open { display:flex; }
+      ${MODAL_SEL} .kh-assets-headerbar { position: relative; display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+      ${MODAL_SEL} .kh-assets-headerbar h2 { flex:1 1 auto; text-align:center; margin:0; font-size:16px; color:#1f2937; }
+      ${MODAL_SEL} .kh-assets-close { position:absolute; right:8px; top:50%; transform:translateY(-50%); margin:0; }
+      ${MODAL_SEL} .kh-btn{ padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; }
+      ${MODAL_SEL} .kh-btn:hover{ background:#f5f7ff; border-color:#99a; }
+      ${MODAL_SEL} .kh-btn:active{ transform:translateY(1px); }
+      ${MODAL_SEL} ${NAV_SEL} { display:flex; gap: 8px; list-style:none; padding: 4px 0; margin: 0 0 6px 0; }
+      ${MODAL_SEL} ${PANE_SEL} { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+      ${MODAL_SEL} ${SUMMARY_SEL} { flex: 0 0 auto; }
+      ${MODAL_SEL} ${RESULTS_SEL} { padding: 8px 0; overflow: auto; flex:1 1 auto; min-height:0; }
+      ${MODAL_SEL} ${GRID_SEL} { display:block; }
+      ${MODAL_SEL} ${POST_GROUP_SEL} { background: #fff; border: 1px solid #e7eaee; border-radius: 10px; box-shadow: 0 2px 8px rgba(17,24,39,.06); margin: 12px 0; overflow: hidden; }
+      ${MODAL_SEL} ${GROUP_HEADER_SEL} { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: linear-gradient(180deg, #f8fafc, #f3f5f7); border-bottom: 1px solid #edf0f3; gap: 10px; }
+      ${MODAL_SEL} ${GROUP_HEADER_SEL} .title { display:flex; align-items:center; gap:8px; font-weight: 600; color: #374151; }
+      ${MODAL_SEL} ${GROUP_HEADER_SEL} .actions { display: flex; align-items: center; gap: 8px; }
+      ${MODAL_SEL} ${JUMP_BTN_SEL} { padding: 2px 8px; border: 1px solid #d3d9df; background: #ffffff; border-radius: 6px; cursor: pointer; color: #4b5563; }
+      ${MODAL_SEL} .kh-pill-btn { padding: 6px 10px; border: 1px solid #d3d9df; background: #f9fafb; color: #374151; border-radius: 999px; cursor: pointer; transition: background .2s, box-shadow .2s; display: inline-flex; align-items: center; gap: 6px; }
+      ${MODAL_SEL} .kh-pill-btn:hover { background: #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+      ${MODAL_SEL} ${LIST_SEL} { list-style: none; padding: 10px; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+      ${MODAL_SEL} ${FILE_ROW_SEL} { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f1f3f5; }
+      ${MODAL_SEL} ${FILENAME_SEL} { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; }
+      ${MODAL_SEL} ${COPY_URL_BTN_SEL} { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; }
+      ${MODAL_SEL} ${COPY_URL_BTN_SEL}:hover { background: #eef2f7; }
+      ${MODAL_SEL} .kh-image-grid { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+      ${MODAL_SEL} .kh-image-item { display: flex; flex-direction: column; gap: 6px; }
+      ${MODAL_SEL} .kh-thumb { width: 100%; height: 96px; border: 1px solid #e6ebf0; border-radius: 8px; object-fit: cover; background: #f8fafc; }
+      ${MODAL_SEL} .kh-toolbar { display: flex; gap: 8px; padding: 6px 12px; }
+      ${MODAL_SEL} .kh-links-intro { color:#374151; padding: 6px 12px; }
+      ${MODAL_SEL} .kh-links-table { display:grid; grid-template-columns: 96px 1fr; gap:0; }
+      ${MODAL_SEL} .kh-links-table .header-cell { font-weight:600; color:#4b5563; padding:8px 12px; border-bottom:1px solid #edf0f3; background:#f9fafb; }
+      ${MODAL_SEL} .kh-links-table .row { display:contents; }
+      ${MODAL_SEL} .kh-links-table .cell { padding:8px 12px; border-bottom:1px solid #f1f3f5; }
+    `;
+    modal.appendChild(style);
 };
 
 /* Modal shell */
@@ -43,6 +184,10 @@ export const buildModal = (): HTMLElement => {
     const wrap = document.createElement('div');
     wrap.className = MODAL_SEL.slice(1);
     wrap.innerHTML = `
+        <div class="kh-assets-headerbar">
+            <h2>Ticket assets</h2>
+            <button class="kh-btn kh-assets-close" title="Close">✕</button>
+        </div>
         <ul class="${NAV_SEL.slice(1)}">
             <li class="${NAV_ITEM_SEL.slice(1)} active" data-tab="links"      >Links</li>
             <li class="${NAV_ITEM_SEL.slice(1)}"        data-tab="images"     >Images</li>
@@ -52,19 +197,21 @@ export const buildModal = (): HTMLElement => {
             <div class="${SUMMARY_SEL.slice(1)}"></div>
             <div class="${RESULTS_SEL.slice(1)}"></div>
         </div>`;
+    injectStyles(wrap);
     return wrap;
 };
 
 /* UI helpers */
 const setActiveTab = (modal: HTMLElement, tab: keyof ReturnType<typeof getState>['cache']) => {
     modal.querySelectorAll<HTMLElement>(NAV_ITEM_SEL)
-        .forEach(li => li.classList.toggle('active', li.dataset.tab === tab));
+        .forEach(li => li.classList.toggle('active', (li.dataset as any)['tab'] === tab));
     renderPane(modal, tab);
 };
 
 const renderSummary = (modal: HTMLElement) => {
     const { fetched, totalPosts } = getState();
-    const s         = modal.querySelector<HTMLElement>(SUMMARY_SEL)!;
+    const s         = modal.querySelector<HTMLElement>(SUMMARY_SEL);
+    if (!s) return;
     const atEnd     = fetched >= totalPosts;
     const nextLabel = `Fetch next ${Math.min(PAGE_LIMIT, totalPosts - fetched)} posts`;
 
@@ -74,45 +221,293 @@ const renderSummary = (modal: HTMLElement) => {
          <button class="${FETCH_ALL_SEL.slice(1)}" ${atEnd ? 'disabled' : ''}>Fetch all</button>`;
 };
 
-/* Grid for links / attachments */
+/* Links tab – categorized table with descriptive header */
 const buildGrid = (items: { url:string; post:number }[]) => {
     const grid = document.createElement('div');
     grid.className = GRID_SEL.slice(1);
 
-    const addHeaders = () => {
-        const h1 = Object.assign(document.createElement('div'), { className: 'id-cell header-cell', textContent: 'Post' });
-        const h2 = Object.assign(document.createElement('div'), { className: 'link-cell header-cell', textContent: 'Content' });
-        grid.append(h1, h2);
-    };
+    const intro = Object.assign(document.createElement('div'), { className: 'kh-links-intro' });
+    intro.textContent = 'Links are grouped by category (Kayako, Jira, GitHub, etc). Click a post number to jump.';
+    grid.appendChild(intro);
 
-    for (const { url, post } of items) {
-        if (url.startsWith('--- ')) {
-            const head = Object.assign(document.createElement('div'), {
-                className: `${HEADER_SEL.slice(1)} header-row`,
-                textContent: url.replace(/^---\s|\s---$/g, ''),
-            });
-            grid.appendChild(head);
-            addHeaders();
+    // Build categories in encounter order from header tokens: --- Label ---
+    const categories: Array<{ label: string; rows: { url: string; post: number }[] }> = [];
+    let current: { label: string; rows: { url: string; post: number }[] } | null = null;
+    for (const it of items) {
+        if (it.url.startsWith('--- ')) {
+            const label = it.url.replace(/^---\s*|\s*---$/g, '');
+            current = { label, rows: [] };
+            categories.push(current);
             continue;
         }
+        if (!current) {
+            current = { label: 'Links', rows: [] };
+            categories.push(current);
+        }
+        current.rows.push(it);
+    }
 
-        const row     = Object.assign(document.createElement('div'), { className: 'asset-row' });
-        const idCell  = Object.assign(document.createElement('div'), { className: 'id-cell' });
-        const jumpBtn = Object.assign(document.createElement('button'), {
-            className  : JUMP_BTN_SEL.slice(1),
-            textContent: `#${post}`,
-        });
-        jumpBtn.addEventListener('click', () => jumpToPost(post));
-        idCell.appendChild(jumpBtn);
+    for (const cat of categories) {
+        if (!cat.rows.length) continue;
+        const card = Object.assign(document.createElement('section'), { className: POST_GROUP_SEL.slice(1) });
+        const header = Object.assign(document.createElement('div'), { className: GROUP_HEADER_SEL.slice(1) });
+        const title = Object.assign(document.createElement('div'), { className: 'title' });
+        const titleLabel = document.createElement('span');
+        titleLabel.textContent = cat.label;
+        title.append(titleLabel);
+        const actions = Object.assign(document.createElement('div'), { className: 'actions' });
+        header.append(title, actions);
 
-        const linkCell = Object.assign(document.createElement('div'), { className: 'link-cell' });
-        const a = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', textContent: url });
-        linkCell.appendChild(a);
+        const table = Object.assign(document.createElement('div'), { className: 'kh-links-table' });
+        // Header row
+        const thPost = Object.assign(document.createElement('div'), { className: 'header-cell' }); thPost.textContent = 'Post';
+        const thContent = Object.assign(document.createElement('div'), { className: 'header-cell' }); thContent.textContent = 'Content';
+        table.append(thPost, thContent);
 
-        row.append(idCell, linkCell);
-        grid.appendChild(row);
+        for (const { url, post } of cat.rows) {
+            const rowFrag = document.createDocumentFragment();
+            const postCell = Object.assign(document.createElement('div'), { className: 'cell' });
+            const postBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
+            postBtn.title = 'Jump to post';
+            postBtn.addEventListener('click', () => { log('Jump to post', post); jumpToPost(post); });
+            postCell.appendChild(postBtn);
+
+            const contentCell = Object.assign(document.createElement('div'), { className: 'cell' });
+            const link = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', textContent: url });
+            const tools = document.createElement('span'); tools.style.display = 'inline-flex'; tools.style.gap = '6px'; tools.style.marginLeft = '8px';
+            const copyBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
+            copyBtn.appendChild(createCopyIconSvg());
+            copyBtn.addEventListener('click', async () => { log('Copy link URL', { post, url }); await copyToClipboard(url); });
+            tools.appendChild(copyBtn);
+            contentCell.append(link, tools);
+
+            rowFrag.append(postCell, contentCell);
+            table.appendChild(rowFrag);
+        }
+
+        card.append(header, table);
+        grid.appendChild(card);
     }
     return grid;
+};
+
+/* Group helpers */
+const groupByPost = (items: { url:string; post:number }[]) => {
+    const map = new Map<number, { files: string[]; dlAll?: string }>();
+    const DL_ALL_RE = /\/attachments\/download\/all(?![^#?])/i;
+    for (const { url, post } of items) {
+        let entry = map.get(post);
+        if (!entry) { entry = { files: [] }; map.set(post, entry); }
+        if (DL_ALL_RE.test(url)) entry.dlAll = url;
+        else entry.files.push(url);
+    }
+    return map;
+};
+
+const buildAttachmentGroups = (items: { url:string; post:number }[]) => {
+    const container = document.createElement('div');
+    // Global toolbar for Attachments: Download all ticket attachments (ZIP)
+    const toolbar = Object.assign(document.createElement('div'), { className: 'kh-toolbar' });
+    const allAttachZip = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_ATTACH_ALL_TICKET_ZIP_SEL.slice(1)}`, textContent: 'Download all ticket attachments (ZIP)' });
+    allAttachZip.title = 'Download every attachment in this ticket as a single ZIP file';
+    toolbar.append(allAttachZip);
+    container.appendChild(toolbar);
+    const groups = groupByPost(items);
+    for (const [post, { files, dlAll }] of groups) {
+        const group = Object.assign(document.createElement('section'), { className: POST_GROUP_SEL.slice(1) });
+        const header = Object.assign(document.createElement('div'), { className: GROUP_HEADER_SEL.slice(1) });
+        const title = Object.assign(document.createElement('div'), { className: 'title' });
+        const titleLabel = document.createElement('span');
+        titleLabel.textContent = 'Attachments • Post';
+        const jumpBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
+        jumpBtn.title = 'Jump to post';
+        jumpBtn.addEventListener('click', () => { log('Jump to post', post); jumpToPost(post); });
+        title.append(titleLabel, jumpBtn);
+        const actions = Object.assign(document.createElement('div'), { className: 'actions' });
+
+        if (files.length > 1 && dlAll) {
+            const dlBtn = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_ALL_ATTACH_BTN_SEL.slice(1)}` });
+            dlBtn.textContent = 'Download all';
+            dlBtn.title = 'Download all attachments in this post';
+            dlBtn.addEventListener('click', () => {
+                log('Download all attachments link', { post, url: dlAll });
+                const a = document.createElement('a'); a.href = dlAll; a.target = '_blank'; a.rel = 'noopener'; a.click();
+            });
+            actions.appendChild(dlBtn);
+        }
+        header.append(title, actions);
+
+        const list = document.createElement('div');
+        for (const url of files) {
+            const row = Object.assign(document.createElement('div'), { className: FILE_ROW_SEL.slice(1) });
+            const left = document.createElement('div');
+            const domName = findAttachmentFilenameInDom(url, post);
+            const pretty = domName || fileNameFromUrl(url);
+            const nameEl = Object.assign(document.createElement('span'), { className: FILENAME_SEL.slice(1), textContent: pretty });
+            left.appendChild(nameEl);
+
+            const right = document.createElement('div');
+            const copyBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
+            copyBtn.appendChild(createCopyIconSvg());
+            copyBtn.addEventListener('click', async () => { log('Copy attachment URL', { post, url }); await copyToClipboard(url); });
+
+            right.appendChild(copyBtn);
+            row.append(left, right);
+            list.appendChild(row);
+        }
+
+        group.append(header, list);
+        container.appendChild(group);
+    }
+    // Wire global download-all ZIP for attachments (fetch and zip)
+    allAttachZip.addEventListener('click', async () => {
+        try {
+            // Flatten only file URLs (exclude any per-post download-all URLs)
+            const flat = Array.from(groups.values()).flatMap(g => g.files);
+            log('Download ALL attachments ZIP', { count: flat.length });
+            const zip = new JSZip();
+            let idx = 1;
+            for (const url of flat) {
+                const blob = await fetchBlob(url);
+                const name = fileNameFromUrl(url) || `file_${idx++}`;
+                zip.file(name, blob);
+            }
+            const out = await zip.generateAsync({ type: 'blob' });
+            downloadBlob(out, 'all_attachments.zip');
+        } catch (err) { console.error('[AssetsInspector] Attachments ZIP (all) failed', err); }
+    });
+    return container;
+};
+
+const buildImagesGroups = (items: { url:string; post:number }[]) => {
+    const container = document.createElement('div');
+
+    // Global toolbar
+    const toolbar = Object.assign(document.createElement('div'), { className: 'kh-toolbar' });
+    const allZip = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_ALL_ZIP_BTN_SEL.slice(1)}`, textContent: 'Download all screenshots (ZIP)' });
+    const allInd = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_ALL_INDIV_BTN_SEL.slice(1)}`, textContent: 'Download all screenshots (individual)' });
+    allZip.title = 'Download every screenshot in this ticket as a single ZIP file';
+    allInd.title = 'Download every screenshot as individual files';
+    toolbar.append(allZip, allInd);
+    container.appendChild(toolbar);
+
+    const groups = groupByPost(items);
+    for (const [post, { files }] of groups) {
+        const group = Object.assign(document.createElement('section'), { className: POST_GROUP_SEL.slice(1) });
+        const header = Object.assign(document.createElement('div'), { className: GROUP_HEADER_SEL.slice(1) });
+        const title = Object.assign(document.createElement('div'), { className: 'title' });
+        const titleLabel = document.createElement('span');
+        titleLabel.textContent = 'Images • Post';
+        const jumpBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
+        jumpBtn.title = 'Jump to post';
+        jumpBtn.addEventListener('click', () => { log('Jump to post', post); jumpToPost(post); });
+        title.append(titleLabel, jumpBtn);
+        const actions = Object.assign(document.createElement('div'), { className: 'actions' });
+
+        const dlZip = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_POST_ZIP_BTN_SEL.slice(1)}`, textContent: 'Download all (ZIP)' });
+        dlZip.title = 'Download all screenshots from this post as a ZIP file';
+        dlZip.addEventListener('click', async () => {
+            try {
+                log('Download images ZIP (post)', { post, count: files.length });
+                const zip = new JSZip();
+                let idx = 1;
+                for (const url of files) {
+                    const blob = await fetchBlob(url);
+                    const name = fileNameFromUrl(url) || `image_${idx++}.png`;
+                    zip.file(name, blob);
+                }
+                const out = await zip.generateAsync({ type: 'blob' });
+                downloadBlob(out, `post_${post}_screenshots.zip`);
+            } catch (err) { console.error('[AssetsInspector] ZIP (post) failed', err); }
+        });
+
+        const dlInd = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_POST_INDIV_BTN_SEL.slice(1)}`, textContent: 'Download all post individually' });
+        dlInd.title = 'Download all screenshots from this post as individual files';
+        dlInd.addEventListener('click', async () => {
+            log('Download images individually (post)', { post, count: files.length });
+            for (const url of files) {
+                const a = document.createElement('a'); a.href = url; a.download = fileNameFromUrl(url); a.target = '_blank'; a.rel = 'noopener'; a.click();
+            }
+        });
+
+        actions.append(dlZip, dlInd);
+        header.append(title, actions);
+
+        const grid = Object.assign(document.createElement('div'), { className: 'kh-image-grid' });
+        for (const url of files) {
+            const item = Object.assign(document.createElement('div'), { className: 'kh-image-item' });
+            const a = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', title: 'Open full-size image' });
+            const img = Object.assign(document.createElement('img'), { src: url, className: 'kh-thumb', loading: 'lazy' });
+            a.appendChild(img);
+            const meta = document.createElement('div');
+            const name = Object.assign(document.createElement('div'), { className: FILENAME_SEL.slice(1), textContent: fileNameFromUrl(url) });
+            // Buttons row: [Copy URL] [Copy Image]
+            const actions = document.createElement('div');
+            actions.style.display = 'inline-flex';
+            actions.style.gap = '4px';
+            const copyUrlBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
+            copyUrlBtn.appendChild(createCopyIconSvg());
+            copyUrlBtn.addEventListener('click', async () => { log('Copy image URL', { post, url }); await copyToClipboard(url); });
+
+            const copyImgBtn = Object.assign(document.createElement('button'), { className: 'kh-assets-copy-img', title: 'Copy image to clipboard' });
+            // Different icon for image copy (camera)
+            const cam = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            cam.setAttribute('viewBox', '0 0 24 24'); cam.setAttribute('width', '16'); cam.setAttribute('height', '16');
+            cam.innerHTML = '<path d="M4 7h3l2-2h6l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z" fill="#5b6570"></path>';
+            copyImgBtn.appendChild(cam);
+            copyImgBtn.addEventListener('click', async () => {
+                try {
+                    log('Copy image BLOB', { post, url });
+                    const blob = await fetchBlob(url);
+                    if ((navigator as any).clipboard?.write) {
+                        const type = blob.type || 'image/png';
+                        const item = new (window as any).ClipboardItem({ [type]: blob });
+                        await (navigator as any).clipboard.write([item]);
+                    } else {
+                        // Fallback: open and instruct user to copy (clipboard API not available)
+                        window.open(url, '_blank', 'noopener');
+                    }
+                } catch (err) {
+                    console.error('[AssetsInspector] Copy image failed', err);
+                }
+            });
+
+            actions.append(copyUrlBtn, copyImgBtn);
+            meta.style.display = 'flex'; meta.style.alignItems = 'center'; meta.style.justifyContent = 'space-between'; meta.style.gap = '6px';
+            meta.append(name, actions);
+            item.append(a, meta);
+            grid.appendChild(item);
+        }
+
+        group.append(header, grid);
+        container.appendChild(group);
+    }
+
+    // Wire global toolbar now that groups exist
+    allZip.addEventListener('click', async () => {
+        try {
+            const all = items.map(i => i.url);
+            log('Download ALL images ZIP', { count: all.length });
+            const zip = new JSZip();
+            let idx = 1;
+            for (const url of all) {
+                const blob = await fetchBlob(url);
+                const name = fileNameFromUrl(url) || `image_${idx++}.png`;
+                zip.file(name, blob);
+            }
+            const out = await zip.generateAsync({ type: 'blob' });
+            downloadBlob(out, 'all_screenshots.zip');
+        } catch (err) { console.error('[AssetsInspector] ZIP (all) failed', err); }
+    });
+    allInd.addEventListener('click', () => {
+        const all = items.map(i => i.url);
+        log('Download ALL images individually', { count: all.length });
+        for (const url of all) {
+            const a = document.createElement('a'); a.href = url; a.download = fileNameFromUrl(url); a.target = '_blank'; a.rel = 'noopener'; a.click();
+        }
+    });
+
+    return container;
 };
 
 /* Full pane renderer */
@@ -125,29 +520,8 @@ export const renderPane = (modal: HTMLElement, tab: keyof ReturnType<typeof getS
     const items = state.cache[tab];
     if (!items.length) { box.textContent = '— None found —'; return; }
 
-    if (tab === 'images') {
-        const ul = Object.assign(document.createElement('ul'), { className: LIST_SEL.slice(1) });
-        for (const { url, post } of items) {
-            const li  = document.createElement('li');
-            const jmp = Object.assign(document.createElement('button'), {
-                className: JUMP_BTN_SEL.slice(1), textContent: `#${post}`,
-            });
-            jmp.addEventListener('click', () => jumpToPost(post));
-
-            const a = Object.assign(document.createElement('a'), { href: url, tabIndex: 0, title: 'Open preview' });
-            a.addEventListener('click', ev => { ev.preventDefault(); window.open(url, '_blank', 'noopener'); });
-
-            const img = Object.assign(document.createElement('img'), {
-                src: url, loading: 'lazy', width: 64, height: 64,
-                style: 'object-fit:cover;',
-            });
-            a.appendChild(img);
-            li.append(a, jmp);
-            ul.appendChild(li);
-        }
-        box.appendChild(ul);
-        return;
-    }
+    if (tab === 'images') { box.appendChild(buildImagesGroups(items)); return; }
+    if (tab === 'attachments') { box.appendChild(buildAttachmentGroups(items)); return; }
     box.appendChild(buildGrid(items));
 };
 
@@ -155,12 +529,15 @@ export const renderPane = (modal: HTMLElement, tab: keyof ReturnType<typeof getS
 export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: () => void) => {
     modal.addEventListener('mouseover', ev => {
         const li = (ev.target as HTMLElement).closest<HTMLElement>(NAV_ITEM_SEL);
-        if (li) setActiveTab(modal, li.dataset.tab as any);
+        if (li) setActiveTab(modal, (li.dataset as any)['tab'] as any);
     });
     modal.addEventListener('click', ev => {
         const t = ev.target as HTMLElement;
         if (t.matches(FETCH_NEXT_SEL)) fetchNext();
         if (t.matches(FETCH_ALL_SEL))  fetchAll();
+        if (t.closest('.kh-assets-close')) {
+            (modal as any).classList.remove('open');
+        }
     });
     setActiveTab(modal, 'links');   // default
 };

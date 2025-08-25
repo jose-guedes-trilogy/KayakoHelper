@@ -22,7 +22,7 @@ export function openCannedPromptModal(store: EphorStore): void {
     modal.innerHTML = /* HTML */`
       <div style="display:flex;align-items:center;gap:8px;">
         <h3 style="margin:0;font-size:15px;">Canned Prompts</h3>
-        <button id="kh-canned-close" class="kh-btn" style="margin-left:auto;">✕</button>
+        <button id="kh-canned-close" class="kh-btn kh-close-button" style="margin-left:auto;">✕</button>
       </div>
 
       <div style="display:grid;grid-template-columns:180px 1fr;gap:14px;min-height:280px;">
@@ -57,10 +57,48 @@ export function openCannedPromptModal(store: EphorStore): void {
     const bodyTa         = $("#kh-canned-body")        as HTMLTextAreaElement;
 
     let currentId: string | null = null;
+    const SYSTEM_TRANSCRIPT_ID = "__system_transcript__";
+    const SYSTEM_FILE_ID       = "__system_file__";
+    const SYSTEM_PAST_ID       = "__system_past__";
+    const SYSTEM_STYLE_ID      = "__system_style__";
+
+    const isSystem = (id: string | null) => id === SYSTEM_TRANSCRIPT_ID || id === SYSTEM_FILE_ID || id === SYSTEM_PAST_ID || id === SYSTEM_STYLE_ID;
+
+    const normalizePlaceholder = (raw: string): string => {
+        const s = (raw || "").trim();
+        // Extract core if already wrapped
+        let core = s;
+        const m = s.match(/^@#\s*(.*?)\s*#@$/);
+        if (m) core = m[1];
+        // Sanitize core: uppercase, replace invalid with underscore
+        core = core
+            .toUpperCase()
+            .replace(/[^A-Z0-9_.-]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+        if (!core) core = "PLACEHOLDER";
+        return `@#${core}#@`;
+    };
+
+    const isValidPlaceholder = (s: string) => /^@#\s*[A-Z0-9_.-]+\s*#@$/.test((s || "").trim());
 
     /* ---------- UI helpers ---------- */
     const rebuildList = () => {
         listDiv.textContent = "";
+        const addSys = (id: string, label: string) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:pointer;border-radius:3px;";
+            if (currentId === id) row.style.background = "hsl(203 100% 95%)";
+            const lab = document.createElement("span"); lab.textContent = label; lab.style.flex = "1";
+            const tag = document.createElement("span"); tag.textContent = "system"; tag.style.cssText = "font-size:11px;color:#334;opacity:.7;border:1px solid #adc1e3;padding:1px 6px;border-radius:999px;";
+            row.appendChild(lab); row.appendChild(tag);
+            row.addEventListener("click", () => loadPrompt(id));
+            listDiv.appendChild(row);
+        };
+        addSys(SYSTEM_TRANSCRIPT_ID, "Transcript");
+        addSys(SYSTEM_FILE_ID, "File Analysis");
+        addSys(SYSTEM_PAST_ID, "Past tickets");
+        addSys(SYSTEM_STYLE_ID, "Style Guide");
+
         for (const cp of store.cannedPrompts) {
             const row = document.createElement("div");
             row.style.cssText = "display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:pointer;border-radius:3px;";
@@ -77,12 +115,29 @@ export function openCannedPromptModal(store: EphorStore): void {
             Object.assign(del.style, { border:"none", background:"none", cursor:"pointer", padding:"0 4px" });
             del.addEventListener("click", ev => {
                 ev.stopPropagation();
-                if (!confirm(`Delete custom placeholder “${cp.title || cp.placeholder}”?`)) return;
-                store.cannedPrompts = store.cannedPrompts.filter(p => p.id !== cp.id);
-                void saveEphorStore(store).then(() => {
-                    rebuildList(); document.dispatchEvent(new CustomEvent("cannedPromptsChanged"));
-                    if (currentId === cp.id) loadPrompt(null);
+                const overlay = document.createElement("div");
+                overlay.className = "kh-dialog-overlay";
+                const dlg = document.createElement("div");
+                dlg.className = "kh-dialog";
+                dlg.innerHTML = `
+                  <header>Delete Placeholder</header>
+                  <main><p style="margin:0;line-height:1.4">Delete “${(cp.title || cp.placeholder).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}”?</p></main>
+                  <footer>
+                    <button class="kh-btn" data-act="cancel">Cancel</button>
+                    <button class="kh-btn kh-btn-primary" data-act="ok">Delete</button>
+                  </footer>`;
+                const close = () => overlay.remove();
+                dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", close);
+                dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => {
+                    store.cannedPrompts = store.cannedPrompts.filter(p => p.id !== cp.id);
+                    void saveEphorStore(store).then(() => {
+                        rebuildList(); document.dispatchEvent(new CustomEvent("cannedPromptsChanged"));
+                        if (currentId === cp.id) loadPrompt(null);
+                        close();
+                    });
                 });
+                overlay.appendChild(dlg);
+                document.body.appendChild(overlay);
             });
             row.appendChild(del);
 
@@ -94,21 +149,65 @@ export function openCannedPromptModal(store: EphorStore): void {
     const loadPrompt = (id: string | null) => {
         currentId = id;
         rebuildList();
-        const cp = store.cannedPrompts.find(p => p.id === id);
-        titleInp.value = cp?.title ?? "";
-        phInp.value    = cp?.placeholder ?? "";
-        bodyTa.value   = cp?.body ?? "";
+        const sys = isSystem(id);
+        if (sys) {
+            if (id === SYSTEM_TRANSCRIPT_ID) {
+                titleInp.value = "Transcript";
+                phInp.value    = "@#TRANSCRIPT#@";
+                bodyTa.value   = "";
+            } else if (id === SYSTEM_FILE_ID) {
+                titleInp.value = "File Analysis";
+                phInp.value    = "@#FILE_ANALYSIS#@";
+                bodyTa.value   = (store.systemPromptBodies?.fileAnalysis ?? "");
+            } else if (id === SYSTEM_PAST_ID) {
+                titleInp.value = "Past tickets";
+                phInp.value    = "@#PAST_TICKETS#@";
+                bodyTa.value   = (store.systemPromptBodies?.pastTickets ?? "");
+            } else if (id === SYSTEM_STYLE_ID) {
+                titleInp.value = "Style Guide";
+                phInp.value    = "@#STYLE_GUIDE#@";
+                bodyTa.value   = (store.systemPromptBodies?.styleGuide ?? "");
+            }
+        } else {
+            const cp = store.cannedPrompts.find(p => p.id === id);
+            titleInp.value = cp?.title ?? "";
+            phInp.value    = cp?.placeholder ?? "";
+            bodyTa.value   = cp?.body ?? "";
+        }
+        // Disable editing for Transcript only (cannot edit/delete). Others editable but non-deletable.
+        titleInp.disabled = id === SYSTEM_TRANSCRIPT_ID;
+        phInp.disabled    = id === SYSTEM_TRANSCRIPT_ID;
+        bodyTa.disabled   = false;
     };
 
     const writeBack = () => {
         if (!currentId) return;
+        if (currentId === SYSTEM_TRANSCRIPT_ID) return;
+        if (currentId === SYSTEM_FILE_ID) {
+            store.systemPromptBodies = store.systemPromptBodies || { fileAnalysis:"", pastTickets:"", styleGuide:"" };
+            store.systemPromptBodies.fileAnalysis = bodyTa.value;
+            void saveEphorStore(store).then(() => { rebuildList(); document.dispatchEvent(new CustomEvent("cannedPromptsChanged")); });
+            return;
+        }
+        if (currentId === SYSTEM_PAST_ID) {
+            store.systemPromptBodies = store.systemPromptBodies || { fileAnalysis:"", pastTickets:"", styleGuide:"" };
+            store.systemPromptBodies.pastTickets = bodyTa.value;
+            void saveEphorStore(store).then(() => { rebuildList(); document.dispatchEvent(new CustomEvent("cannedPromptsChanged")); });
+            return;
+        }
+        if (currentId === SYSTEM_STYLE_ID) {
+            store.systemPromptBodies = store.systemPromptBodies || { fileAnalysis:"", pastTickets:"", styleGuide:"" };
+            store.systemPromptBodies.styleGuide = bodyTa.value;
+            void saveEphorStore(store).then(() => { rebuildList(); document.dispatchEvent(new CustomEvent("cannedPromptsChanged")); });
+            return;
+        }
         const idx = store.cannedPrompts.findIndex(p => p.id === currentId);
         if (idx === -1) return;
 
         store.cannedPrompts[idx] = {
             ...store.cannedPrompts[idx],
             title      : titleInp.value.trim(),
-            placeholder: phInp.value.trim(),
+            placeholder: normalizePlaceholder(phInp.value),
             body       : bodyTa.value,
         };
         void saveEphorStore(store).then(() => {
@@ -131,8 +230,20 @@ export function openCannedPromptModal(store: EphorStore): void {
     });
 
     titleInp.addEventListener("input", writeBack);
-    phInp   .addEventListener("input", writeBack);
-    bodyTa  .addEventListener("input", writeBack);
+    phInp.addEventListener("input", () => {
+        // live validation styling; defer save until blur or valid
+        const valid = isValidPlaceholder(phInp.value);
+        phInp.style.borderColor = valid ? "#ccc" : "#c33";
+        if (valid) writeBack();
+    });
+    phInp.addEventListener("blur", () => {
+        if (isSystem(currentId)) return;
+        const normalized = normalizePlaceholder(phInp.value);
+        phInp.value = normalized;
+        phInp.style.borderColor = "#ccc";
+        writeBack();
+    });
+    bodyTa.addEventListener("input", writeBack);
 
     closeBtn.addEventListener("click", () => modal.remove());
 

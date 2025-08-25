@@ -20,6 +20,18 @@ export interface CannedPrompt {
 }
 
 /* ------------------------------------------------------------------ */
+/* NEW ▸ AI model selection presets                                    */
+/* ------------------------------------------------------------------ */
+export interface AISelection {
+    /** Stable UUID */
+    id    : string;
+    /** Human-readable name */
+    name  : string;
+    /** List of model ids in this preset */
+    models: string[];
+}
+
+/* ------------------------------------------------------------------ */
 /* Workflow types                                                     */
 /* ------------------------------------------------------------------ */
 export interface WorkflowStage {
@@ -110,6 +122,33 @@ export interface EphorStore {
 
     /* chat list sort order */
     channelSortOrder?: "alpha" | "created";
+
+    /* UI preferences */
+    showApiLog?: boolean;
+
+    /* System prompt bodies (editable, non-deletable) */
+    systemPromptBodies?: {
+        fileAnalysis: string;
+        pastTickets : string;
+        styleGuide  : string;
+    };
+
+    /* 👇 NEW: saved AI model selection presets */
+    aiSelections?: AISelection[];
+
+    /* 👇 NEW: saved multi-stage workflow presets */
+    workflows?: Array<{
+        id: string;
+        name: string;
+        data: {
+            workflowStages: WorkflowStage[];
+            preferredMode: ConnectionMode;
+            preferredQueryMode?: "single" | "workflow";
+            runMode: RunMode;
+            selectedModels: string[];
+            systemPromptBodies?: EphorStore["systemPromptBodies"];
+        };
+    }>;
 }
 
 const KEY = "kh-ephor-store";
@@ -184,7 +223,15 @@ export async function loadEphorStore(): Promise<EphorStore> {
         customInstructionsByContext: {},
         customInstructionsByStage: {},
         instructionsScopeForWorkflow: "ticket",
-        channelSortOrder: "alpha",
+        channelSortOrder: "created",
+        showApiLog: false,
+        systemPromptBodies: {
+            fileAnalysis: "",
+            pastTickets : "",
+            styleGuide  : "",
+        },
+        aiSelections: [],
+        workflows: [],
     };
     return {
         ...defaults,
@@ -196,7 +243,15 @@ export async function loadEphorStore(): Promise<EphorStore> {
         customInstructionsByStage: saved?.customInstructionsByStage ?? {},
         instructionsScopeForWorkflow: saved?.instructionsScopeForWorkflow ?? "ticket",
         preferredQueryMode: saved?.preferredQueryMode ?? "workflow",
-        channelSortOrder: saved?.channelSortOrder ?? "alpha",
+        channelSortOrder: saved?.channelSortOrder ?? "created",
+        showApiLog: saved?.showApiLog ?? false,
+        systemPromptBodies: {
+            fileAnalysis: saved?.systemPromptBodies?.fileAnalysis ?? "",
+            pastTickets : saved?.systemPromptBodies?.pastTickets  ?? "",
+            styleGuide  : saved?.systemPromptBodies?.styleGuide   ?? "",
+        },
+        aiSelections: saved?.aiSelections ?? [],
+        workflows: saved?.workflows ?? [],
     };
 }
 

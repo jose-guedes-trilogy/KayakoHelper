@@ -217,6 +217,9 @@ export interface ExtensionSelectors {
   exportInserterChk: string;
   exportDefaultRadio: string;
   exportDelUrlBtn: string;
+  exportNewUrlLabelInput: string;
+  exportNewUrlUrlInput: string;
+  exportNewUrlAddBtn: string;
   exportSettingsHeader: string;
   exportSettingsFooter: string;
   exportSetDefaultUrlBtn: string;
@@ -236,6 +239,19 @@ export interface ExtensionSelectors {
   assetsHeader: string;
   assetsJumpButton: string;
   assetsList: string;
+  assetsPostGroup: string;
+  assetsGroupHeader: string;
+  assetsFilename: string;
+  assetsFileRow: string;
+  assetsCopyUrlBtn: string;
+  assetsDownloadAllAttachmentsBtn: string;
+  assetsDownloadImagesPostZipBtn: string;
+  assetsDownloadImagesPostIndivBtn: string;
+  assetsDownloadAllImagesZipBtn: string;
+  assetsDownloadAllImagesIndivBtn: string;
+  assetsDownloadAllTicketAttachmentsZipBtn: string;
+  linksIntro: string;
+  linksTable: string;
   ticketPreviewTooltip: string;
   ticketPreviewPost: string;
   ticketPreviewMeta: string;
@@ -516,6 +532,9 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   exportInserterChk: ".kh-exp-ins",
   exportDefaultRadio: ".kh-exp-def",
   exportDelUrlBtn: ".kh-exp-del-url",
+  exportNewUrlLabelInput: ".kh-exp-new-label",
+  exportNewUrlUrlInput: ".kh-exp-new-url",
+  exportNewUrlAddBtn: ".kh-exp-add-url-submit",
   exportSettingsHeader: ".kh-exp-header",
   exportSettingsFooter: ".kh-exp-footer",
   exportSetDefaultUrlBtn: ".kh-exp-set-default-url",
@@ -535,6 +554,19 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   assetsHeader: ".kh-assets-header",
   assetsJumpButton: ".kh-assets-jump",
   assetsList: ".kh-assets-list",
+  assetsPostGroup: ".kh-assets-post-group",
+  assetsGroupHeader: ".kh-assets-group-header",
+  assetsFilename: ".kh-assets-filename",
+  assetsFileRow: ".kh-assets-file-row",
+  assetsCopyUrlBtn: ".kh-assets-copy-url",
+  assetsDownloadAllAttachmentsBtn: ".kh-assets-dl-all-attach",
+  assetsDownloadImagesPostZipBtn: ".kh-assets-dl-post-zip",
+  assetsDownloadImagesPostIndivBtn: ".kh-assets-dl-post-indiv",
+  assetsDownloadAllImagesZipBtn: ".kh-assets-dl-all-zip",
+  assetsDownloadAllImagesIndivBtn: ".kh-assets-dl-all-indiv",
+  assetsDownloadAllTicketAttachmentsZipBtn: ".kh-assets-dl-attach-all-zip",
+  linksIntro: ".kh-links-intro",
+  linksTable: ".kh-links-table",
   ticketPreviewTooltip: ".kh-ticket-preview-tooltip",
   ticketPreviewPost: ".kh-ticket-preview-post",
   ticketPreviewMeta: ".kh-ticket-preview-meta",

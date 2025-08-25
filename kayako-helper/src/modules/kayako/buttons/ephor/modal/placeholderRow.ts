@@ -34,14 +34,10 @@ export function rebuildPlaceholderRow(
     const row = refs.placeholderRow;
     row.textContent = "";                                    // wipe
 
-    /* --- label --- */
-    const lbl = document.createElement("span");
-    lbl.style.fontWeight = "600";
-    lbl.textContent = "Insert:";
-    row.appendChild(lbl);
+    // Label rendered in left split column in markup; no inline label here
 
     /* --- Transcript button (always visible) --- */
-    createPlainBtn("@#TRANSCRIPT#@", row);
+    createPlainBtn("Transcript", "@#TRANSCRIPT#@", row);
 
     /* Single-stage mode stops here. */
     if (!useWorkflow) { rebuildCanned(); return; }
@@ -60,7 +56,7 @@ export function rebuildPlaceholderRow(
         /* main – combined */
         wrap.appendChild(
             createSplitBtnPart(
-                `@#RD_${r}_OUTPUT#@`,
+                `Round ${r} Combined`,
                 `@#RD_${r}_COMBINED#@`,
                 "kh-split-main",
             ),
@@ -110,10 +106,10 @@ function insertPlaceholder(refs: ModalRefs, token: string): void {
     ta.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function createPlainBtn(token: string, parent: HTMLElement): HTMLButtonElement {
+function createPlainBtn(label: string, token: string, parent: HTMLElement): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.className  = "kh-ph-btn";
-    btn.textContent = token;
+    btn.textContent = label;
     btn.dataset.ph  = token;
     parent.appendChild(btn);
     return btn;

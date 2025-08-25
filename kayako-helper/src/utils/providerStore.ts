@@ -63,17 +63,54 @@ export function normalizeStore(s: Store): Store {
 }
 
 export async function loadStore(): Promise<Store> {
-    const raw = await chrome.storage.sync.get(KEY);
-    let data = raw[KEY] as Store | undefined;
-    if (data) {
-        return normalizeStore(data);
+    // Prefer local first in case we previously fell back due to sync quota.
+    try {
+        const [localRaw, syncRaw] = await Promise.all([
+            chrome.storage.local.get(KEY).catch(() => ({} as Record<string, unknown>)),
+            chrome.storage.sync.get(KEY).catch(() => ({} as Record<string, unknown>)),
+        ]);
+
+        const localData = localRaw[KEY] as Store | undefined;
+        if (localData) {
+            console.info('[exportChat] loadStore: using chrome.storage.local');
+            return normalizeStore(localData);
+        }
+
+        const syncData = syncRaw[KEY] as Store | undefined;
+        if (syncData) {
+            console.info('[exportChat] loadStore: using chrome.storage.sync');
+            return normalizeStore(syncData);
+        }
+
+        // Nothing stored yet → seed lightweight defaults (small) to sync.
+        try {
+            await chrome.storage.sync.set({ [KEY]: DEFAULTS });
+            console.info('[exportChat] loadStore: seeded defaults to sync');
+        } catch (err) {
+            console.warn('[exportChat] loadStore: failed to seed sync, seeding local instead', err);
+            await chrome.storage.local.set({ [KEY]: DEFAULTS });
+        }
+        return structuredClone(DEFAULTS);
+    } catch (err) {
+        console.error('[exportChat] loadStore failed, returning in-memory defaults', err);
+        return structuredClone(DEFAULTS);
     }
-    await chrome.storage.sync.set({ [KEY]: DEFAULTS });
-    return structuredClone(DEFAULTS);
 }
 
 export async function saveStore(store: Store): Promise<void> {
-    await chrome.storage.sync.set({ [KEY]: store });
+    // Try sync first for cross-device settings; fall back to local on quota errors.
+    try {
+        await chrome.storage.sync.set({ [KEY]: store });
+        // Mirror to local for resilience and to ensure future reads succeed even if sync is pruned.
+        await chrome.storage.local.set({ [KEY]: store });
+        console.info('[exportChat] saveStore: saved to sync and local');
+    } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        const approxSize = (() => { try { return JSON.stringify(store).length; } catch { return -1; } })();
+        console.warn('[exportChat] saveStore: sync failed, falling back to local', { message, approxSize });
+        await chrome.storage.local.set({ [KEY]: store });
+        console.info('[exportChat] saveStore: saved to local only');
+    }
 }
 
 /* Convenience helpers – used by the UI code */

@@ -11,6 +11,7 @@ import {
 import {
     fillPrompt, ensureDefaultProviders,
     mainDefaultUrl, providerSignature,
+    augmentMissingDefaultProviders,
 } from './promptUtils.ts';
 
 import { EXTENSION_SELECTORS } from '@/generated/selectors.ts';
@@ -34,14 +35,20 @@ let lastMenuSig = '';
 
 /* ───────────────────────── boot ────────────────────────── */
 export async function bootExportChatButton(): Promise<void> {
-    store = await loadStore();
-    await ensureDefaultProviders(store);
+    try {
+        console.info('[exportChat] boot start');
+        store = await loadStore();
+        console.info('[exportChat] store loaded', { providers: store.providers.length });
+        await ensureDefaultProviders(store);
+        const changed = await augmentMissingDefaultProviders(store);
+        if (changed) console.info('[exportChat] defaults augmented');
 
-    if (!store.mainDefaultProviderId ||
-        !findProvider(store, store.mainDefaultProviderId)) {
-        store.mainDefaultProviderId = store.providers[0]?.id ?? null;
-        await saveStore(store);
-    }
+        if (!store.mainDefaultProviderId ||
+            !findProvider(store, store.mainDefaultProviderId)) {
+            store.mainDefaultProviderId = store.providers[0]?.id ?? null;
+            await saveStore(store);
+            console.info('[exportChat] mainDefaultProviderId set', { id: store.mainDefaultProviderId });
+        }
 
     const cfg: SplitButtonConfig = {
         id: BTN_ID, rightId: MENU_ID, rightLabel: '▾',
@@ -69,7 +76,15 @@ export async function bootExportChatButton(): Promise<void> {
         groupOrder: 2,
     };
 
-    registerSplitButton(cfg);
+    try {
+        registerSplitButton(cfg);
+        console.info('[exportChat] button registered');
+    } catch (e) {
+        console.error('[exportChat] failed to register button', e);
+    }
+    } catch (e) {
+        console.error('[exportChat] boot failed', e);
+    }
 }
 
 /* External helper (used by tests & background) */

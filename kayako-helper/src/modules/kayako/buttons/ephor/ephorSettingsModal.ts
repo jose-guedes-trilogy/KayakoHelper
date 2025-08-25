@@ -26,6 +26,7 @@ import {
 import { fetchTranscript } from "@/utils/api.js";
 
 import { openCannedPromptModal } from "./ephorCannedPromptModal.ts";
+import { openAiSelectionsModal } from "./ephorAiSelectionsModal.ts";
 
 import { attachPlaceholderRowHandler, rebuildPlaceholderRow } from "./modal/placeholderRow.ts";
 import { currentKayakoTicketId } from "@/utils/kayakoIds.ts";
@@ -96,10 +97,11 @@ export async function openEphorSettingsModal(
         const stageVal = skey ? store.customInstructionsByStage?.[skey] : "";
         const ticketVal = tkey ? store.customInstructionsByContext?.[tkey] : "";
         const useTicket = (store.instructionsScopeForWorkflow ?? "ticket") === "ticket";
-        refs.instrScopeCbx.checked = useTicket;
+        // Checkbox now means: when CHECKED → use per-stage instead
+        refs.instrScopeCbx.checked = !useTicket;
         refs.instrScopeLabel.textContent = useTicket
-            ? "4. Per-ticket Custom Instructions"
-            : "4. Per-stage Custom Instructions";
+            ? "4. Per-ticket Instructions"
+            : "4. Per-stage Instructions";
         ta.value = useTicket ? (ticketVal ?? "") : (stageVal ?? ticketVal ?? "");
         ta.placeholder = useTicket
             ? "Optional: saved for this Kayako ticket. These lines will be prepended to prompts."
@@ -124,7 +126,8 @@ export async function openEphorSettingsModal(
     });
 
     refs.instrScopeCbx.addEventListener("change", async () => {
-        store.instructionsScopeForWorkflow = refs.instrScopeCbx.checked ? "ticket" : "stage";
+        // Checkbox checked → per-stage; unchecked → per-ticket
+        store.instructionsScopeForWorkflow = refs.instrScopeCbx.checked ? "stage" : "ticket";
         await saveEphorStore(store);
         refreshCustomInstr();
     });
@@ -179,21 +182,68 @@ export async function openEphorSettingsModal(
     const highlightPre = modal.querySelector<HTMLPreElement>("#kh-ephor-prompt-highlight");
     const renderHighlight = () => {
         if (!highlightPre) return;
-        let t = promptTa.value
+
+        const cannedMap = new Map<string, string>();
+        try {
+            for (const cp of store.cannedPrompts ?? []) {
+                const core = String(cp.placeholder || "").replace(/^@#\s*|\s*#@$/g, "");
+                if (core) cannedMap.set(core, cp.title || core);
+            }
+        } catch {}
+
+        const toLabel = (name: string): string => {
+            const canned = cannedMap.get(name);
+            if (canned) return canned;
+            if (/^TRANSCRIPT$/i.test(name)) return "Transcript";
+            if (/^PRV_RD_OUTPUT$/i.test(name)) return "Previous Round";
+            const m1 = name.match(/^RD_(\d+)_COMBINED$/i);
+            if (m1) return `Round ${m1[1]} Combined`;
+            const m2 = name.match(/^RD_(\d+)_AI_(.+)$/i);
+            if (m2) return `Round ${m2[1]} ${m2[2]}`;
+            return name;
+        };
+
+        const esc = (s: string) => s
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
-        // Bold @#PLACEHOLDER#@ and {{ PLACEHOLDER }} forms
-        t = t
-            .replace(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g, '<b style="color:#000">@$#$1#$@</b>')
-            .replace(/\{\{\s*([A-Z0-9_.-]+)\s*\}\}/g, '<b style="color:#000">{{$1}}</b>')
-            .replace(/@\$#\$/g, "@#") // revert temporary
-            .replace(/#\$@/g, "#@");
+
+        const pill = (name: string, fullToken: string) => {
+            const label = esc(toLabel(name));
+            const tokenEsc = esc(fullToken);
+            return `<span class=\"kh-pill\" title=\"${tokenEsc}\">${label}</span>`;
+        };
+
+        const raw = promptTa.value;
+        const tokens1 = raw.match(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g) ?? [];
+        try { console.debug("[Ephor] Placeholder highlight", { count: tokens1.length }); } catch {}
+
+        let t = esc(raw);
+        // Replace @#PLACEHOLDER#@
+        t = t.replace(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g, (_m, name) => pill(String(name), `@#${String(name)}#@`));
+
         highlightPre.innerHTML = t;
     };
     if (highlightPre) {
         renderHighlight();
-        promptTa.addEventListener("input", renderHighlight);
+        promptTa.addEventListener("input", () => {
+            renderHighlight();
+            // live validation for placeholder syntax in Default Instructions
+            const hasCurly = /\{\{[^}]+\}\}/.test(promptTa.value);
+            promptTa.style.borderColor = hasCurly ? "#c33" : "";
+            promptTa.style.boxShadow = hasCurly ? "0 0 0 2px rgba(195,51,51,.15)" : "";
+        });
+        promptTa.addEventListener("blur", () => {
+            // normalize any {{NAME}} → @#NAME#@
+            const before = promptTa.value;
+            const after = before.replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_m, name) => `@#${String(name).toUpperCase()}#@`);
+            if (after !== before) {
+                promptTa.value = after;
+                promptTa.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            promptTa.style.borderColor = "";
+            promptTa.style.boxShadow = "";
+        });
     }
 
     /* ------------------------------------------------------------------ *
@@ -270,6 +320,115 @@ export async function openEphorSettingsModal(
     /* ------------------------------------------------------------------ *
      * Main-tab helper                                                    *
      * ------------------------------------------------------------------ */
+    function openInlineDialog(title: string, fields: Array<{ id: string; label: string; value?: string; placeholder?: string }>, onSubmit: (values: Record<string,string>) => void) {
+        const overlay = document.createElement("div");
+        overlay.className = "kh-dialog-overlay";
+        const dlg = document.createElement("div");
+        dlg.className = "kh-dialog";
+        dlg.innerHTML = `
+          <header>${title}</header>
+          <main></main>
+          <footer>
+            <button class="kh-btn" data-act="cancel">Cancel</button>
+            <button class="kh-btn kh-btn-primary" data-act="ok">OK</button>
+          </footer>`;
+        const main = dlg.querySelector("main")!;
+        fields.forEach(f => {
+            const wrap = document.createElement("div");
+            wrap.style.margin = "6px 0";
+            const lbl = document.createElement("label");
+            lbl.textContent = f.label;
+            lbl.style.display = "block";
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = f.value ?? "";
+            input.placeholder = f.placeholder ?? "";
+            input.id = f.id;
+            input.style.width = "100%";
+            input.style.padding = "6px";
+            wrap.appendChild(lbl);
+            wrap.appendChild(input);
+            main.appendChild(wrap);
+        });
+        const close = () => overlay.remove();
+        dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", close);
+        dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => {
+            const vals: Record<string,string> = {};
+            fields.forEach(f => {
+                vals[f.id] = (dlg.querySelector<HTMLInputElement>(`#${CSS.escape(f.id)}`)?.value ?? "").trim();
+            });
+            onSubmit(vals);
+            close();
+        });
+        overlay.appendChild(dlg);
+        modal.appendChild(overlay);
+        (dlg.querySelector<HTMLInputElement>(`#${CSS.escape(fields[0].id)}`) as HTMLInputElement | null)?.focus();
+    }
+
+    function openMessageDialog(title: string, message: string): void {
+        const overlay = document.createElement("div");
+        overlay.className = "kh-dialog-overlay";
+        const dlg = document.createElement("div");
+        dlg.className = "kh-dialog";
+        dlg.innerHTML = `
+          <header>${title}</header>
+          <main><p style="margin:0;line-height:1.4">${message}</p></main>
+          <footer>
+            <button class="kh-btn kh-btn-primary" data-act="ok">OK</button>
+          </footer>`;
+        dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => overlay.remove());
+        overlay.appendChild(dlg);
+        modal.appendChild(overlay);
+    }
+
+    function openConfirmDialog(message: string): Promise<boolean> {
+        return new Promise(resolve => {
+            const overlay = document.createElement("div");
+            overlay.className = "kh-dialog-overlay";
+            const dlg = document.createElement("div");
+            dlg.className = "kh-dialog";
+            dlg.innerHTML = `
+              <header>Confirm</header>
+              <main><p style="margin:0;line-height:1.4">${message}</p></main>
+              <footer>
+                <button class="kh-btn" data-act="cancel">Cancel</button>
+                <button class="kh-btn kh-btn-primary" data-act="ok">OK</button>
+              </footer>`;
+            const close = (v: boolean) => { overlay.remove(); resolve(v); };
+            dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", () => close(false));
+            dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => close(true));
+            overlay.appendChild(dlg);
+            modal.appendChild(overlay);
+        });
+    }
+
+    function openPromptDialog(title: string, label: string, defaultValue = ""): Promise<string | null> {
+        return new Promise(resolve => {
+            const overlay = document.createElement("div");
+            overlay.className = "kh-dialog-overlay";
+            const dlg = document.createElement("div");
+            dlg.className = "kh-dialog";
+            dlg.innerHTML = `
+              <header>${title}</header>
+              <main>
+                <label style="display:block;margin-bottom:4px">${label}</label>
+                <input id="kh-prompt-input" type="text" style="width:100%;padding:6px">
+              </main>
+              <footer>
+                <button class="kh-btn" data-act="cancel">Cancel</button>
+                <button class="kh-btn kh-btn-primary" data-act="ok">OK</button>
+              </footer>`;
+            const input = dlg.querySelector<HTMLInputElement>("#kh-prompt-input")!;
+            input.value = defaultValue;
+            const close = (v: string | null) => { overlay.remove(); resolve(v); };
+            dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", () => close(null));
+            dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => close((input.value || "").trim()));
+            overlay.appendChild(dlg);
+            modal.appendChild(overlay);
+            input.focus();
+        });
+    }
+
     function setMainTab(t: "settings" | "outputs") {
         const isSettings = t === "settings";
         refs.paneSettings.style.display = isSettings ? "block" : "none";
@@ -282,9 +441,6 @@ export async function openEphorSettingsModal(
     refs.tabSettingsBtn.addEventListener("click", () => setMainTab("settings"));
     refs.tabOutputsBtn.addEventListener("click", () => setMainTab("outputs"));
 
-    /* ------------------------------------------------------------------ *
-     * Connection-mode (multiplexer / stream)                             *
-     * ------------------------------------------------------------------ */
     refs.modeMultiplexer.checked = store.preferredMode === "multiplexer";
     refs.modeStream.checked = store.preferredMode === "stream";
     const onMode = () => {
@@ -292,17 +448,11 @@ export async function openEphorSettingsModal(
         void saveEphorStore(store);
         log(`Connection mode → ${store.preferredMode}`);
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
-        // The project context for the ticket key may change when switching mode/selection;
-        // reflect the current (projectId, ticketId) mapping.
-        // (refresh also happens on project selection below)
         refreshCustomInstr();
     };
     refs.modeMultiplexer.addEventListener("change", onMode);
     refs.modeStream.addEventListener("change", onMode);
 
-    /* ------------------------------------------------------------------ *
-     * QUERY-MODE (single vs workflow)                                    *
-     * ------------------------------------------------------------------ */
     refs.queryWorkflowRadio.checked = (store.preferredQueryMode ?? "workflow") === "workflow";
     refs.querySingleRadio.checked = !refs.queryWorkflowRadio.checked;
 
@@ -311,10 +461,9 @@ export async function openEphorSettingsModal(
         store.preferredQueryMode = useWorkflow ? "workflow" : "single";
         void saveEphorStore(store);
 
-        /* stage bar visibility */
-        refs.stageBarDiv.style.display = useWorkflow ? "" : "none";
+        refs.stageBarDiv.style.display = "";
+        refs.stageBarDiv.classList.toggle("kh-stagebar-disabled", !useWorkflow);
 
-        /* 🔧 Run-mode selector enable/disable */
         const enableRun = useWorkflow;
         refs.runRow.style.opacity = enableRun ? "1" : "0.45";
         refs.runAutoRadio.disabled = refs.runManualRadio.disabled = !enableRun;
@@ -333,15 +482,13 @@ export async function openEphorSettingsModal(
 
         rebuildOutputTabs();
         rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
+        rebuildAiSelectionButtons();
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
     }
 
     refs.querySingleRadio.addEventListener("change", updateQueryMode);
     refs.queryWorkflowRadio.addEventListener("change", updateQueryMode);
 
-    /* ------------------------------------------------------------------ *
-     * Run-mode (auto / manual)                                           *
-     * ------------------------------------------------------------------ */
     refs.runAutoRadio.checked = store.runMode === "automatic";
     refs.runManualRadio.checked = store.runMode === "manual";
     const updateRunMode = () => {
@@ -356,62 +503,150 @@ export async function openEphorSettingsModal(
      * ------------------------------------------------------------------ */
     function rebuildStageBar(): void {
         refs.stageBarDiv.textContent = "";
-        const label = document.createElement("span");
-        label.style.fontWeight = "600";
-        label.textContent = "Stage:";
-        refs.stageBarDiv.appendChild(label);
-        for (const s of store.workflowStages) {
+        let dragIndex = -1;
+        const onDragOver = (e: DragEvent, overIndex: number) => {
+            e.preventDefault();
+            const after = (e.offsetX / (e.currentTarget as HTMLElement).clientWidth) > 0.5;
+            (e.currentTarget as HTMLElement).style.borderLeft = after ? "" : "2px solid #88a5da";
+            (e.currentTarget as HTMLElement).style.borderRight = after ? "2px solid #88a5da" : "";
+        };
+        const clearBorders = (el: HTMLElement) => { el.style.borderLeft = el.style.borderRight = ""; };
+        store.workflowStages.forEach((s, index) => {
             const wrap = document.createElement("span");
             wrap.className = "kh-stage";
+            wrap.draggable = true;
             const tab = Object.assign(document.createElement("span"), { textContent: s.name });
             tab.className = "kh-bar-btn" + (s.id === currentStageId ? " active" : "");
-            tab.addEventListener("click", () => {
-                currentStageId = s.id;
-                onStageChange();
-            });
+            tab.addEventListener("click", () => { currentStageId = s.id; onStageChange(); });
             const del = document.createElement("span");
-            del.className = "kh-del";
-            del.textContent = "×";
-            del.title = "Delete stage";
-            del.addEventListener("click", (ev) => {
+            del.className = "kh-del"; del.textContent = "×"; del.title = "Delete stage"; del.tabIndex = 0;
+            del.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); del.click(); } });
+            del.addEventListener("click", async (ev) => {
                 ev.stopPropagation();
-                const ok = confirm(`Delete stage "${s.name}"?`);
+                const ok = await openConfirmDialog(`Delete stage "${s.name}"?`);
                 if (!ok) return;
                 const idx = store.workflowStages.findIndex(x => x.id === s.id);
                 if (idx !== -1) {
                     store.workflowStages.splice(idx, 1);
-                    if (currentStageId === s.id) {
-                        currentStageId = store.workflowStages[0]?.id ?? "";
-                    }
+                    if (currentStageId === s.id) currentStageId = store.workflowStages[0]?.id ?? "";
                     void saveEphorStore(store);
-                    rebuildStageBar();
-                    onStageChange();
+                    rebuildStageBar(); onStageChange();
                 }
             });
-            wrap.appendChild(tab);
-            wrap.appendChild(del);
+            wrap.appendChild(tab); wrap.appendChild(del);
+            wrap.addEventListener("dragstart", () => { dragIndex = index; });
+            wrap.addEventListener("dragover", (e) => onDragOver(e as DragEvent, index));
+            wrap.addEventListener("dragleave", () => clearBorders(wrap));
+            wrap.addEventListener("drop", (e) => {
+                e.preventDefault(); clearBorders(wrap);
+                if (dragIndex === -1 || dragIndex === index) return;
+                const item = store.workflowStages.splice(dragIndex, 1)[0];
+                let targetIndex = index;
+                // If dropped on the right half, insert after
+                const after = (e as DragEvent).offsetX / (wrap.clientWidth) > 0.5;
+                if (after && targetIndex < store.workflowStages.length) targetIndex += 1;
+                store.workflowStages.splice(targetIndex, 0, item);
+                dragIndex = -1;
+                void saveEphorStore(store);
+                rebuildStageBar(); onStageChange();
+            });
             refs.stageBarDiv.appendChild(wrap);
-        }
+        });
         refs.stageBarDiv.appendChild(refs.addStageBtn);
     }
 
-    refs.addStageBtn.addEventListener("click", () => {
-        const name = prompt("Stage name:");
-        if (!name) return;
-        const promptText = prompt("Prompt template (use @#RD_1_COMBINED#@ / @#TRANSCRIPT#@):", "@#TRANSCRIPT#@");
-        if (promptText === null) return;
-
-        const stg: WorkflowStage = {
-            id: crypto.randomUUID(),
-            name: name.trim(),
-            prompt: promptText.trim(),
-            selectedModels: [state.availableModels[0] ?? "gpt-4o"],
+    // Custom Sort dropdown wiring
+    (function initSortDropdown(){
+        const sortDd = modal.querySelector<HTMLDivElement>("#kh-sort-dd");
+        const sortDdBtn = sortDd?.querySelector<HTMLButtonElement>(".kh-dd-btn");
+        const sortDdMenu = sortDd?.querySelector<HTMLDivElement>(".kh-dd-menu");
+        const sortDdLabel = sortDd?.querySelector<HTMLSpanElement>("#kh-sort-dd-label");
+        if (!(sortDd && sortDdBtn && sortDdMenu && sortDdLabel && refs.chatSortSelect)) return;
+        const updateFromSelect = () => {
+            const v = refs.chatSortSelect!.value === "created" ? "created" : "alpha";
+            sortDdLabel.textContent = v === "created" ? "Newest" : "A–Z";
         };
-        store.workflowStages.push(stg);
-        currentStageId = stg.id;
-        void saveEphorStore(store);
-        rebuildStageBar();
-        onStageChange();
+        updateFromSelect();
+        sortDdBtn.addEventListener("click", () => {
+            const open = sortDdBtn.getAttribute("aria-expanded") === "true";
+            sortDdBtn.setAttribute("aria-expanded", open ? "false" : "true");
+            sortDdMenu.style.display = open ? "none" : "block";
+        });
+        sortDdMenu.addEventListener("click", (ev) => {
+            const item = (ev.target as HTMLElement).closest<HTMLElement>("[data-value]");
+            if (!item) return;
+            const v = item.getAttribute("data-value") === "created" ? "created" : "alpha";
+            refs.chatSortSelect!.value = v;
+            refs.chatSortSelect!.dispatchEvent(new Event("change", { bubbles: true }));
+            sortDdMenu.style.display = "none";
+            sortDdBtn.setAttribute("aria-expanded", "false");
+            updateFromSelect();
+        });
+        document.addEventListener("click", (e) => {
+            if (!sortDd.contains(e.target as Node)) {
+                sortDdMenu.style.display = "none";
+                sortDdBtn.setAttribute("aria-expanded", "false");
+            }
+        });
+    })();
+
+    /* Ensure model list matches Projects/Chats visual height */
+    function syncModelListHeight(): void {
+        try {
+            const projH = refs.projectListDiv.clientHeight || 0;
+            const chanH = refs.channelListDiv.clientHeight || 0;
+            const target = Math.max(projH, chanH);
+            if (target > 0) {
+                refs.aiListDiv.style.height = `${target}px`;
+                refs.aiListDiv.style.minHeight = `${target}px`;
+            }
+        } catch {}
+    }
+    window.addEventListener("resize", () => syncModelListHeight());
+
+    refs.addStageBtn.addEventListener("click", () => {
+        const overlay = document.createElement("div");
+        overlay.className = "kh-dialog-overlay";
+        const dlg = document.createElement("div");
+        dlg.className = "kh-dialog";
+        dlg.innerHTML = `
+          <header>Add Stage</header>
+          <main>
+            <div style=\"margin:6px 0\">
+              <label style=\"display:block\">Stage name</label>
+              <input id=\"dlg-stage-name\" type=\"text\" style=\"width:100%;padding:6px\" placeholder=\"e.g. Review\">
+            </div>
+            <div style=\"margin:6px 0\">
+              <label style=\"display:block\">Prompt template</label>
+              <input id=\"dlg-stage-prompt\" type=\"text\" style=\"width:100%;padding:6px\" value=\"@#TRANSCRIPT#@\">
+            </div>
+          </main>
+          <footer>
+            <button class=\"kh-btn\" data-act=\"cancel\">Cancel</button>
+            <button class=\"kh-btn kh-btn-primary\" data-act=\"ok\">OK</button>
+          </footer>`;
+        const close = () => overlay.remove();
+        dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", close);
+        dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => {
+            const name = (dlg.querySelector<HTMLInputElement>("#dlg-stage-name")!.value || "").trim();
+            const promptText = (dlg.querySelector<HTMLInputElement>("#dlg-stage-prompt")!.value || "").trim();
+            if (!name) return;
+            const stg: WorkflowStage = {
+                id: crypto.randomUUID(),
+                name,
+                prompt: promptText || "@#TRANSCRIPT#@",
+                selectedModels: [state.availableModels[0] ?? "gpt-4o"],
+            };
+            store.workflowStages.push(stg);
+            currentStageId = stg.id;
+            void saveEphorStore(store);
+            rebuildStageBar();
+            onStageChange();
+            close();
+        });
+        overlay.appendChild(dlg);
+        modal.appendChild(overlay);
+        (dlg.querySelector("#dlg-stage-name") as HTMLInputElement).focus();
     });
 
     /* ------------------------------------------------------------------ *
@@ -422,8 +657,10 @@ export async function openEphorSettingsModal(
         if (!stg) return;
         refs.promptInput.value = stg.prompt;
         rebuildModelList(state, refs, refs.modelSearchInp.value, stg);
+        syncModelListHeight();
         rebuildStageBar();
         rebuildOutputTabs();
+        rebuildAiSelectionButtons();
         rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
         refreshCustomInstr(); // stage changed → swap to stage-specific instructions
     }
@@ -450,6 +687,7 @@ export async function openEphorSettingsModal(
             useWorkflow ? store.workflowStages.find(x => x.id === currentStageId)! : null,
         ),
     );
+    refs.modelSearchInp.addEventListener("input", () => syncModelListHeight());
 
     /* ------------------------------------------------------------------ *
      * Live tab sync on (un)checking model boxes                          *
@@ -488,15 +726,47 @@ export async function openEphorSettingsModal(
             log("Log cleared");
         });
 
+    // Settings gear → open preferences (toggle API Log visibility)
+    const gearBtn = modal.querySelector<HTMLButtonElement>("#kh-ephor-gear");
+    gearBtn?.addEventListener("click", () => {
+        const overlay = document.createElement("div");
+        overlay.className = "kh-dialog-overlay";
+        const dlg = document.createElement("div");
+        dlg.className = "kh-dialog";
+        dlg.innerHTML = `
+          <header>Preferences</header>
+          <main>
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="kh-pref-show-log" type="checkbox"> Show API Log section
+            </label>
+          </main>
+          <footer>
+            <button class="kh-btn" data-act="cancel">Close</button>
+          </footer>`;
+        const cbx = dlg.querySelector<HTMLInputElement>("#kh-pref-show-log")!;
+        cbx.checked = store.showApiLog ?? true;
+        cbx.addEventListener("change", async () => {
+            store.showApiLog = cbx.checked;
+            await saveEphorStore(store);
+            const sec = modal.querySelector<HTMLDivElement>("#kh-ephor-log-section");
+            if (sec) sec.style.display = store.showApiLog ? "" : "none";
+        });
+        dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", () => overlay.remove());
+        overlay.appendChild(dlg);
+        modal.appendChild(overlay);
+    });
+
     /* ------------------------------------------------------------------ *
      * Project / chat search                                              *
      * ------------------------------------------------------------------ */
     refs.projectSearchInp.addEventListener("input", () =>
         rebuildProjectList(state, refs, refs.projectSearchInp.value),
     );
+    refs.projectSearchInp.addEventListener("input", () => syncModelListHeight());
     refs.channelSearchInp.addEventListener("input", () =>
         rebuildChannelList(state, refs, refs.channelSearchInp.value),
     );
+    refs.channelSearchInp.addEventListener("input", () => syncModelListHeight());
     refs.chatSortSelect?.addEventListener("change", () => {
         const v = refs.chatSortSelect!.value === "created" ? "created" : "alpha";
         store.channelSortOrder = v;
@@ -510,8 +780,8 @@ export async function openEphorSettingsModal(
     refs.refreshBtn.addEventListener("click", () => void refreshProjects(state, refs, log));
 
     refs.newChatBtn.addEventListener("click", async () => {
-        if (!store.selectedProjectId) return alert("Select a project first.");
-        const name = prompt("Enter new chat name:");
+        if (!store.selectedProjectId) { openMessageDialog("New Chat", "Select a project first."); return; }
+        const name = await openPromptDialog("New Chat", "Enter new chat name:", "");
         if (!name) return;
 
         log("REQUEST", `POST /projects/${store.selectedProjectId}/channels {name:"${name}"}`);
@@ -545,10 +815,9 @@ export async function openEphorSettingsModal(
     });
 
     refs.sendBtn.addEventListener("click", async () => {
-        if (isSending) return; // re-entrancy guard
-        if (!store.selectedProjectId) return alert("Pick a project.");
+        if (isSending) return;
+        if (!store.selectedProjectId) { openMessageDialog("Send", "Pick a project."); return; }
 
-        /* prompt + models */
         let promptToSend = "";
         let modelsToUse: string[] = [];
         if (useWorkflow) {
@@ -559,13 +828,12 @@ export async function openEphorSettingsModal(
             promptToSend = refs.promptInput.value.trim();
             modelsToUse = [...store.selectedModels];
         }
-        if (!promptToSend) return alert("Write a prompt.");
-        if (modelsToUse.length === 0) return alert("Pick at least one model.");
+        if (!promptToSend) { openMessageDialog("Send", "Write a prompt."); return; }
+        if (modelsToUse.length === 0) { openMessageDialog("Send", "Pick at least one model."); return; }
 
         const channelId = store.preferredMode === "multiplexer" ? "" : store.selectedChannelId ?? "";
-        if (store.preferredMode !== "multiplexer" && !channelId) return alert("Pick a chat.");
+        if (store.preferredMode !== "multiplexer" && !channelId) { openMessageDialog("Send", "Pick a chat."); return; }
 
-        // Cross-workflow accurate total (sum of all stages’ selected models)
         const totalForWorkflow =
             useWorkflow && store.runMode === "automatic"
                 ? store.workflowStages.reduce((a, s) => a + (s.selectedModels?.length ?? 0), 0)
@@ -584,7 +852,6 @@ export async function openEphorSettingsModal(
 
         try {
             if (useWorkflow && store.runMode === "automatic") {
-                /* full chain */
                 await runAiReplyWorkflow(
                     client,
                     store,
@@ -592,7 +859,6 @@ export async function openEphorSettingsModal(
                     await fetchTranscript(1000),
                     m => {
                         log("STATUS", m);
-                        // short status hints
                         const parts = refs.progressBadge.textContent?.match(/(\d+)\s*\/\s*(\d+)/);
                         const curr = parts ? Number(parts[1]) : 0;
                         if (/Retrying/i.test(m)) setProgress(stageName, curr, totalForWorkflow, "retrying");
@@ -602,9 +868,8 @@ export async function openEphorSettingsModal(
                     refs.progressBadge,
                     abortCtl.signal,
                 );
-                setMainTab("outputs"); // show results
+                setMainTab("outputs");
             } else {
-                /* single stage */
                 const result = await sendEphorMessage({
                     client,
                     store,
@@ -632,14 +897,12 @@ export async function openEphorSettingsModal(
                     abortSignal: abortCtl.signal,
                 });
 
-                // Persist outputs for "single" run (or current stage) and refresh Outputs tab
                 const pseudoId = useWorkflow ? currentStageId : "__single__";
                 store.lastOutputs[pseudoId] = { combined: result.combined, byModel: { ...result.byModel } };
                 await saveEphorStore(store);
                 document.dispatchEvent(new CustomEvent("ephorOutputsUpdated", { detail: { stageId: pseudoId } }));
 
                 if (useWorkflow && store.runMode === "manual") {
-                    /* advance to next stage */
                     const stages = store.workflowStages;
                     const idx = stages.findIndex(s => s.id === currentStageId);
                     if (idx >= 0 && idx < stages.length - 1) {
@@ -648,14 +911,14 @@ export async function openEphorSettingsModal(
                         setMainTab("settings");
                     }
                 }
-                setMainTab("outputs"); // show results
+                setMainTab("outputs");
             }
         } catch (e: any) {
             log("ERROR", String(e));
             if (e?.name === "AbortError" || /cancel/i.test(String(e))) {
                 refs.progressBadge.textContent = "Cancelled";
             } else {
-                alert(String(e));
+                openMessageDialog("Error", String(e));
                 refs.progressBadge.textContent = "Error";
             }
         } finally {
@@ -680,6 +943,7 @@ export async function openEphorSettingsModal(
         void saveEphorStore(store);
         rebuildProjectList(state, refs, refs.projectSearchInp.value);
         rebuildChannelList(state, refs);
+        syncModelListHeight();
         void fetchChannels(state, refs, log);
     });
     refs.channelListDiv.addEventListener("click", e => {
@@ -689,6 +953,7 @@ export async function openEphorSettingsModal(
         store.selectedChannelId = id;
         void saveEphorStore(store);
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
+        syncModelListHeight();
 
         // 👇 NEW: pre-read /messages and cache the latest id for correct parenting
         if (store.selectedProjectId) {
@@ -738,7 +1003,9 @@ export async function openEphorSettingsModal(
      * ------------------------------------------------------------------ */
     rebuildProjectList(state, refs);
     rebuildChannelList(state, refs);
+    syncModelListHeight();
     void refreshProjects(state, refs, log);
+    setTimeout(() => syncModelListHeight(), 0);
     // Initialize custom-instructions textarea for current ticket/project context.
     refreshCustomInstr();
 
@@ -766,7 +1033,15 @@ export async function openEphorSettingsModal(
     // initialize chat sort select from persisted store
     if (refs.chatSortSelect) {
         refs.chatSortSelect.value = (store.channelSortOrder ?? "alpha") as any;
+        const lbl = modal.querySelector<HTMLSpanElement>("#kh-sort-dd-label");
+        if (lbl) lbl.textContent = refs.chatSortSelect.value === "created" ? "Newest" : "A–Z";
+        // keep channel list reflecting the chosen order
+        refs.chatSortSelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
+
+    // Apply initial log visibility
+    const logSection = modal.querySelector<HTMLDivElement>("#kh-ephor-log-section");
+    if (logSection) logSection.style.display = (store.showApiLog ?? true) ? "" : "none";
 
     /* ------------------------------------------------------------------ *
      * Placeholder-insert buttons (built-in and canned)                   *
@@ -788,8 +1063,8 @@ export async function openEphorSettingsModal(
             btn.className = "kh-ph-btn";
             btn.dataset.ph = cp.placeholder;
             btn.dataset.canned = "1";
-            btn.textContent = cp.placeholder;
-            btn.title = (cp.title ? `${cp.title} — ` : "") + "Right-click to set its value from your clipboard";
+            btn.textContent = cp.title || cp.placeholder;
+            btn.title = `${cp.title || "Custom placeholder"} (${cp.placeholder}) — Right-click to set its value from your clipboard`;
 
             /* NEW: right-click → set this custom placeholder’s body from clipboard, then save */
             btn.addEventListener("contextmenu", async (e) => {
@@ -818,6 +1093,175 @@ export async function openEphorSettingsModal(
 
     /* Open canned-prompt manager */
     refs.cannedBtn.addEventListener("click", () => openCannedPromptModal(store));
+
+    /* ------------------------------------------------------------------ *
+     * Workflows manager (save/load/delete/switch)                        *
+     * ------------------------------------------------------------------ */
+    function rebuildWorkflowSelect(): void {
+        const sel = refs.wfSelect;
+        if (!sel) return;
+        sel.textContent = "";
+        const none = document.createElement("option"); none.value = ""; none.textContent = "(Unsaved)";
+        sel.appendChild(none);
+        for (const wf of (store.workflows ?? [])) {
+            const opt = document.createElement("option");
+            opt.value = wf.id; opt.textContent = wf.name || "Workflow";
+            sel.appendChild(opt);
+        }
+        // no persisted selection tracking for now
+        sel.value = "";
+        if (refs.wfNameInp) refs.wfNameInp.value = sel.value ? (store.workflows?.find(w=>w.id===sel.value)?.name ?? "") : "";
+    }
+
+    function snapshotCurrentWorkflow(): EphorStore["workflows"][number]["data"] {
+        return {
+            workflowStages: JSON.parse(JSON.stringify(store.workflowStages)),
+            preferredMode: store.preferredMode,
+            preferredQueryMode: store.preferredQueryMode,
+            runMode: store.runMode,
+            selectedModels: [...(store.selectedModels ?? [])],
+            systemPromptBodies: store.systemPromptBodies ? { ...store.systemPromptBodies } : undefined,
+        };
+    }
+
+    async function restoreWorkflow(data: EphorStore["workflows"][number]["data"]): Promise<void> {
+        store.workflowStages = JSON.parse(JSON.stringify(data.workflowStages || []));
+        store.preferredMode = data.preferredMode ?? store.preferredMode;
+        store.preferredQueryMode = data.preferredQueryMode ?? store.preferredQueryMode;
+        store.runMode = data.runMode ?? store.runMode;
+        store.selectedModels = [...(data.selectedModels ?? [])];
+        if (data.systemPromptBodies) store.systemPromptBodies = { ...data.systemPromptBodies };
+        await saveEphorStore(store);
+        updateQueryMode();
+        rebuildStageBar();
+        onStageChange();
+        rebuildOutputTabs();
+        rebuildAiSelectionButtons();
+    }
+
+    rebuildWorkflowSelect();
+
+    refs.wfSaveBtn?.addEventListener("click", async () => {
+        const id = refs.wfSelect?.value || "";
+        let name = (refs.wfNameInp?.value || "").trim();
+        if (!id) {
+            if (!name) name = "New Workflow";
+            const wf = { id: crypto.randomUUID(), name, data: snapshotCurrentWorkflow() } as EphorStore["workflows"][number];
+            store.workflows = store.workflows ?? [];
+            store.workflows.push(wf);
+            await saveEphorStore(store);
+            rebuildWorkflowSelect();
+            if (refs.wfSelect) refs.wfSelect.value = wf.id;
+            if (refs.wfNameInp) refs.wfNameInp.value = name;
+            try { log("UI", `Workflow created: ${name}`); } catch {}
+            return;
+        }
+        const idx = (store.workflows ?? []).findIndex(w => w.id === id);
+        if (idx === -1) return;
+        if (name) store.workflows![idx].name = name;
+        store.workflows![idx].data = snapshotCurrentWorkflow();
+        await saveEphorStore(store);
+        rebuildWorkflowSelect();
+        if (refs.wfSelect) refs.wfSelect.value = id;
+        if (refs.wfNameInp) refs.wfNameInp.value = store.workflows![idx].name;
+        try { log("UI", `Workflow saved: ${store.workflows![idx].name}`); } catch {}
+    });
+
+    refs.wfLoadBtn?.addEventListener("click", async () => {
+        const id = refs.wfSelect?.value || "";
+        const wf = (store.workflows ?? []).find(w => w.id === id);
+        if (!wf) return;
+        await restoreWorkflow(wf.data);
+        try { log("UI", `Workflow loaded: ${wf.name}`); } catch {}
+        if (refs.wfNameInp) refs.wfNameInp.value = wf.name;
+    });
+
+    refs.wfDeleteBtn?.addEventListener("click", async () => {
+        const id = refs.wfSelect?.value || "";
+        const wf = (store.workflows ?? []).find(w => w.id === id);
+        if (!wf) return;
+        const ok = await openConfirmDialog(`Delete workflow "${wf.name}"?`);
+        if (!ok) return;
+        store.workflows = (store.workflows ?? []).filter(w => w.id !== id);
+        await saveEphorStore(store);
+        rebuildWorkflowSelect();
+        try { log("UI", `Workflow deleted: ${wf.name}`); } catch {}
+    });
+
+    refs.wfSelect?.addEventListener("change", () => {
+        const id = refs.wfSelect.value;
+        const wf = (store.workflows ?? []).find(w => w.id === id);
+        if (refs.wfNameInp) refs.wfNameInp.value = wf?.name ?? "";
+    });
+
+    refs.wfNameInp?.addEventListener("input", () => {
+        const id = refs.wfSelect?.value || "";
+        if (!id) return; // only edit name of existing
+        const wf = (store.workflows ?? []).find(w => w.id === id);
+        if (!wf) return;
+        wf.name = refs.wfNameInp!.value.trim();
+        void saveEphorStore(store).then(() => rebuildWorkflowSelect());
+    });
+
+    /* ------------------------------------------------------------------ *
+     * AI Selections (presets)                                            *
+     * ------------------------------------------------------------------ */
+    function applyAiSelection(models: string[]): void {
+        const avail = new Set(state.availableModels.map(x => x.toLowerCase()));
+        const sanitized = (models || []).filter(m => avail.has(String(m).toLowerCase()));
+        if (useWorkflow) {
+            const stg = store.workflowStages.find(x => x.id === currentStageId);
+            if (stg) stg.selectedModels = [...sanitized];
+        } else {
+            store.selectedModels = [...sanitized];
+        }
+        void saveEphorStore(store);
+        rebuildModelList(state, refs, refs.modelSearchInp.value, useWorkflow ? store.workflowStages.find(x => x.id === currentStageId)! : null);
+        rebuildOutputTabs();
+        try { log("UI", `Applied AI selection (${sanitized.length} models)`); } catch {}
+    }
+
+    function rebuildAiSelectionButtons(): void {
+        try { /* keep UI resilient if toolbar missing */ if (!refs.aiSelRow) return; } catch { return; }
+        refs.aiSelRow.textContent = "";
+        const list = store.aiSelections ?? [];
+        for (const sel of list) {
+            const btn = document.createElement("button");
+            btn.className = "kh-ph-btn";
+            btn.textContent = sel.name || "Selection";
+            btn.title = `${sel.name || "Selection"} — ${sel.models.length} models`;
+            btn.addEventListener("click", () => applyAiSelection(sel.models));
+            refs.aiSelRow.appendChild(btn);
+        }
+        // Always keep gear enabled
+        if (refs.aiSelGearBtn) refs.aiSelGearBtn.disabled = false;
+    }
+
+    // Open manager modal
+    refs.aiSelGearBtn?.addEventListener("click", () => {
+        try { log("UI", "Open AI Selections manager"); } catch {}
+        openAiSelectionsModal(store, state.availableModels);
+    });
+
+    // Live updates when presets change from the manager
+    const onAiSelectionsChanged = () => rebuildAiSelectionButtons();
+    document.addEventListener("aiSelectionsChanged", onAiSelectionsChanged);
+
+    /* Add Placeholder button (circle plus) — open manager, create new, focus name */
+    const addPhBtn = modal.querySelector<HTMLButtonElement>("#kh-add-placeholder");
+    addPhBtn?.addEventListener("click", () => {
+        try { log("UI", "Open Canned Prompts (via +)"); } catch {}
+        openCannedPromptModal(store);
+        // Defer to allow modal to mount
+        window.setTimeout(() => {
+            const m = document.getElementById("kh-canned-prompt-modal");
+            const newBtn = m?.querySelector<HTMLButtonElement>("#kh-canned-new");
+            newBtn?.click();
+            const title = m?.querySelector<HTMLInputElement>("#kh-canned-title");
+            title?.focus();
+            try { log("UI", "New placeholder created and focused"); } catch {}
+        }, 0);
+    });
 
     /* ------------------------------------------------------------------ *
      * TICKET WATCHER – keep modal in sync when user navigates to

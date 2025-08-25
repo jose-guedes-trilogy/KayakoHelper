@@ -1,0 +1,526 @@
+{
+  "ACRM": {
+    "project_id": "3ade6f53-6f7e-4f3c-8453-65d2ed834ae6",
+    "invite_link_id": "a118b15c"
+  },
+  "AI Learning Resource": {
+    "project_id": "b8d03ee3-09f9-46a7-8741-32a42ac69483",
+    "invite_link_id": "52fbf5b3"
+  },
+  "CS Colab": {
+    "project_id": "3db5e786-7b9b-4679-abd7-dfbcac65e392",
+    "invite_link_id": "b30481f6"
+  },
+  "CallStream": {
+    "project_id": "9a647af3-f9c0-43d5-8f1f-f50d3282e695",
+    "invite_link_id": "c1254611"
+  },
+  "Central Documents (DB & Compute)": {
+    "project_id": "887f0345-68ec-4079-8a77-3c99fb920133",
+    "invite_link_id": "7a6eca3f"
+  },
+  "Central SaaS Assistant": {
+    "project_id": "3d02083e-8377-4497-b68d-55721c9123ce",
+    "invite_link_id": "af8e69ab"
+  },
+  "CloudSense": {
+    "project_id": "f1d8fcb7-550f-48d3-aaba-1de81682c854",
+    "invite_link_id": "da03f099"
+  },
+  "Contently Support": {
+    "project_id": "cdc56690-5b8d-4442-a8a9-7280b5e50794",
+    "invite_link_id": "17e47e79"
+  },
+  "Crossover": {
+    "project_id": "8d0179ee-b966-4bba-aa1a-9f05ac68c5d0",
+    "invite_link_id": "1a842012"
+  },
+  "Default": {
+    "project_id": "77057287-d743-4e7f-bec3-7b30dba041e3",
+    "invite_link_id": "7bb5c8a9"
+  },
+  "Education": {
+    "project_id": "c58a0aa3-3705-402d-86a6-4f8d6d14044a",
+    "invite_link_id": "dd8e3d4e"
+  },
+  "Exinda": {
+    "project_id": "124d742b-03f8-461f-adbb-7eb445c9297f",
+    "invite_link_id": "936e7d4f"
+  },
+  "GHI Analyzer": {
+    "project_id": "0f2328aa-4e0e-4223-8f09-a6a139277993",
+    "invite_link_id": "88103224"
+  },
+  "Gensym": {
+    "project_id": "a62d2daf-d526-45ea-8274-f0dc537c3214",
+    "invite_link_id": "38c00e27"
+  },
+  "Influitive Bot": {
+    "project_id": "5fa8c752-02cc-4f8b-8890-dc67bff8f6ba",
+    "invite_link_id": "203e6ab9"
+  },
+  "Kayako TNK": {
+    "project_id": "09b3ee9a-6a8c-4602-8204-1b69e6246c12",
+    "invite_link_id": "64287c91"
+  },
+  "Kerio Control": {
+    "project_id": "91ec7bdd-f87e-4e2a-92d9-5e7d329d91e9",
+    "invite_link_id": "d2c1239e"
+  },
+  "KerioConnect": {
+    "project_id": "68449a6e-6d9d-47a8-9cb9-387fd3506176",
+    "invite_link_id": "e02507b1"
+  },
+  "Khoros Aurora Community": {
+    "project_id": "82da61b2-1cf0-43ce-b8a5-09a51d22d04c",
+    "invite_link_id": "dc6de3ad"
+  },
+  "Khoros Care": {
+    "project_id": "4e9b54bd-3f31-4913-b0bc-4111a6bf1223",
+    "invite_link_id": "883ce887"
+  },
+  "Khoros Classic Community": {
+    "project_id": "f81967dd-7e15-4a18-99bb-6de330d8bb14",
+    "invite_link_id": "36ad818a"
+  },
+  "Khoros Flow": {
+    "project_id": "d816b6d1-f2ce-41c4-b433-2d1e3fcfe6ca",
+    "invite_link_id": "5ba4abc6"
+  },
+  "Khoros Marketing": {
+    "project_id": "90d2d360-55e2-4219-87bd-c1b208fdfc9c",
+    "invite_link_id": "fea44c99"
+  },
+  "Newnet Master project": {
+    "project_id": "d60209ab-c6a4-4ed1-b69d-089dc60436fa",
+    "invite_link_id": "1467b922"
+  },
+  "SaaS.DevOps Team": {
+    "project_id": "56857153-64ca-458d-9f64-9a1e1ab8286c",
+    "invite_link_id": "29da1082"
+  },
+  "There's a Form for That": {
+    "project_id": "b96eee2e-8a7c-4e4c-8747-27f7a896828d",
+    "invite_link_id": "e6d41b24"
+  },
+  "Tivian CXI SaaS 2nd Brain": {
+    "project_id": "daa898ed-e46f-4edd-9015-28ceb1ac4062",
+    "invite_link_id": "5bd421f4"
+  },
+  "Tivian CXI SaaS KT": {
+    "project_id": "c2ec8053-69c9-4a91-a82c-19ab8d7a19a0",
+    "invite_link_id": "ec9f9834"
+  },
+  "Tivian DXI": {
+    "project_id": "1b8ef246-d71e-4d9c-84e4-42caa45ad8c4",
+    "invite_link_id": "76b9a684"
+  },
+  "Vibe: 2hr Learning": {
+    "project_id": "1d67d08f-5e6f-498c-958a-a7939b90c08e",
+    "invite_link_id": "beeb2ec2"
+  },
+  "Vibe: @Hand": {
+    "project_id": "3ce83eda-bbe4-41a8-910b-654c8d364dda",
+    "invite_link_id": "824eaa3b"
+  },
+  "Vibe: ALP": {
+    "project_id": "d95749da-446a-40eb-8bf7-7ec64590fd50",
+    "invite_link_id": "cd3951cb"
+  },
+  "Vibe: Accuris": {
+    "project_id": "e7e813fd-b260-41e6-931a-785555aab47a",
+    "invite_link_id": "118f898e"
+  },
+  "Vibe: AnswerHub": {
+    "project_id": "7e78a6a9-b5a9-4f47-bfe5-aa7f4917964b",
+    "invite_link_id": "7976a4fc"
+  },
+  "Vibe: Aurea Portal Management": {
+    "project_id": "2f4cb4ee-a6fa-407a-9db9-c2504c600cf5",
+    "invite_link_id": "242c2cb7"
+  },
+  "Vibe: Aurea::AEM::Lyris HQ": {
+    "project_id": "ca7a3558-f7ff-4baf-8d62-e24523dd0efb",
+    "invite_link_id": "065897d9"
+  },
+  "Vibe: Aurea::AEM::Lyris LM": {
+    "project_id": "30aa2601-429e-4449-a681-17de5f1b2c60",
+    "invite_link_id": "507c2a97"
+  },
+  "Vibe: Aurea::AES::CIS": {
+    "project_id": "e1b71060-92fa-45c5-812f-1d2c1549802f",
+    "invite_link_id": "337ac6f5"
+  },
+  "Vibe: Aurea::AES::EDI": {
+    "project_id": "c5d64596-3d3b-4eac-9de3-540a22941ec3",
+    "invite_link_id": "334edc02"
+  },
+  "Vibe: Aurea::AMS::Alertfind": {
+    "project_id": "1a2c0ce3-be05-4054-a62c-d4922b1ac986",
+    "invite_link_id": "01d0ad54"
+  },
+  "Vibe: Aurea::AMS::EMS": {
+    "project_id": "c52fbd04-099c-4524-b0f9-2f137c3ff19b",
+    "invite_link_id": "64e2d20e"
+  },
+  "Vibe: Aurea::CRM": {
+    "project_id": "e7fc63df-dae6-4993-84c5-0effd0692158",
+    "invite_link_id": "a904a7f7"
+  },
+  "Vibe: Aurea::Messenger": {
+    "project_id": "60ea47d2-ee41-4c03-b6f5-f93d923e1f43",
+    "invite_link_id": "b3dc5790"
+  },
+  "Vibe: Aurea::Monitor": {
+    "project_id": "de6cf8ff-3a6a-4e4c-a2e5-df64ee01a1c6",
+    "invite_link_id": "9be72fed"
+  },
+  "Vibe: Aurea::Process": {
+    "project_id": "05d8be86-307d-45f0-978c-3e91f77aa4dd",
+    "invite_link_id": "1acd6176"
+  },
+  "Vibe: Auto-trol": {
+    "project_id": "b54e48af-0d15-406b-b3ac-89b9a07d05c1",
+    "invite_link_id": "62bfbfa8"
+  },
+  "Vibe: Bonzai Intranet": {
+    "project_id": "fa337da7-256a-4c9a-a589-1e36953da167",
+    "invite_link_id": "c08c2864"
+  },
+  "Vibe: CSAI": {
+    "project_id": "dbf021d8-059a-4190-8d42-900099ae01e9",
+    "invite_link_id": "94b67c8d"
+  },
+  "Vibe: CallStream": {
+    "project_id": "84ef9667-f2b3-43bf-aa33-4ee9d1c6e5f9",
+    "invite_link_id": "2766a138"
+  },
+  "Vibe: Central Compliance": {
+    "project_id": "1689b635-f4ae-453c-ab9c-6bfd5d9b0c76",
+    "invite_link_id": "73a56016"
+  },
+  "Vibe: Central Finance": {
+    "project_id": "90a54d4b-9c71-454c-aba3-32abc192d31c",
+    "invite_link_id": "62bcdb66"
+  },
+  "Vibe: Central SaaS": {
+    "project_id": "803522cd-d093-4b6d-bdba-6b42a5e1c294",
+    "invite_link_id": "32713466"
+  },
+  "Vibe: Central Vendor Management": {
+    "project_id": "3d76f9fe-4bd2-4d83-9c01-379e5d8d128a",
+    "invite_link_id": "74bbd539"
+  },
+  "Vibe: CityNumbers": {
+    "project_id": "ffbc36f7-f326-4356-a3ed-2de09fd4435e",
+    "invite_link_id": "6881a23d"
+  },
+  "Vibe: Cloud Charging and Billing": {
+    "project_id": "8ba3333e-0f03-4d1a-abc1-fb88d34cb0b1",
+    "invite_link_id": "9bfd2acd"
+  },
+  "Vibe: Cloud Charging and Billing - UI": {
+    "project_id": "dba3908d-6e93-4a28-be3a-15203273f3bb",
+    "invite_link_id": "54bcff4d"
+  },
+  "Vibe: CloudFix": {
+    "project_id": "a5445c5f-ea28-4e65-8731-e81e8f90d293",
+    "invite_link_id": "4b8599d7"
+  },
+  "Vibe: CloudSense": {
+    "project_id": "7ca63d3c-ca89-4390-9a7c-159590c80e76",
+    "invite_link_id": "882c8140"
+  },
+  "Vibe: Communicate XI": {
+    "project_id": "7d48572c-9070-4b17-b89b-2b3e814adb9e",
+    "invite_link_id": "60097c0d"
+  },
+  "Vibe: Computron": {
+    "project_id": "d388f5ab-0229-4598-b4e2-b9b6b3978b50",
+    "invite_link_id": "ed5d291a"
+  },
+  "Vibe: Contently": {
+    "project_id": "802f3ca9-390f-4d62-a52f-6374c7331d9d",
+    "invite_link_id": "79e69bf8"
+  },
+  "Vibe: CoreTrac": {
+    "project_id": "77a1c9d5-a52c-44aa-ad9e-6a4afe01fe2b",
+    "invite_link_id": "19716466"
+  },
+  "Vibe: Crossover": {
+    "project_id": "6bdc0dac-7c57-49f9-ba6e-3c5274661019",
+    "invite_link_id": "58ce697f"
+  },
+  "Vibe: Crossover Hiring": {
+    "project_id": "48c966c8-e132-43db-9e1b-0caef5a64ea6",
+    "invite_link_id": "116d43cf"
+  },
+  "Vibe: Crossover Internal": {
+    "project_id": "eec5dbd4-1e69-491b-8b6b-4659e71a94d6",
+    "invite_link_id": "6843df11"
+  },
+  "Vibe: DNN": {
+    "project_id": "2b752f1e-5d17-4e9f-80d8-5a37e4f417de",
+    "invite_link_id": "764921c9"
+  },
+  "Vibe: Discover XI": {
+    "project_id": "35727d80-38dd-4581-922a-d00cba920f2c",
+    "invite_link_id": "eb4d8cbc"
+  },
+  "Vibe: EDU": {
+    "project_id": "2cb4863b-f08e-406e-b68e-386bdf1bb087",
+    "invite_link_id": "e27def2d"
+  },
+  "Vibe: EDU: Finance & Operation": {
+    "project_id": "55c95e9c-d1bd-4f2e-a729-c2b2f6681ffc",
+    "invite_link_id": "0a6bf2e0"
+  },
+  "Vibe: EPM Live": {
+    "project_id": "fe5e9ac8-36e4-489e-bd4d-c380b005a603",
+    "invite_link_id": "1270118d"
+  },
+  "Vibe: Engine Yard": {
+    "project_id": "3d680d24-66a3-45d8-899e-19262dd888e6",
+    "invite_link_id": "f1cfc2d9"
+  },
+  "Vibe: Everest": {
+    "project_id": "407ea415-e675-4e17-8fb3-49a9076160cc",
+    "invite_link_id": "dd326790"
+  },
+  "Vibe: Field Force Manager": {
+    "project_id": "92744ec7-ae51-417f-b14d-30912f10289d",
+    "invite_link_id": "43fe9aec"
+  },
+  "Vibe: FogBugz": {
+    "project_id": "01ca5603-bbb3-41ad-9aa3-8f353949327f",
+    "invite_link_id": "b5ad6c22"
+  },
+  "Vibe: GFI - AppManager": {
+    "project_id": "3ac341c0-879a-4e9c-8f9f-9fda10ee98eb",
+    "invite_link_id": "6b01b6a1"
+  },
+  "Vibe: GFI - Archiver": {
+    "project_id": "5fd8495d-288e-45f2-bcb8-d3eeb465eb64",
+    "invite_link_id": "04f42c36"
+  },
+  "Vibe: GFI - Exinda Network Orchestrator": {
+    "project_id": "34b13219-8167-4476-92e9-bfa8fd4c5b4e",
+    "invite_link_id": "33e6e163"
+  },
+  "Vibe: GFI - FaxMaker": {
+    "project_id": "88c7e8b9-33b5-481b-8df0-c63f668fdc3e",
+    "invite_link_id": "41954634"
+  },
+  "Vibe: GFI - FaxMaker Online": {
+    "project_id": "10464a44-da16-4e00-a120-0bd18f10bd7b",
+    "invite_link_id": "3bd43ad3"
+  },
+  "Vibe: GFI - Kerio Connect": {
+    "project_id": "218ab7d0-4568-4e0a-8041-e6e3fdb9a508",
+    "invite_link_id": "db9145af"
+  },
+  "Vibe: GFI - Kerio Control": {
+    "project_id": "be4f78f3-357b-456a-b065-3c2d95dee779",
+    "invite_link_id": "c9c3e90a"
+  },
+  "Vibe: GFI - Kerio Operator": {
+    "project_id": "f15178c8-d183-476a-9e1f-c281db5e0522",
+    "invite_link_id": "4b906980"
+  },
+  "Vibe: GFI - LanGuard": {
+    "project_id": "a830629a-1f85-4ea9-b1ab-6381ff6aa600",
+    "invite_link_id": "30dc5274"
+  },
+  "Vibe: GFI - MailEssentials": {
+    "project_id": "44ecc460-cb29-4b9e-8b5f-2cdb2e87d277",
+    "invite_link_id": "c34a0e8f"
+  },
+  "Vibe: Gensym": {
+    "project_id": "e15b3b16-7cd8-4645-a7bd-14b929fff848",
+    "invite_link_id": "2e4ed524"
+  },
+  "Vibe: GoMembers 4gov": {
+    "project_id": "3d4ee5d1-835e-48e1-8581-ba62ef54f4dd",
+    "invite_link_id": "96b4f5f8"
+  },
+  "Vibe: GoMembers Enterprise": {
+    "project_id": "7a7afc23-b89f-43d2-8f6f-8ad743e39ebf",
+    "invite_link_id": "6bfefce3"
+  },
+  "Vibe: GoMembers OnDemand": {
+    "project_id": "31f688a8-e94b-4a1c-8194-06011daee278",
+    "invite_link_id": "d47d33f9"
+  },
+  "Vibe: Influitive": {
+    "project_id": "ec013ddd-5013-42c8-b3dc-7054bd783aa8",
+    "invite_link_id": "5181d424"
+  },
+  "Vibe: Infobright DB": {
+    "project_id": "bbfa1f7d-0564-4f6d-9c23-a1e114fa1dcd",
+    "invite_link_id": "fcf8b75c"
+  },
+  "Vibe: Jigsaw Interactive": {
+    "project_id": "bb00f711-d5d6-4493-8b39-cbc05b538338",
+    "invite_link_id": "badc62dc"
+  },
+  "Vibe: Jive Cloud": {
+    "project_id": "5e755490-3fa0-4608-9ad1-e7409957407b",
+    "invite_link_id": "0124f604"
+  },
+  "Vibe: Jive HOP": {
+    "project_id": "2707c7d8-d814-43d0-8346-13508c4218b9",
+    "invite_link_id": "47d64ddb"
+  },
+  "Vibe: Kandy": {
+    "project_id": "305e49ef-e35f-4e66-80f4-0d4565842be8",
+    "invite_link_id": "98a7be87"
+  },
+  "Vibe: Kandy Cpaas": {
+    "project_id": "aefd4f60-d035-469d-a440-6670b8131b8c",
+    "invite_link_id": "1b398042"
+  },
+  "Vibe: Kayako": {
+    "project_id": "b970ee15-8f68-4bb7-b356-12fbc4331f21",
+    "invite_link_id": "aa195ed6"
+  },
+  "Vibe: Kayako Classic": {
+    "project_id": "36d1dafc-13a2-479b-a289-e6ebffb5a904",
+    "invite_link_id": "0d3160e7"
+  },
+  "Vibe: Khoros Care": {
+    "project_id": "4cd9dad3-c6f2-4e4f-bab8-53f6d3f4db28",
+    "invite_link_id": "e008a7db"
+  },
+  "Vibe: Khoros Community Aurora": {
+    "project_id": "36a61cdf-41b6-4662-85d1-729171e22538",
+    "invite_link_id": "a01fa178"
+  },
+  "Vibe: Khoros Community Classic": {
+    "project_id": "d751b105-a765-456a-b8d0-ba02f079fd23",
+    "invite_link_id": "7d14e64f"
+  },
+  "Vibe: Khoros Flow": {
+    "project_id": "1ed226dc-ba03-4d0f-ab3c-a9c9ffa08fa9",
+    "invite_link_id": "98acbdf4"
+  },
+  "Vibe: Khoros Marketing": {
+    "project_id": "45717ea4-5334-47fe-9f62-fe75f4ac7498",
+    "invite_link_id": "d4ca1476"
+  },
+  "Vibe: Knova": {
+    "project_id": "383cac0c-0aa5-43cf-a5ae-8e13b7b58d5e",
+    "invite_link_id": "99364433"
+  },
+  "Vibe: Learn and Earn": {
+    "project_id": "3cb852c9-ca9e-4094-a88a-cf5e85cf6f35",
+    "invite_link_id": "17e1d59e"
+  },
+  "Vibe: Mobilogy Now": {
+    "project_id": "837b332b-2c2f-44f8-9111-55e664d2b786",
+    "invite_link_id": "b09feeaa"
+  },
+  "Vibe: NewNet": {
+    "project_id": "b8742b11-fefd-4f35-b4c2-bf7fb3d18e8e",
+    "invite_link_id": "495e3edf"
+  },
+  "Vibe: Northplains - Xinet": {
+    "project_id": "ba030a44-1ff9-48cc-a098-99c24763adb9",
+    "invite_link_id": "7cbffa96"
+  },
+  "Vibe: NuView": {
+    "project_id": "c58e7db4-e73f-4f43-a50d-e1f187191e52",
+    "invite_link_id": "3f407210"
+  },
+  "Vibe: ObjectStore": {
+    "project_id": "e4163522-ee3e-492b-a792-5f46b87a0583",
+    "invite_link_id": "90e90bec"
+  },
+  "Vibe: OneSCM": {
+    "project_id": "7674d8ed-7d52-42d0-a5ee-f1687841bc8c",
+    "invite_link_id": "017dd945"
+  },
+  "Vibe: Pivotal": {
+    "project_id": "784aebc9-8fde-425a-8a39-23e23565d1e0",
+    "invite_link_id": "ae148e04"
+  },
+  "Vibe: Placeable": {
+    "project_id": "430898db-f936-4168-b8bf-63e3c48510c6",
+    "invite_link_id": "61d47920"
+  },
+  "Vibe: Playbooks": {
+    "project_id": "6c5aa256-a369-4375-9841-bc5730601558",
+    "invite_link_id": "7389624a"
+  },
+  "Vibe: Post Beyond": {
+    "project_id": "6763892b-e2fc-45d9-a57f-b40bd1adefd8",
+    "invite_link_id": "b6993f3c"
+  },
+  "Vibe: Prologic": {
+    "project_id": "bdc6e903-3322-42b4-b87d-76215faf9863",
+    "invite_link_id": "a94bba34"
+  },
+  "Vibe: QuickSilver": {
+    "project_id": "0a096bcc-2758-473e-af9e-d4a7b096a6b1",
+    "invite_link_id": "3e188f61"
+  },
+  "Vibe: ResponseTek Telco": {
+    "project_id": "2d51727a-39b7-4f2f-b531-769a80e94b6d",
+    "invite_link_id": "bf18d1f5"
+  },
+  "Vibe: Saratoga": {
+    "project_id": "636fd248-d929-41ec-8113-1390f6fcbbb1",
+    "invite_link_id": "e2f2898c"
+  },
+  "Vibe: ScaleArc": {
+    "project_id": "bf6e47d5-6334-47e3-94a4-f6357c030382",
+    "invite_link_id": "84e9a014"
+  },
+  "Vibe: Service Gateway (Skyvera)": {
+    "project_id": "606c4c39-ea86-446e-94ad-d1c381ea4acd",
+    "invite_link_id": "a9ef110e"
+  },
+  "Vibe: Skyvera Analytics": {
+    "project_id": "a32848a7-9a14-4d32-b45a-0218d180eaf1",
+    "invite_link_id": "116679c2"
+  },
+  "Vibe: Skyvera Monetization and CxM": {
+    "project_id": "8282d636-2816-4306-bc5e-f9b47dc656e8",
+    "invite_link_id": "9ff08b58"
+  },
+  "Vibe: Skyvera Network 5G & WiFi": {
+    "project_id": "8b9cfa4a-8a7f-4080-a33f-e9949967bd33",
+    "invite_link_id": "5a697305"
+  },
+  "Vibe: SmartRoutines": {
+    "project_id": "7bcb9dff-07af-4c9a-b19d-8e2d3fdf9bc7",
+    "invite_link_id": "a1d96316"
+  },
+  "Vibe: Sococo": {
+    "project_id": "a58974c3-e96b-4861-8602-bdfe36e7b57f",
+    "invite_link_id": "a3f2df3c"
+  },
+  "Vibe: Stratifyd": {
+    "project_id": "2e0e06d3-8a09-4169-bf3c-78d5acec09b4",
+    "invite_link_id": "35dad836"
+  },
+  "Vibe: StreetSmart": {
+    "project_id": "1066cef1-6ded-4f01-87f3-8bf93b6c8975",
+    "invite_link_id": "128a3599"
+  },
+  "Vibe: SupportSoft": {
+    "project_id": "819c6085-ee6f-4a31-96d5-0eaf378317d4",
+    "invite_link_id": "9aade3d2"
+  },
+  "Vibe: TradeBeam": {
+    "project_id": "aebaf9ab-8188-492d-9097-32e05a02f3cf",
+    "invite_link_id": "523c08ea"
+  },
+  "Vibe: Verdiem": {
+    "project_id": "25b5f2fa-e2fa-411a-a7ac-0f9b7eaaddba",
+    "invite_link_id": "ef3af03a"
+  },
+  "Vibe: Volt Delta": {
+    "project_id": "8573600f-43b3-425e-b747-2a5fbfe412d4",
+    "invite_link_id": "b9253d27"
+  }
+}

@@ -512,6 +512,21 @@ export class EphorClient {
         return this.request("/api/v1/projects", { method: "GET" });
     }
 
+    /**
+     * List projects using the Clerk cookie/JWT through the hidden app tab.
+     * Does not require an API key.
+     */
+    async listProjectsCookie(): Promise<any> {
+        await this.ensureStreamJwt();
+        const url = `${this.apiBase}/api/v1/projects`;
+        return this.hiddenTab.fetch<any>(url, {
+            headers: {
+                Accept: "application/json, text/plain, */*",
+                Authorization: `Bearer ${this._streamJwt}`,
+            },
+        });
+    }
+
     async listModels(): Promise<string[]> {
         return [
             "gemini-2.5-pro",
@@ -567,6 +582,60 @@ export class EphorClient {
 
     async getChannelMessages(projectId: string, channelId: string) {
         return this.request(`/api/v1/projects/${projectId}/channels/${channelId}/messages`, { method: "GET" });
+    }
+
+    /**
+     * Attempt to silently join a project via invite id.
+     * 1) Try a background hidden fetch to the invite URL.
+     * 2) Poll /projects via cookie/JWT to verify membership.
+     * 3) Fallback: open the join URL in the hidden pinned tab, close it after load, and re-check.
+     */
+    async quietJoinByInvite(inviteId: string, projectId: string, timeoutMs = 15_000): Promise<boolean> {
+        const joinUrl = `https://app.ephor.ai/join/${inviteId}`;
+        const start = Date.now();
+
+        const hasJoined = async (): Promise<boolean> => {
+            try {
+                const list = await this.listProjectsCookie();
+                const items: any[] = Array.isArray(list) ? list : (list?.items ?? list?.data ?? []);
+                return items.some((p: any) => String(p.id ?? p.project_id ?? p.uuid) === projectId);
+            } catch { return false; }
+        };
+
+        try {
+            await this.hiddenTab.fetch<string>(joinUrl, { method: "GET" });
+        } catch {}
+
+        // Poll for membership
+        while (Date.now() - start < timeoutMs) {
+            if (await hasJoined()) return true;
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
+        // Fallback: open in hidden pinned tab and close after load
+        try {
+            const tabId = (HiddenEphorTab as any)["ensureTab"] ? await (HiddenEphorTab as any)["ensureTab"]() : undefined;
+            if (tabId != null && chrome.tabs?.update) {
+                await chrome.tabs.update(tabId, { url: joinUrl, active: false, pinned: true });
+                await new Promise<void>(resolve => {
+                    const lis = (id: number, _ci: any, info: chrome.tabs.TabChangeInfo) => {
+                        if (id === tabId && info.status === "complete") {
+                            chrome.tabs.onUpdated.removeListener(lis);
+                            resolve();
+                        }
+                    };
+                    chrome.tabs.onUpdated.addListener(lis);
+                });
+                try { await chrome.tabs.remove(tabId); } catch {}
+            }
+        } catch {}
+
+        const start2 = Date.now();
+        while (Date.now() - start2 < 10_000) {
+            if (await hasJoined()) return true;
+            await new Promise(r => setTimeout(r, 1000));
+        }
+        return false;
     }
 
     /* ------------------------------------------------------------------
@@ -785,7 +854,10 @@ export class EphorClient {
 
         if (EphorClient.verbose) console.log("[Ephor] ⇠", url, { status: res.status, ok: res.ok, body });
 
-        if (!res.ok) throw new Error(JSON.stringify({ status: res.status, url, body }));
+        if (!res.ok) {
+            try { console.error('[Ephor] FETCH ✗', { url, status: res.status, body }); } catch {}
+            throw new Error(JSON.stringify({ status: res.status, url, body }));
+        }
         return body;
     }
 

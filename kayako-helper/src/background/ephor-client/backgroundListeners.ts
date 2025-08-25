@@ -11,6 +11,7 @@ import { HiddenEphorTab } from "./HiddenEphorTab.ts";
 /* ------------------------------------------------------------------ */
 if (self && EphorClient.isBackgroundContext()) {
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+        try { console.log('[ephor.bg] message', msg?.action || msg); } catch {}
 
         /* regular proxy */
         if (msg?.action === EphorClient["BG_ACTION"]) {
@@ -31,6 +32,7 @@ if (self && EphorClient.isBackgroundContext()) {
                     const data = await hiddenFetch(msg.tabId, msg.url, msg.init);
                     sendResponse({ ok: true, data });
                 } catch (err: any) {
+                    console.error('[ephor.bg] hidden fetch error', err);
                     sendResponse({ ok: false, error: err?.message ?? String(err) });
                 }
             })();
@@ -44,6 +46,38 @@ if (self && EphorClient.isBackgroundContext()) {
                     const { token, expiresAt } = await new HiddenEphorTab().getSessionJwt();
                     sendResponse({ ok: true, token, expiresAt });
                 } catch (err: any) {
+                    sendResponse({ ok: false, error: err?.message ?? String(err) });
+                }
+            })();
+            return true;
+        }
+
+        /* List projects via cookie/JWT through hidden tab */
+        if (msg?.action === "ephor.listProjects") {
+            (async () => {
+                try {
+                    const cli = new EphorClient({});
+                    await cli.ready();
+                    const data = await cli.listProjectsCookie();
+                    sendResponse({ ok: true, data });
+                } catch (err: any) {
+                    console.error('[ephor.bg] listProjects error', err);
+                    sendResponse({ ok: false, error: err?.message ?? String(err) });
+                }
+            })();
+            return true;
+        }
+
+        /* Quiet join via invite and confirm */
+        if (msg?.action === "ephor.joinByInvite" && msg?.inviteId && msg?.projectId) {
+            (async () => {
+                try {
+                    const cli = new EphorClient({});
+                    await cli.ready();
+                    const ok = await cli.quietJoinByInvite(String(msg.inviteId), String(msg.projectId));
+                    sendResponse({ ok, joined: ok });
+                } catch (err: any) {
+                    console.error('[ephor.bg] joinByInvite error', err);
                     sendResponse({ ok: false, error: err?.message ?? String(err) });
                 }
             })();

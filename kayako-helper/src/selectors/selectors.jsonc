@@ -327,6 +327,14 @@
     "exportDefaultRadio"      : ".kh-exp-def",
     "exportDelUrlBtn"         : ".kh-exp-del-url",
 
+    // Always-visible inputs to add a new URL under each provider
+    // Name/Label input for the new URL row
+    "exportNewUrlLabelInput"  : ".kh-exp-new-label",
+    // URL input for the new URL row
+    "exportNewUrlUrlInput"    : ".kh-exp-new-url",
+    // Submit button to add the URL from the inputs
+    "exportNewUrlAddBtn"      : ".kh-exp-add-url-submit",
+
     /* modal header + footer */
     "exportSettingsHeader"    : ".kh-exp-header",
     "exportSettingsFooter"    : ".kh-exp-footer",
@@ -352,6 +360,23 @@
     "assetsHeader":            ".kh-assets-header",
     "assetsJumpButton":        ".kh-assets-jump",
     "assetsList":              ".kh-assets-list",
+    // New elaborate UI selectors for grouped assets
+    "assetsPostGroup":         ".kh-assets-post-group", // container card per post group
+    "assetsGroupHeader":       ".kh-assets-group-header", // header row within group card
+    "assetsFilename":          ".kh-assets-filename", // filename text span
+    "assetsFileRow":           ".kh-assets-file-row", // row per attachment file
+    "assetsCopyUrlBtn":        ".kh-assets-copy-url", // per-file copy URL button (attachments + images)
+    "assetsDownloadAllAttachmentsBtn": ".kh-assets-dl-all-attach", // per-post download-all for attachments (hide when 1)
+    "assetsDownloadImagesPostZipBtn":  ".kh-assets-dl-post-zip", // per-post images zip
+    "assetsDownloadImagesPostIndivBtn": ".kh-assets-dl-post-indiv", // per-post images individual
+    "assetsDownloadAllImagesZipBtn":   ".kh-assets-dl-all-zip", // global images zip
+    "assetsDownloadAllImagesIndivBtn": ".kh-assets-dl-all-indiv", // global images individual
+    // Global toolbar button for Attachments tab
+    "assetsDownloadAllTicketAttachmentsZipBtn": ".kh-assets-dl-attach-all-zip",
+
+    // Links tab intro + table (sanitized, resilient)
+    "linksIntro":              ".kh-links-intro",
+    "linksTable":              ".kh-links-table",
 
 
     /* Ticket preview tooltip */
