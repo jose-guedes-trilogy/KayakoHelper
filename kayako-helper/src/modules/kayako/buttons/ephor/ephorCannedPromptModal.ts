@@ -21,7 +21,7 @@ export function openCannedPromptModal(store: EphorStore): void {
 
     modal.innerHTML = /* HTML */`
       <div style="display:flex;align-items:center;gap:8px;">
-        <h3 style="margin:0;font-size:15px;">Canned Prompts</h3>
+        <h3 style="margin:0;font-size:15px;">Placeholders</h3>
         <button id="kh-canned-close" class="kh-btn kh-close-button" style="margin-left:auto;">✕</button>
       </div>
 
@@ -29,7 +29,7 @@ export function openCannedPromptModal(store: EphorStore): void {
         <!-- left: list -->
         <div style="border:1px solid #ddd;border-radius:4px;padding:6px;display:flex;flex-direction:column;gap:6px;">
           <div id="kh-canned-list" style="flex:1 1 auto;overflow-y:auto;"></div>
-          <button id="kh-canned-new" class="kh-btn">➕ New prompt</button>
+          <button id="kh-canned-new" class="kh-btn">➕ New placeholder</button>
         </div>
 
         <!-- right: editor -->
@@ -81,6 +81,16 @@ export function openCannedPromptModal(store: EphorStore): void {
 
     const isValidPlaceholder = (s: string) => /^@#\s*[A-Z0-9_.-]+\s*#@$/.test((s || "").trim());
 
+    const isDuplicatePlaceholder = (normalized: string, excludeId: string | null): boolean => {
+        const norm = (v: string) => v.trim().toUpperCase();
+        const n = norm(normalized);
+        // Check against system placeholders
+        const system = ["@#TRANSCRIPT#@","@#FILE_ANALYSIS#@","@#PAST_TICKETS#@","@#STYLE_GUIDE#@"]; 
+        if (system.includes(n)) return true;
+        // Check against saved
+        return (store.cannedPrompts || []).some(p => (excludeId ? p.id !== excludeId : true) && norm(p.placeholder) === n);
+    };
+
     /* ---------- UI helpers ---------- */
     const rebuildList = () => {
         listDiv.textContent = "";
@@ -96,7 +106,7 @@ export function openCannedPromptModal(store: EphorStore): void {
         };
         addSys(SYSTEM_TRANSCRIPT_ID, "Transcript");
         addSys(SYSTEM_FILE_ID, "File Analysis");
-        addSys(SYSTEM_PAST_ID, "Past tickets");
+        addSys(SYSTEM_PAST_ID, "Past Tickets");
         addSys(SYSTEM_STYLE_ID, "Style Guide");
 
         for (const cp of store.cannedPrompts) {
@@ -160,7 +170,7 @@ export function openCannedPromptModal(store: EphorStore): void {
                 phInp.value    = "@#FILE_ANALYSIS#@";
                 bodyTa.value   = (store.systemPromptBodies?.fileAnalysis ?? "");
             } else if (id === SYSTEM_PAST_ID) {
-                titleInp.value = "Past tickets";
+                titleInp.value = "Past Tickets";
                 phInp.value    = "@#PAST_TICKETS#@";
                 bodyTa.value   = (store.systemPromptBodies?.pastTickets ?? "");
             } else if (id === SYSTEM_STYLE_ID) {
@@ -204,10 +214,17 @@ export function openCannedPromptModal(store: EphorStore): void {
         const idx = store.cannedPrompts.findIndex(p => p.id === currentId);
         if (idx === -1) return;
 
+        const nextPlaceholder = normalizePlaceholder(phInp.value);
+        // prevent duplicates
+        if (isDuplicatePlaceholder(nextPlaceholder, currentId)) {
+            phInp.style.borderColor = "#c33";
+            return;
+        }
+        phInp.style.borderColor = "#ccc";
         store.cannedPrompts[idx] = {
             ...store.cannedPrompts[idx],
             title      : titleInp.value.trim(),
-            placeholder: normalizePlaceholder(phInp.value),
+            placeholder: nextPlaceholder,
             body       : bodyTa.value,
         };
         void saveEphorStore(store).then(() => {
@@ -219,7 +236,7 @@ export function openCannedPromptModal(store: EphorStore): void {
     newBtn.addEventListener("click", () => {
         const cp: CannedPrompt = {
             id: crypto.randomUUID(),
-            title:"New Prompt",
+            title:"New Placeholder",
             placeholder:`@#PROMPT_${store.cannedPrompts.length+1}#@`,
             body:"",
         };

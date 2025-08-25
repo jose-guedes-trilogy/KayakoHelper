@@ -34,6 +34,10 @@ const DL_IMG_POST_INDIV_BTN_SEL = '.kh-assets-dl-post-indiv';
 const DL_IMG_ALL_ZIP_BTN_SEL = '.kh-assets-dl-all-zip';
 const DL_IMG_ALL_INDIV_BTN_SEL = '.kh-assets-dl-all-indiv';
 const DL_ATTACH_ALL_TICKET_ZIP_SEL = '.kh-assets-dl-attach-all-zip';
+const SEARCHBAR_SEL = '.kh-assets-searchbar';
+const SEARCH_INPUT_SEL = '.kh-assets-search-input';
+// removed extension search input
+// const SEARCH_EXT_SEL = '.kh-assets-ext-input';
 
 /* Jump-to-post helper (unchanged logic) */
 import { KAYAKO_SELECTORS } from '@/generated/selectors.ts';
@@ -69,6 +73,22 @@ const fileNameFromUrl = (url: string) => {
         const b = raw.split('?')[0] || '';
         const last = b ? (b.includes('/') ? b.substring(b.lastIndexOf('/') + 1) : b) : '';
         return decodeURIComponent(last || 'file');
+    }
+};
+
+const fileNameFromQueryParams = (u: string): string | null => {
+    try {
+        const base = (typeof location !== 'undefined' && location && location.href) ? location.href : undefined as unknown as string;
+        const parsed = base ? new URL(u, base) : new URL(u);
+        const params = parsed.searchParams;
+        const candidates = ['filename', 'file', 'name', 'download'];
+        for (const key of candidates) {
+            const v = params.get(key);
+            if (v && /\.[a-z0-9]{2,5}$/i.test(v)) return v;
+        }
+        return null;
+    } catch {
+        return null;
     }
 };
 
@@ -131,6 +151,49 @@ const copyToClipboard = async (text: string) => {
     }
 };
 
+// Decode any image Blob into a PNG Blob via Canvas to ensure clipboard compatibility
+const convertImageBlobToPng = async (blob: Blob): Promise<Blob> => {
+    try {
+        // Prefer createImageBitmap for speed and reliability
+        if (typeof (window as any).createImageBitmap === 'function') {
+            const bitmap = await (window as any).createImageBitmap(blob);
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas 2D context unavailable');
+            ctx.drawImage(bitmap, 0, 0);
+            const pngBlob: Blob = await new Promise((resolve, reject) =>
+                canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/png'));
+            return pngBlob;
+        }
+        // Fallback path using HTMLImageElement
+        const url = URL.createObjectURL(blob);
+        try {
+            const img = new Image();
+            const loaded: HTMLImageElement = await new Promise((resolve, reject) => {
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Image load failed'));
+                img.src = url;
+            });
+            const canvas = document.createElement('canvas');
+            canvas.width = loaded.naturalWidth || loaded.width;
+            canvas.height = loaded.naturalHeight || loaded.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas 2D context unavailable');
+            ctx.drawImage(loaded, 0, 0);
+            const pngBlob: Blob = await new Promise((resolve, reject) =>
+                canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/png'));
+            return pngBlob;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    } catch (err) {
+        console.error('[AssetsInspector] convertImageBlobToPng failed', err);
+        throw err;
+    }
+};
+
 const fetchBlob = async (url: string): Promise<Blob> => {
     const resp = await fetch(url, { credentials: 'include' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
@@ -154,14 +217,15 @@ const injectStyles = (modal: HTMLElement) => {
     style.className = 'kh-assets-style';
     /* 14px base, Ephor-like container, cards, refined lists, buttons */
     style.textContent = `
-      ${MODAL_SEL} { font-size: 14px; background:#fff; border:1px solid hsl(213deg 15% 88.07%); border-radius: 8px; padding: 10px 12px; box-shadow:0 6px 24px rgba(17,24,39,.12); display:none; flex-direction:column; max-width: 900px; max-height: min(80vh, 720px); overflow: hidden; }
+      ${MODAL_SEL} { font-size: 14px; background:#fff; border:1px solid hsl(213deg 15% 88.07%); border-radius: 8px; padding: 10px 12px; box-shadow:0 6px 24px rgba(17,24,39,.12); display:none; flex-direction:column; max-width: 900px; max-height: min(80vh, 720px); overflow: hidden; position: fixed; top: 64px; left: 64px; z-index: 2147483647; }
       ${MODAL_SEL}.open { display:flex; }
-      ${MODAL_SEL} .kh-assets-headerbar { position: relative; display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+      ${MODAL_SEL} .kh-assets-headerbar { position: relative; display:flex; align-items:center; gap:12px; margin-bottom:8px; cursor: move; -webkit-user-select: none; user-select: none; }
       ${MODAL_SEL} .kh-assets-headerbar h2 { flex:1 1 auto; text-align:center; margin:0; font-size:16px; color:#1f2937; }
       ${MODAL_SEL} .kh-assets-close { position:absolute; right:8px; top:50%; transform:translateY(-50%); margin:0; }
       ${MODAL_SEL} .kh-btn{ padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; }
       ${MODAL_SEL} .kh-btn:hover{ background:#f5f7ff; border-color:#99a; }
       ${MODAL_SEL} .kh-btn:active{ transform:translateY(1px); }
+      ${MODAL_SEL} .kh-assets-close:active{ transform:translateY(-50%); }
       ${MODAL_SEL} ${NAV_SEL} { display:flex; gap: 8px; list-style:none; padding: 4px 0; margin: 0 0 6px 0; }
       ${MODAL_SEL} ${PANE_SEL} { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
       ${MODAL_SEL} ${SUMMARY_SEL} { flex: 0 0 auto; }
@@ -176,9 +240,12 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} .kh-pill-btn:hover { background: #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
       ${MODAL_SEL} ${LIST_SEL} { list-style: none; padding: 10px; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
       ${MODAL_SEL} ${FILE_ROW_SEL} { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f1f3f5; }
-      ${MODAL_SEL} ${FILENAME_SEL} { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; }
+      ${MODAL_SEL} ${FILENAME_SEL} { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; flex: 1 1 auto; min-width: 0; }
+      ${MODAL_SEL} ${FILE_ROW_SEL} > div:first-child { flex: 1 1 auto; min-width: 0; }
       ${MODAL_SEL} ${COPY_URL_BTN_SEL} { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; }
       ${MODAL_SEL} ${COPY_URL_BTN_SEL}:hover { background: #eef2f7; }
+      ${MODAL_SEL} .kh-assets-copy-img { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; }
+      ${MODAL_SEL} .kh-assets-copy-img:hover { background: #eef2f7; }
       ${MODAL_SEL} .kh-image-grid { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
       ${MODAL_SEL} .kh-image-item { display: flex; flex-direction: column; gap: 6px; }
       ${MODAL_SEL} .kh-thumb { width: 100%; height: 96px; border: 1px solid #e6ebf0; border-radius: 8px; object-fit: cover; background: #f8fafc; }
@@ -188,6 +255,11 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} .kh-links-table .header-cell { font-weight:600; color:#4b5563; padding:8px 12px; border-bottom:1px solid #edf0f3; background:#f9fafb; }
       ${MODAL_SEL} .kh-links-table .row { display:contents; }
       ${MODAL_SEL} .kh-links-table .cell { padding:8px 12px; border-bottom:1px solid #f1f3f5; }
+      ${MODAL_SEL} ${SEARCHBAR_SEL} { display:flex; gap:8px; padding: 6px 12px; align-items:center; }
+      ${MODAL_SEL} ${SEARCHBAR_SEL} input { min-width: 0; padding: 6px 10px; border:1px solid #d3d9df; border-radius:6px; font:inherit; }
+      ${MODAL_SEL} ${SEARCHBAR_SEL} ${SEARCH_INPUT_SEL} { flex: 0 0 220px; margin-left: auto; }
+      ${MODAL_SEL} .kh-assets-copy-img { cursor: pointer; }
+      ${MODAL_SEL} ${JUMP_BTN_SEL}:hover { background: #f5f7ff; border-color:#99a; }
     `;
     modal.appendChild(style);
 };
@@ -218,20 +290,25 @@ export const buildModal = (): HTMLElement => {
 const setActiveTab = (modal: HTMLElement, tab: keyof ReturnType<typeof getState>['cache']) => {
     modal.querySelectorAll<HTMLElement>(NAV_ITEM_SEL)
         .forEach(li => li.classList.toggle('active', (li.dataset as any)['tab'] === tab));
+    // Extension search removed; nothing to toggle
     renderPane(modal, tab);
 };
 
 const renderSummary = (modal: HTMLElement) => {
-    const { fetched, totalPosts } = getState();
-    const s         = modal.querySelector<HTMLElement>(SUMMARY_SEL);
+    const s = modal.querySelector<HTMLElement>(SUMMARY_SEL);
     if (!s) return;
-    const atEnd     = fetched >= totalPosts;
-    const nextLabel = `Fetch next ${Math.min(PAGE_LIMIT, totalPosts - fetched)} posts`;
+
+    const prevSearch = (s.querySelector(SEARCH_INPUT_SEL) as HTMLInputElement | null)?.value ?? '';
+    const prevExt = '';
 
     s.innerHTML =
-        `Showing assets from <strong>${fetched}</strong> posts (total <strong>${totalPosts}</strong>)
-         <button class="${FETCH_NEXT_SEL.slice(1)}" ${atEnd ? 'disabled' : ''}>${nextLabel}</button>
-         <button class="${FETCH_ALL_SEL.slice(1)}" ${atEnd ? 'disabled' : ''}>Fetch all</button>`;
+        `<div class="${SEARCHBAR_SEL.slice(1)}">
+           <input class="${SEARCH_INPUT_SEL.slice(1)}" type="text" placeholder="Search name or URL" aria-label="Search" />
+         </div>`;
+
+    const si = s.querySelector<HTMLInputElement>(SEARCH_INPUT_SEL);
+    // no ext input
+    if (si) si.value = prevSearch;
 };
 
 /* Links tab – categorized table with descriptive header */
@@ -239,9 +316,9 @@ const buildGrid = (items: { url:string; post:number }[]) => {
     const grid = document.createElement('div');
     grid.className = GRID_SEL.slice(1);
 
-    const intro = Object.assign(document.createElement('div'), { className: 'kh-links-intro' });
-    intro.textContent = 'Links are grouped by category (Kayako, Jira, GitHub, etc). Click a post number to jump.';
-    grid.appendChild(intro);
+    // const intro = Object.assign(document.createElement('div'), { className: 'kh-links-intro' });
+    // intro.textContent = 'Links are grouped by category (Kayako, Jira, GitHub, etc). Click a post number to jump.';
+    // grid.appendChild(intro);
 
     // Build categories in encounter order from header tokens: --- Label ---
     const categories: Array<{ label: string; rows: { url: string; post: number }[] }> = [];
@@ -397,10 +474,10 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
 
     // Global toolbar
     const toolbar = Object.assign(document.createElement('div'), { className: 'kh-toolbar' });
-    const allZip = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_ALL_ZIP_BTN_SEL.slice(1)}`, textContent: 'Download all screenshots (ZIP)' });
-    const allInd = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_ALL_INDIV_BTN_SEL.slice(1)}`, textContent: 'Download all screenshots (individual)' });
-    allZip.title = 'Download every screenshot in this ticket as a single ZIP file';
-    allInd.title = 'Download every screenshot as individual files';
+    const allZip = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_ALL_ZIP_BTN_SEL.slice(1)}`, textContent: 'Download all images (ZIP)' });
+    const allInd = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_ALL_INDIV_BTN_SEL.slice(1)}`, textContent: 'Download all images (individual)' });
+    allZip.title = 'Download every image in this ticket as a single ZIP file';
+    allInd.title = 'Download every image as individual files';
     toolbar.append(allZip, allInd);
     container.appendChild(toolbar);
 
@@ -434,7 +511,7 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
             } catch (err) { console.error('[AssetsInspector] ZIP (post) failed', err); }
         });
 
-        const dlInd = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_POST_INDIV_BTN_SEL.slice(1)}`, textContent: 'Download all post individually' });
+        const dlInd = Object.assign(document.createElement('button'), { className: `${'kh-pill-btn'} ${DL_IMG_POST_INDIV_BTN_SEL.slice(1)}`, textContent: 'Download all post images individually' });
         dlInd.title = 'Download all screenshots from this post as individual files';
         dlInd.addEventListener('click', async () => {
             log('Download images individually (post)', { post, count: files.length });
@@ -453,7 +530,10 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
             const img = Object.assign(document.createElement('img'), { src: url, className: 'kh-thumb', loading: 'lazy' });
             a.appendChild(img);
             const meta = document.createElement('div');
-            const name = Object.assign(document.createElement('div'), { className: FILENAME_SEL.slice(1), textContent: fileNameFromUrl(url) });
+            // Prefer DOM-derived filename (from timeline anchor) when available, then query params
+            const domDerivedName = findAttachmentFilenameInDom(url, post);
+            const prettyName = domDerivedName || fileNameFromQueryParams(url) || fileNameFromUrl(url);
+            const name = Object.assign(document.createElement('div'), { className: FILENAME_SEL.slice(1), textContent: prettyName });
             // Buttons row: [Copy URL] [Copy Image]
             const actions = document.createElement('div');
             actions.style.display = 'inline-flex';
@@ -467,18 +547,21 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
             copyImgBtn.appendChild(createCopyIconSvg());
             copyImgBtn.addEventListener('click', async () => {
                 try {
-                    log('Copy image BLOB', { post, url });
-                    const blob = await fetchBlob(url);
+                    log('Copy image to clipboard attempt', { post, url });
+                    const srcBlob = await fetchBlob(url);
+                    const pngBlob = await convertImageBlobToPng(srcBlob);
                     if ((navigator as any).clipboard?.write) {
-                        const type = blob.type || 'image/png';
-                        const item = new (window as any).ClipboardItem({ [type]: blob });
+                        const item = new (window as any).ClipboardItem({ 'image/png': pngBlob });
                         await (navigator as any).clipboard.write([item]);
+                        log('Copied image to clipboard as PNG', { post, url });
                     } else {
-                        // Fallback: open and instruct user to copy (clipboard API not available)
+                        // Fallback: open image so user can copy manually
                         window.open(url, '_blank', 'noopener');
                     }
                 } catch (err) {
                     console.error('[AssetsInspector] Copy image failed', err);
+                    // Last-resort fallback: copy URL
+                    try { await copyToClipboard(url); } catch {}
                 }
             });
 
@@ -521,18 +604,56 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
 };
 
 /* Full pane renderer */
-export const renderPane = (modal: HTMLElement, tab: keyof ReturnType<typeof getState>['cache']) => {
+export const renderPane = (
+    modal: HTMLElement,
+    tab: keyof ReturnType<typeof getState>['cache'],
+    options?: { skipSummary?: boolean },
+) => {
     const box   = modal.querySelector<HTMLElement>(RESULTS_SEL)!;
     const state = getState();
+    if (!options?.skipSummary) renderSummary(modal);
     box.innerHTML = '';
 
     if (state.isLoading) { box.textContent = 'Loading…'; return; }
     const items = state.cache[tab];
-    if (!items.length) { box.textContent = '— None found —'; return; }
 
-    if (tab === 'images') { box.appendChild(buildImagesGroups(items)); return; }
-    if (tab === 'attachments') { box.appendChild(buildAttachmentGroups(items)); return; }
-    box.appendChild(buildGrid(items));
+    // Read search inputs
+    const searchInput = modal.querySelector<HTMLInputElement>(SEARCH_INPUT_SEL);
+    // no ext input
+    const q = (searchInput?.value ?? '').trim().toLowerCase();
+    const exts: string[] = [];
+
+    const matchesText = (s: string) => q ? s.toLowerCase().includes(q) : true;
+    const extractExt = (nameOrUrl: string) => {
+        try {
+            const safe = (nameOrUrl ?? '').toString();
+            const base = safe.split('?')[0] ?? '';
+            const hashless = base.split('#')[0] ?? base;
+            const last = (hashless.split('/').pop() ?? '') as string;
+            const idx = last.lastIndexOf('.');
+            return idx >= 0 ? last.slice(idx + 1).toLowerCase() : '';
+        } catch { return ''; }
+    };
+    const fileMatches = (url: string, post: number) => {
+        const displayName = findAttachmentFilenameInDom(url, post) || fileNameFromQueryParams(url) || fileNameFromUrl(url);
+        const okText = matchesText(displayName) || matchesText(url);
+        return okText;
+    };
+    const filtered = (() => {
+        if (tab === 'links') {
+            // Keep header rows, filter non-headers
+            return items.filter(it => it.url.startsWith('--- ') || matchesText(it.url));
+        }
+        return items.filter(it => fileMatches(it.url, it.post));
+    })();
+
+    log('Search filter', { tab, query: q, exts, before: items.length, after: filtered.length });
+
+    if (!filtered.length) { box.textContent = '— None found —'; return; }
+
+    if (tab === 'images') { box.appendChild(buildImagesGroups(filtered)); return; }
+    if (tab === 'attachments') { box.appendChild(buildAttachmentGroups(filtered)); return; }
+    box.appendChild(buildGrid(filtered));
 };
 
 /* Public helpers for index.ts */
@@ -549,5 +670,63 @@ export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: (
             (modal as any).classList.remove('open');
         }
     });
+    // Live search re-render
+    modal.addEventListener('input', ev => {
+        const target = ev.target as HTMLElement;
+        if (target.closest(SEARCHBAR_SEL)) {
+            const active = modal.querySelector<HTMLElement>(`${NAV_ITEM_SEL}.active`);
+            const tab = (active?.dataset as any)?.tab || 'links';
+            // Prevent summary re-render so inputs do not lose focus/selection
+            renderPane(modal, tab as any, { skipSummary: true });
+        }
+    });
+    // Dragging by header
+    const header = modal.querySelector<HTMLElement>('.kh-assets-headerbar');
+    if (header) {
+        let dragging = false;
+        let startX = 0, startY = 0;
+        let boxLeft = 0, boxTop = 0;
+        const onDown = (e: MouseEvent) => {
+            if ((e.target as HTMLElement).closest('.kh-assets-close')) return;
+            dragging = true;
+            const rect = (modal as HTMLElement).getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            boxLeft = rect.left;
+            boxTop = rect.top;
+            // Ensure left/top control and allow horizontal dragging
+            (modal as HTMLElement).style.right = 'auto';
+            (modal as HTMLElement).style.bottom = 'auto';
+            // Lock width to avoid reflow affecting pointer math
+            (modal as HTMLElement).style.width = `${Math.round(rect.width)}px`;
+            (modal as HTMLElement).style.left = `${Math.round(rect.left)}px`;
+            (modal as HTMLElement).style.top = `${Math.round(rect.top)}px`;
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp, { once: true });
+            e.preventDefault();
+        };
+        const onMove = (e: MouseEvent) => {
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            let nextLeft = boxLeft + dx;
+            let nextTop = boxTop + dy;
+            // Constrain within viewport
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const rect = (modal as HTMLElement).getBoundingClientRect();
+            const width = rect.width, height = rect.height;
+            nextLeft = Math.max(0, Math.min(vw - width, nextLeft));
+            nextTop = Math.max(0, Math.min(vh - 40, nextTop));
+            (modal as HTMLElement).style.left = `${Math.round(nextLeft)}px`;
+            (modal as HTMLElement).style.top = `${Math.round(nextTop)}px`;
+        };
+        const onUp = () => {
+            dragging = false;
+            // Keep width auto after drag ends
+            (modal as HTMLElement).style.width = '';
+            document.removeEventListener('mousemove', onMove);
+        };
+        header.addEventListener('mousedown', onDown);
+    }
     setActiveTab(modal, 'links');   // default
 };

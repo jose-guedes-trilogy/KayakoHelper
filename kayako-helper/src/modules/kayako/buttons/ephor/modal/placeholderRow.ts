@@ -1,7 +1,7 @@
 // Kayako Helper – placeholderRow.ts
 // Centralised helpers for the placeholder-button row in the settings modal.
 
-import { EphorStore } from "../ephorStore.ts";
+import { EphorStore, saveEphorStore } from "../ephorStore.ts";
 import type { ModalRefs } from "../ephorSettingsUI.ts";
 
 /* ------------------------------------------------------------------ */
@@ -33,14 +33,19 @@ export function rebuildPlaceholderRow(
 
     const row = refs.placeholderRow;
     row.textContent = "";                                    // wipe
+    row.style.scrollBehavior = "smooth";
 
     // Label rendered in left split column in markup; no inline label here
 
     /* --- Transcript button (always visible) --- */
     createPlainBtn("Transcript", "@#TRANSCRIPT#@", row);
 
-    /* Single-stage mode stops here. */
-    if (!useWorkflow) { rebuildCanned(); return; }
+    /* Single-stage mode still shows system placeholders and user canned */
+    if (!useWorkflow) {
+        appendSystemPlaceholders(row, store);
+        rebuildCanned();
+        return;
+    }
 
     /* Determine completed round count (0-based → 1-based display) */
     const stageIdx = store.workflowStages.findIndex(s => s.id === currentStageId);
@@ -86,7 +91,36 @@ export function rebuildPlaceholderRow(
         document.addEventListener("click", () => { menu.style.display = "none"; });
     }
 
+    appendSystemPlaceholders(row, store);
     rebuildCanned();   // append user canned-prompt buttons
+
+    // Make canned placeholder buttons draggable to reorder within the row
+    try {
+        const buttons = Array.from(row.querySelectorAll<HTMLButtonElement>(".kh-ph-btn[data-canned]"));
+        buttons.forEach((btn, index) => {
+            btn.draggable = true;
+            btn.addEventListener("dragstart", (e) => {
+                btn.dataset.dragIndex = String(index);
+                e.dataTransfer?.setData("text/plain", String(index));
+            });
+            btn.addEventListener("dragover", (e) => { e.preventDefault(); });
+            btn.addEventListener("drop", async (e) => {
+                e.preventDefault();
+                const fromIdx = Number(e.dataTransfer?.getData("text/plain") ?? btn.dataset.dragIndex ?? -1);
+                const toIdx = buttons.indexOf(btn);
+                if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+                const arr = store.cannedPrompts ?? [];
+                if (!arr.length) return;
+                const [moved] = arr.splice(fromIdx, 1);
+                arr.splice(toIdx, 0, moved);
+                await saveEphorStore(store);
+                // Rebuild the row to reflect new order
+                rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCanned);
+                // Keep plus button visible by scrolling to end
+                row.scrollLeft = row.scrollWidth;
+            });
+        });
+    } catch {}
 }
 
 /* ------------------------------------------------------------------ */
@@ -125,4 +159,13 @@ function createSplitBtnPart(
     btn.textContent = label;
     if (token) btn.dataset.ph = token;
     return btn;
+}
+
+function appendSystemPlaceholders(parent: HTMLElement, store: EphorStore): void {
+    // System placeholders: File Analysis, Past Tickets, Style Guide (Transcript already included above)
+    try {
+        createPlainBtn("File Analysis", "@#FILE_ANALYSIS#@", parent);
+        createPlainBtn("Past Tickets", "@#PAST_TICKETS#@", parent);
+        createPlainBtn("Style Guide", "@#STYLE_GUIDE#@", parent);
+    } catch {}
 }

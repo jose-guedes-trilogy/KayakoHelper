@@ -45,30 +45,47 @@ const grabInlineImageSrc = (html?: string): string[] => {
 const isProbablyImage = (url: string) =>
     IMG_EXT_RE.test(url) || KAYAKO_MEDIA_RE.test(url);
 
-/* domain-classifier – unchanged from original */
+/* domain-classifier – updated to split Kayako links */
 export const classify = (u: string):
-    | 'salesforce' | 'netsuite' | 'kayako_article'
-    | 'kayako'     | 'jira'    | 'github' | 'other' => {
+    | 'salesforce' | 'netsuite'
+    | 'kayako_instances' | 'kayako_tickets' | 'kayako_articles' | 'kayako'
+    | 'jira' | 'github' | 'other' => {
 
     if (/(?:\.|^)force\.com/i.test(u) || /salesforce\.com/i.test(u)) return 'salesforce';
-    if (/netsuite\.com/i.test(u))                                    return 'netsuite';
-    if (/(?:^|\.)classichelp\.kayako\.com/i.test(u)
-        || /(?:^|\.)help\.kayako\.com/i.test(u)
-        || /\/article\/\d+/i.test(u))                               return 'kayako_article';
-    if (u.includes('.kayako.com'))                                  return 'kayako';
-    if (u.includes('github.com/'))                                  return 'github';
-    if (u.includes('.atlassian.net'))                               return 'jira';
+    if (/netsuite\.com/i.test(u))                                      return 'netsuite';
+    if (u.includes('github.com/'))                                      return 'github';
+    if (u.includes('.atlassian.net'))                                   return 'jira';
+
+    // Kayako domains
+    if (/\.kayako\.com/i.test(u)) {
+        try {
+            const href = (typeof location !== 'undefined' && (location as any)?.href) ? (location as any).href : undefined as unknown as string;
+            const url = href ? new URL(u, href) : new URL(u);
+            const path = url.pathname || '/';
+            if (/^\/agent\/conversations\//i.test(path)) return 'kayako_tickets';
+            if (/^\/article\//i.test(path))               return 'kayako_articles';
+            if (path === '/' || path === '')                return 'kayako_instances';
+            return 'kayako';
+        } catch {
+            if (/\/agent\/conversations\//i.test(u)) return 'kayako_tickets';
+            if (/\/article\//i.test(u))               return 'kayako_articles';
+            return 'kayako';
+        }
+    }
+
     return 'other';
 };
 
 export const CATEGORY_LABELS = {
-    salesforce     : 'Salesforce Links',
-    netsuite       : 'NetSuite Links',
-    kayako_article : 'Kayako Articles',
-    kayako         : 'Kayako Links',
-    github         : 'GitHub Links',
-    jira           : 'Jira Links',
-    other          : 'Other Links',
+    salesforce       : 'Salesforce Links',
+    netsuite         : 'NetSuite Links',
+    kayako_instances : 'Kayako Instances',
+    kayako_tickets   : 'Kayako Tickets',
+    kayako_articles  : 'Kayako Articles',
+    kayako           : 'Kayako Link',
+    github           : 'GitHub Links',
+    jira             : 'Jira Links',
+    other            : 'Other Links',
 } as const;
 
 /* ───────────── State ───────────── */
@@ -139,13 +156,18 @@ export async function loadAssets(limit: number): Promise<void> {
         /* group links by domain (adds header rows) */
         if (cache.links.length) {
             const grouped: Record<keyof typeof CATEGORY_LABELS, typeof cache.links> = {
-                salesforce: [], netsuite: [], kayako_article: [],
-                kayako: [], github: [], jira: [], other: [],
+                salesforce: [], netsuite: [],
+                kayako_instances: [], kayako_tickets: [], kayako_articles: [], kayako: [],
+                github: [], jira: [], other: [],
             };
             cache.links.forEach(l => grouped[classify(l.url)].push(l));
 
+            // Diagnostic counts for categories
+            try { console.log('[AssetsInspector] Link categories', Object.fromEntries(Object.entries(grouped).map(([k,v]) => [k, v.length]))); } catch {}
+
             const order: (keyof typeof grouped)[] = [
-                'kayako', 'salesforce', 'netsuite', 'github', 'jira', 'kayako_article', 'other',
+                'kayako_instances', 'kayako_tickets', 'kayako_articles', 'kayako',
+                'salesforce', 'netsuite', 'github', 'jira', 'other',
             ];
 
             cache.links = ([] as typeof cache.links).concat(

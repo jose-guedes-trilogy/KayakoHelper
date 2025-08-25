@@ -11,7 +11,7 @@
 
 import { EphorClient } from "@/background/ephorClient.ts";
 import { sendEphorMessage, runAiReplyWorkflow } from "./aiReplyWorkflow.ts";
-import { loadEphorStore, saveEphorStore, EphorStore, WorkflowStage } from "./ephorStore.ts";
+import { loadEphorStore, saveEphorStore, EphorStore, WorkflowStage, SavedInstruction } from "./ephorStore.ts";
 
 import { createSettingsModal } from "./ephorSettingsUI.ts";
 import { makeLogger, LogFn } from "./ephorSettingsLogger.ts";
@@ -267,6 +267,12 @@ export async function openEphorSettingsModal(
         }
         const list = models.length ? models : ["No models selected"];
 
+        // Clear ephemeral models note in Outputs build
+        try {
+            const note = (document.getElementById("kh-model-saved-note") as HTMLSpanElement | null);
+            if (note) { note.style.display = "none"; note.textContent = ""; note.style.opacity = "1"; }
+        } catch {}
+
         const tabs: HTMLButtonElement[] = [];
 
         list.forEach(label => {
@@ -465,13 +471,24 @@ export async function openEphorSettingsModal(
         refs.stageBarDiv.classList.toggle("kh-stagebar-disabled", !useWorkflow);
 
         const enableRun = useWorkflow;
-        refs.runRow.style.opacity = enableRun ? "1" : "0.45";
+        // Hide Run label + controls entirely in single-stage mode
+        const runLabel = (refs.runRow.previousElementSibling as HTMLElement | null);
+        refs.runRow.style.display = enableRun ? "" : "none";
+        if (runLabel) runLabel.style.display = enableRun ? "" : "none";
+        refs.runRow.style.opacity = enableRun ? "1" : "";
         refs.runAutoRadio.disabled = refs.runManualRadio.disabled = !enableRun;
         if (!enableRun) {
             refs.runAutoRadio.checked = true;
             store.runMode = "automatic";
             void saveEphorStore(store);
         }
+
+        // Hide the per-stage scope checkbox in single-stage mode
+        try {
+            const scopeCbx = modal.querySelector<HTMLInputElement>("#kh-ephor-instr-scope");
+            const scopeCbxWrap = scopeCbx?.closest("label") as HTMLElement | null;
+            if (scopeCbxWrap) scopeCbxWrap.style.display = useWorkflow ? "" : "none";
+        } catch {}
 
         if (useWorkflow) {
             onStageChange();
@@ -484,6 +501,7 @@ export async function openEphorSettingsModal(
         rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
         rebuildAiSelectionButtons();
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
+        updateWorkflowDirtyIndicator();
     }
 
     refs.querySingleRadio.addEventListener("change", updateQueryMode);
@@ -494,6 +512,7 @@ export async function openEphorSettingsModal(
     const updateRunMode = () => {
         store.runMode = refs.runAutoRadio.checked ? "automatic" : "manual";
         void saveEphorStore(store);
+        updateWorkflowDirtyIndicator();
     };
     refs.runAutoRadio.addEventListener("change", updateRunMode);
     refs.runManualRadio.addEventListener("change", updateRunMode);
@@ -540,15 +559,28 @@ export async function openEphorSettingsModal(
             wrap.addEventListener("drop", (e) => {
                 e.preventDefault(); clearBorders(wrap);
                 if (dragIndex === -1 || dragIndex === index) return;
-                const item = store.workflowStages.splice(dragIndex, 1)[0];
-                let targetIndex = index;
-                // If dropped on the right half, insert after
-                const after = (e as DragEvent).offsetX / (wrap.clientWidth) > 0.5;
-                if (after && targetIndex < store.workflowStages.length) targetIndex += 1;
-                store.workflowStages.splice(targetIndex, 0, item);
+
+                const isAfter = (e as DragEvent).offsetX / (wrap.clientWidth) > 0.5;
+
+                // Remove dragged first
+                const dragged = store.workflowStages.splice(dragIndex, 1)[0];
+
+                // Adjust hovered index if needed after removal
+                let baseIndex = index;
+                if (dragIndex < index) baseIndex -= 1;
+
+                // Compute insertion index
+                let insertIndex = isAfter ? baseIndex + 1 : baseIndex;
+                if (insertIndex < 0) insertIndex = 0;
+                if (insertIndex > store.workflowStages.length) insertIndex = store.workflowStages.length;
+
+                store.workflowStages.splice(insertIndex, 0, dragged);
                 dragIndex = -1;
+                try { log("UI", `Stage reordered: '${dragged.name}' → position ${insertIndex + 1}`); } catch {}
                 void saveEphorStore(store);
-                rebuildStageBar(); onStageChange();
+                rebuildStageBar(); onStageChange(); updateWorkflowDirtyIndicator();
+                void saveEphorStore(store);
+                rebuildStageBar(); onStageChange(); updateWorkflowDirtyIndicator();
             });
             refs.stageBarDiv.appendChild(wrap);
         });
@@ -642,6 +674,7 @@ export async function openEphorSettingsModal(
             void saveEphorStore(store);
             rebuildStageBar();
             onStageChange();
+            updateWorkflowDirtyIndicator();
             close();
         });
         overlay.appendChild(dlg);
@@ -663,6 +696,27 @@ export async function openEphorSettingsModal(
         rebuildAiSelectionButtons();
         rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
         refreshCustomInstr(); // stage changed → swap to stage-specific instructions
+
+        // Reflect current selection in the Models title note (workflow) – brief, fades away
+        try {
+            const note = (document.getElementById("kh-model-saved-note") as HTMLSpanElement | null);
+            if (note) {
+                const current = stg.selectedModels ?? [];
+                if (current.length) {
+                    note.textContent = current.join(", ");
+                    note.style.color = "hsl(217.86deg 45% 56%)";
+                    note.style.display = "inline";
+                    note.style.transition = "opacity .4s ease";
+                    note.style.opacity = "1";
+                    window.setTimeout(() => { note.style.opacity = "0"; }, 1800);
+                    window.setTimeout(() => { note.style.display = "none"; note.textContent = ""; note.style.opacity = "1"; }, 2400);
+                } else {
+                    note.style.display = "none";
+                    note.textContent = "";
+                    note.style.opacity = "1";
+                }
+            }
+        } catch {}
     }
 
     /* keep prompt text isolated between single-stage and workflow */
@@ -692,7 +746,7 @@ export async function openEphorSettingsModal(
     /* ------------------------------------------------------------------ *
      * Live tab sync on (un)checking model boxes                          *
      * ------------------------------------------------------------------ */
-    refs.aiListDiv.addEventListener("change", rebuildOutputTabs);
+    refs.aiListDiv.addEventListener("change", () => { rebuildOutputTabs(); updateWorkflowDirtyIndicator(); });
 
     /* ------------------------------------------------------------------ *
      * Verbose log toggle                                                 *
@@ -1092,7 +1146,7 @@ export async function openEphorSettingsModal(
     document.addEventListener("cannedPromptsChanged", rebuildCannedButtons);
 
     /* Open canned-prompt manager */
-    refs.cannedBtn.addEventListener("click", () => openCannedPromptModal(store));
+    refs.cannedBtn?.addEventListener("click", () => openCannedPromptModal(store));
 
     /* ------------------------------------------------------------------ *
      * Workflows manager (save/load/delete/switch)                        *
@@ -1108,9 +1162,11 @@ export async function openEphorSettingsModal(
             opt.value = wf.id; opt.textContent = wf.name || "Workflow";
             sel.appendChild(opt);
         }
-        // no persisted selection tracking for now
-        sel.value = "";
+        // use last selected workflow if available
+        const lastId = store.lastSelectedWorkflowId || "";
+        sel.value = (lastId && (store.workflows ?? []).some(w => w.id === lastId)) ? lastId : "";
         if (refs.wfNameInp) refs.wfNameInp.value = sel.value ? (store.workflows?.find(w=>w.id===sel.value)?.name ?? "") : "";
+        updateWorkflowDirtyIndicator();
     }
 
     function snapshotCurrentWorkflow(): EphorStore["workflows"][number]["data"] {
@@ -1137,6 +1193,7 @@ export async function openEphorSettingsModal(
         onStageChange();
         rebuildOutputTabs();
         rebuildAiSelectionButtons();
+        updateWorkflowDirtyIndicator();
     }
 
     rebuildWorkflowSelect();
@@ -1152,6 +1209,8 @@ export async function openEphorSettingsModal(
             await saveEphorStore(store);
             rebuildWorkflowSelect();
             if (refs.wfSelect) refs.wfSelect.value = wf.id;
+            store.lastSelectedWorkflowId = wf.id;
+            await saveEphorStore(store);
             if (refs.wfNameInp) refs.wfNameInp.value = name;
             try { log("UI", `Workflow created: ${name}`); } catch {}
             return;
@@ -1160,11 +1219,13 @@ export async function openEphorSettingsModal(
         if (idx === -1) return;
         if (name) store.workflows![idx].name = name;
         store.workflows![idx].data = snapshotCurrentWorkflow();
+        store.lastSelectedWorkflowId = id;
         await saveEphorStore(store);
         rebuildWorkflowSelect();
         if (refs.wfSelect) refs.wfSelect.value = id;
         if (refs.wfNameInp) refs.wfNameInp.value = store.workflows![idx].name;
         try { log("UI", `Workflow saved: ${store.workflows![idx].name}`); } catch {}
+        updateWorkflowDirtyIndicator();
     });
 
     refs.wfLoadBtn?.addEventListener("click", async () => {
@@ -1172,6 +1233,8 @@ export async function openEphorSettingsModal(
         const wf = (store.workflows ?? []).find(w => w.id === id);
         if (!wf) return;
         await restoreWorkflow(wf.data);
+        store.lastSelectedWorkflowId = id;
+        await saveEphorStore(store);
         try { log("UI", `Workflow loaded: ${wf.name}`); } catch {}
         if (refs.wfNameInp) refs.wfNameInp.value = wf.name;
     });
@@ -1183,6 +1246,7 @@ export async function openEphorSettingsModal(
         const ok = await openConfirmDialog(`Delete workflow "${wf.name}"?`);
         if (!ok) return;
         store.workflows = (store.workflows ?? []).filter(w => w.id !== id);
+        if (store.lastSelectedWorkflowId === id) store.lastSelectedWorkflowId = "";
         await saveEphorStore(store);
         rebuildWorkflowSelect();
         try { log("UI", `Workflow deleted: ${wf.name}`); } catch {}
@@ -1192,6 +1256,9 @@ export async function openEphorSettingsModal(
         const id = refs.wfSelect.value;
         const wf = (store.workflows ?? []).find(w => w.id === id);
         if (refs.wfNameInp) refs.wfNameInp.value = wf?.name ?? "";
+        store.lastSelectedWorkflowId = id;
+        void saveEphorStore(store);
+        updateWorkflowDirtyIndicator();
     });
 
     refs.wfNameInp?.addEventListener("input", () => {
@@ -1202,6 +1269,207 @@ export async function openEphorSettingsModal(
         wf.name = refs.wfNameInp!.value.trim();
         void saveEphorStore(store).then(() => rebuildWorkflowSelect());
     });
+
+    // Clear workflow name input (small × button)
+    try {
+        refs.wfNameClearBtn?.addEventListener("click", () => {
+            if (!refs.wfNameInp) return;
+            refs.wfNameInp.value = "";
+            refs.wfNameInp.focus();
+            refs.wfNameInp.dispatchEvent(new Event("input", { bubbles: true }));
+            try { log("UI", "Cleared workflow name input"); } catch {}
+        });
+    } catch {}
+
+    function updateWorkflowDirtyIndicator(): void {
+        try {
+            const sel = refs.wfSelect;
+            if (!sel) return;
+            const id = sel.value;
+            if (!id) return; // empty selection shows (Unsaved)
+            const wf = (store.workflows ?? []).find(w => w.id === id);
+            if (!wf) return;
+            const current = snapshotCurrentWorkflow();
+            const isDirty = JSON.stringify(current) !== JSON.stringify(wf.data);
+            const opt = Array.from(sel.options).find(o => o.value === id);
+            if (opt) {
+                const base = wf.name || "Workflow";
+                const label = isDirty ? `${base} (unsaved)` : base;
+                if (opt.textContent !== label) opt.textContent = label;
+            }
+        } catch {}
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Saved Instructions toolbar                                        *
+     * ------------------------------------------------------------------ */
+    function rebuildSavedInstructionButtons(): void {
+        try { if (!refs.instrRow) return; } catch { return; }
+        refs.instrRow.textContent = "";
+        const list = store.savedInstructions ?? [];
+        for (const si of list) {
+            const btn = document.createElement("button");
+            btn.className = "kh-ph-btn";
+            btn.textContent = si.name || "Instruction";
+            btn.title = `${si.name || "Instruction"}`;
+            btn.addEventListener("click", () => {
+                const ta = refs.promptInput;
+                const { selectionStart, selectionEnd, value } = ta;
+                const before = value.slice(0, selectionStart);
+                const after = value.slice(selectionEnd);
+                ta.value = `${before}${si.body}${after}`;
+                const pos = before.length + si.body.length;
+                ta.setSelectionRange(pos, pos);
+                ta.dispatchEvent(new Event("input", { bubbles: true }));
+            });
+            refs.instrRow.appendChild(btn);
+        }
+    }
+
+    function openSavedInstructionsModal(): void {
+        if (document.getElementById("kh-instr-modal")) return;
+        const modal2 = document.createElement("div");
+        modal2.id = "kh-instr-modal";
+        Object.assign(modal2.style, {
+            position:"fixed", top:"120px", left:"50%", transform:"translateX(-50%)",
+            minWidth:"720px", background:"#fff", border:"1px solid #ccc", borderRadius:"6px",
+            padding:"12px", zIndex:"10001", boxShadow:"0 4px 16px rgba(0,0,0,.2)",
+            fontFamily:"system-ui", fontSize:"13px", display:"flex", flexDirection:"column", gap:"10px",
+        } as CSSStyleDeclaration);
+        modal2.innerHTML = `
+          <style>
+            /* Match main modal focus styles for inputs in this window */
+            #kh-instr-name:focus,
+            #kh-instr-body:focus {
+              outline: none;
+              border-color: #89b5ff !important;
+              box-shadow: 0 0 0 2px rgba(46,115,233,.15) !important;
+            }
+          </style>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <h3 style="margin:0;font-size:15px;">Saved Instructions</h3>
+            <button id="kh-instr-close" class="kh-btn kh-close-button" style="margin-left:auto;">✕</button>
+          </div>
+          <div style="display:grid;grid-template-columns:200px 1fr;gap:14px;min-height:280px;">
+            <div style="border:1px solid #ddd;border-radius:4px;padding:6px;display:flex;flex-direction:column;gap:6px;">
+              <div id="kh-instr-list" style="flex:1 1 auto;overflow-y:auto;"></div>
+              <button id="kh-instr-new" class="kh-btn">➕ New instruction</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;min-height:0;">
+              <input id="kh-instr-name" type="text" placeholder="Name" style="padding:4px 6px;border:1px solid hsl(213deg 15% 84%);border-radius:4px;background:#fff;box-shadow: inset 0 0 4px 0 hsla(0,0%,0%,0.0325), inset 0 0 2px 0 hsla(0,0%,0%,0.0805), inset 0 0 1px 0 hsla(0,0%,0%,0.089);">
+              <textarea id="kh-instr-body" style="flex:1 1 auto;resize:vertical;padding:6px;border:1px solid hsl(213deg 15% 84%);border-radius:4px;background:#fff;box-shadow: inset 0 0 4px 0 hsla(0,0%,0%,0.0325), inset 0 0 2px 0 hsla(0,0%,0%,0.0805), inset 0 0 1px 0 hsla(0,0%,0%,0.089);"></textarea>
+            </div>
+          </div>`;
+        document.body.appendChild(modal2);
+
+        const $ = <T extends HTMLElement>(q: string) => modal2.querySelector<T>(q)!;
+        const listDiv = $("#kh-instr-list");
+        const newBtn = $("#kh-instr-new") as HTMLButtonElement;
+        const closeBtn = $("#kh-instr-close") as HTMLButtonElement;
+        const nameInp = $("#kh-instr-name") as HTMLInputElement;
+        const bodyTa = $("#kh-instr-body") as HTMLTextAreaElement;
+
+        let currentId: string | null = null;
+
+        const rebuildList = () => {
+            listDiv.textContent = "";
+            for (const s of (store.savedInstructions ?? [])) {
+                const row = document.createElement("div");
+                row.style.cssText = "display:flex;align-items:center;gap:6px;padding:2px 4px;cursor:pointer;border-radius:3px;";
+                if (s.id === currentId) row.style.background = "hsl(203 100% 95%)";
+                const lab = document.createElement("span"); lab.textContent = s.name || "Instruction"; lab.style.flex = "1";
+                row.appendChild(lab);
+                const del = document.createElement("button"); del.textContent = "✕";
+                Object.assign(del.style, { border:"none", background:"none", cursor:"pointer", padding:"0 4px" });
+                del.addEventListener("click", ev => {
+                    ev.stopPropagation();
+                    const overlay = document.createElement("div"); overlay.className = "kh-dialog-overlay";
+                    const dlg = document.createElement("div"); dlg.className = "kh-dialog";
+                    dlg.innerHTML = `
+                      <header>Delete Instruction</header>
+                      <main><p style="margin:0;line-height:1.4">Delete “${(s.name || "Instruction").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}”?</p></main>
+                      <footer>
+                        <button class="kh-btn" data-act="cancel">Cancel</button>
+                        <button class="kh-btn kh-btn-primary" data-act="ok">Delete</button>
+                      </footer>`;
+                    const closeOverlay = () => overlay.remove();
+                    dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", closeOverlay);
+                    dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => {
+                        store.savedInstructions = (store.savedInstructions ?? []).filter(x => x.id !== s.id);
+                        void saveEphorStore(store).then(() => { rebuildList(); rebuildSavedInstructionButtons(); closeOverlay(); });
+                    });
+                    overlay.appendChild(dlg);
+                    document.body.appendChild(overlay);
+                });
+                row.appendChild(del);
+                row.addEventListener("click", () => load(s.id));
+                listDiv.appendChild(row);
+            }
+        };
+
+        const load = (id: string | null) => {
+            currentId = id;
+            rebuildList();
+            const rec = (store.savedInstructions ?? []).find(x => x.id === id);
+            nameInp.value = rec?.name ?? "";
+            bodyTa.value = rec?.body ?? "";
+        };
+
+        nameInp.addEventListener("input", () => {
+            if (!currentId) return;
+            const idx = (store.savedInstructions ?? []).findIndex(x => x.id === currentId);
+            if (idx === -1) return;
+            store.savedInstructions![idx].name = nameInp.value.trim();
+            void saveEphorStore(store).then(() => rebuildList());
+        });
+
+        bodyTa.addEventListener("input", () => {
+            if (!currentId) return;
+            const idx = (store.savedInstructions ?? []).findIndex(x => x.id === currentId);
+            if (idx === -1) return;
+            store.savedInstructions![idx].body = bodyTa.value;
+            void saveEphorStore(store);
+        });
+
+        newBtn.addEventListener("click", () => {
+            const name = (nameInp.value || "").trim() || "New instruction";
+            const s: SavedInstruction = { id: crypto.randomUUID(), name, body: bodyTa.value || "" };
+            store.savedInstructions = store.savedInstructions ?? [];
+            store.savedInstructions.push(s);
+            void saveEphorStore(store).then(() => { rebuildList(); rebuildSavedInstructionButtons(); load(s.id); });
+        });
+
+        closeBtn.addEventListener("click", () => modal2.remove());
+
+        // init
+        if (!Array.isArray(store.savedInstructions)) store.savedInstructions = [];
+        rebuildList();
+        load(store.savedInstructions[0]?.id ?? null);
+    }
+
+    refs.instrGearBtn?.addEventListener("click", () => openSavedInstructionsModal());
+    rebuildSavedInstructionButtons();
+
+    /* ------------------------------------------------------------------ *
+     * Collapsible sections                                              *
+     * ------------------------------------------------------------------ */
+    function wireCollapse(titleSel: string, bodySel: string, collapsedSel: string): void {
+        const title = modal.querySelector<HTMLElement>(titleSel);
+        const body = modal.querySelector<HTMLElement>(bodySel);
+        const collapsed = modal.querySelector<HTMLElement>(collapsedSel);
+        if (!title || !body || !collapsed) return;
+        title.style.cursor = "pointer";
+        let isCollapsed = false;
+        const update = () => {
+            body.style.display = isCollapsed ? "none" : "";
+            collapsed.style.display = isCollapsed ? "block" : "none";
+        };
+        title.addEventListener("click", () => { isCollapsed = !isCollapsed; update(); });
+        update();
+    }
+    wireCollapse("#kh-title-projects", "#kh-proj-body", "#kh-proj-collapsed");
+    wireCollapse("#kh-title-chats", "#kh-chat-body", "#kh-chat-collapsed");
+    wireCollapse("#kh-title-models", "#kh-model-body", "#kh-model-collapsed");
 
     /* ------------------------------------------------------------------ *
      * AI Selections (presets)                                            *
@@ -1218,7 +1486,20 @@ export async function openEphorSettingsModal(
         void saveEphorStore(store);
         rebuildModelList(state, refs, refs.modelSearchInp.value, useWorkflow ? store.workflowStages.find(x => x.id === currentStageId)! : null);
         rebuildOutputTabs();
-        try { log("UI", `Applied AI selection (${sanitized.length} models)`); } catch {}
+        updateWorkflowDirtyIndicator();
+        try {
+            const note = (document.getElementById("kh-model-saved-note") as HTMLSpanElement | null);
+            if (note && sanitized.length) {
+                note.textContent = sanitized.join(", ");
+                note.style.color = "hsl(217.86deg 45% 56%)";
+                note.style.display = "inline";
+                note.style.transition = "opacity .4s ease";
+                note.style.opacity = "1";
+                window.setTimeout(() => { note.style.opacity = "0"; }, 2400);
+                window.setTimeout(() => { note.style.display = "none"; note.textContent = ""; note.style.opacity = "1"; }, 3000);
+            }
+            log("UI", `Applied AI selection (${sanitized.length} models)`);
+        } catch {}
     }
 
     function rebuildAiSelectionButtons(): void {
@@ -1235,6 +1516,12 @@ export async function openEphorSettingsModal(
         }
         // Always keep gear enabled
         if (refs.aiSelGearBtn) refs.aiSelGearBtn.disabled = false;
+
+        // Do not persist the selection note; leave it ephemeral only on click
+        try {
+            const note = (document.getElementById("kh-model-saved-note") as HTMLSpanElement | null);
+            if (note) { note.style.display = "none"; note.textContent = ""; note.style.opacity = "1"; }
+        } catch {}
     }
 
     // Open manager modal

@@ -27,14 +27,14 @@ export function bootAssetsInspector(): void {
             const modal = buildModal();
             wireModal(
                 modal,
-                async () => { await loadAssets(Math.min(getState().fetched + PAGE_LIMIT, getState().totalPosts)); renderPane(modal, 'links'); },
+                async () => { await loadAssets(getState().totalPosts); renderPane(modal, 'links'); },
                 async () => { await loadAssets(getState().totalPosts); renderPane(modal, 'links'); },
             );
             return modal;
         },
 
         onFirstOpen: async (modal) => {
-            await loadAssets(PAGE_LIMIT);
+            await loadAssets(getState().totalPosts || PAGE_LIMIT);
             renderPane(modal, 'links');
         },
     });

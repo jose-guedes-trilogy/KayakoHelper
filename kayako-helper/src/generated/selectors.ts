@@ -28,6 +28,8 @@ export interface KayakoSelectors {
   trashTicketButton: string;
   sideConversationIcon: string;
   messageOrNote: string;
+  layoutContainer: string;
+  sidePanel: string;
   timelineItemActionButtonsWrapper: string;
   feedItemMenu: string;
   timelineItem: string;
@@ -158,6 +160,7 @@ export interface KayakoSelectors {
   sc_senderEmail: string;
   sc_timestamp: string;
   sc_list_time: string;
+  messenger: string;
 }
 
 export interface ExtensionSelectors {
@@ -293,6 +296,8 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   sideConversationIcon:
     "[class*=ko-case-content__side-conversations_][class*=ko-case-content__selected_] svg path, [class*=ko-case-content__side-conversations_]:hover:not([aria-disabled]) svg path",
   messageOrNote: ".message-or-note",
+  layoutContainer: "[class*=ko-agent-content_layout__container_]",
+  sidePanel: "[class*=ko-agent-content_layout__side-panel_]",
   timelineItemActionButtonsWrapper:
     "[class*=ko-timeline-2_list_item__menu-wrapper_]",
   feedItemMenu: ".ko-feed_item_menu",
@@ -473,6 +478,8 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
     "[class*='side-conversations-panel_message-timeline__message-timestamp_']",
   sc_list_time:
     "[class*='side-conversations-panel_conversations-list__conversation-time_']",
+  messenger:
+    "#kayako-messenger, [id='kayako-messenger'], [class*='kayako-messenger']",
 };
 export const EXTENSION_SELECTORS: ExtensionSelectors = {
   defaultButtonClass: ".kh-default-button",

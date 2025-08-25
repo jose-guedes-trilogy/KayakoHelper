@@ -32,6 +32,18 @@ export interface AISelection {
 }
 
 /* ------------------------------------------------------------------ */
+/* NEW ▸ Saved instructions                                           */
+/* ------------------------------------------------------------------ */
+export interface SavedInstruction {
+    /** Stable UUID */
+    id   : string;
+    /** Human-readable name */
+    name : string;
+    /** Instruction body text */
+    body : string;
+}
+
+/* ------------------------------------------------------------------ */
 /* Workflow types                                                     */
 /* ------------------------------------------------------------------ */
 export interface WorkflowStage {
@@ -149,6 +161,12 @@ export interface EphorStore {
             systemPromptBodies?: EphorStore["systemPromptBodies"];
         };
     }>;
+
+    /* 👇 NEW: saved instruction snippets */
+    savedInstructions?: SavedInstruction[];
+
+    /* 👇 NEW: persist last selected workflow id for UX continuity */
+    lastSelectedWorkflowId?: string;
 }
 
 const KEY = "kh-ephor-store";
@@ -232,6 +250,8 @@ export async function loadEphorStore(): Promise<EphorStore> {
         },
         aiSelections: [],
         workflows: [],
+        savedInstructions: [],
+        lastSelectedWorkflowId: "",
     };
     return {
         ...defaults,
@@ -252,6 +272,8 @@ export async function loadEphorStore(): Promise<EphorStore> {
         },
         aiSelections: saved?.aiSelections ?? [],
         workflows: saved?.workflows ?? [],
+        savedInstructions: saved?.savedInstructions ?? [],
+        lastSelectedWorkflowId: saved?.lastSelectedWorkflowId ?? "",
     };
 }
 

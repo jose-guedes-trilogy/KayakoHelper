@@ -1,6 +1,10 @@
 /* extensionStyles.scss */
 @use '@/generated/_selectors.scss' as sel;
 
+:root {
+  --input-shadow: inset 0 0 4px 0 hsla(0, 0%, 0%, 0.0325), inset 0 0 2px 0 hsla(0, 0%, 0%, 0.0805), inset 0 0 1px 0 hsla(0, 0%, 0%, 0.089);
+}
+
 #{sel.$tabStrip}
 {
   height: unset !important;
@@ -918,7 +922,7 @@ root {
   border: 1px solid hsla(232, 8%, 37%, 0.2);
   border-radius: 12px;
   filter: drop-shadow(0 0 6px hsla(225, 20%, 60%, 0.015));
-  box-shadow: inset 0 0 4px 0 hsla(0, 0%, 0%, 0.0325), inset 0 0 2px 0 hsla(0, 0%, 0%, 0.0805), inset 0 0 1px 0 hsla(0, 0%, 0%, 0.089), 0 0 12px 0 hsla(0, 0%, 0%, 0.02);
+  box-shadow: var(--input-shadow);
   background: hsl(225, 40%, 97.5%);
   margin: 4px 0 0;
 }
@@ -929,7 +933,57 @@ root {
   border: 1px solid hsla(232, 8%, 37%, 0.2);
   border-radius: 12px;
   filter: drop-shadow(0 0 6px hsla(225, 20%, 60%, 0.015));
-  box-shadow: inset 0 0 4px 0 hsla(0, 0%, 0%, 0.0325), inset 0 0 2px 0 hsla(0, 0%, 0%, 0.0805), inset 0 0 1px 0 hsla(0, 0%, 0%, 0.089), 0 0 12px 0 hsla(0, 0%, 0%, 0.02);
+  box-shadow: var(--input-shadow);
   background: hsl(225, 40%, 97.5%);
   margin: 4px 0 0;
+}
+
+#kh-ephor-gear, #kh-ephor-close {
+  font-weight: 600;
+  color: #555;
+}
+
+#kh-ephor-close {
+  padding: 4px 8px;
+}
+#kh-ephor-gear {
+   padding: 4px 6px;
+ }
+
+.kh-assets-copy-img {
+  background: none;
+  border: none;
+
+  svg {}
+  filter: contrast(2);
+}
+
+#kh-insert-placeholder-row {
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.kh-date-wrap {
+  > input {
+    max-width: 100px;
+  }
+}
+
+.kh-assets-copy-url {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kh-links-table {
+  .cell {
+    display: flex;
+    align-items: center;
+  }
+}
+
+#kh-ephor-bottom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }

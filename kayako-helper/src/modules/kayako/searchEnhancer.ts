@@ -37,6 +37,7 @@ const UI_PARENT_ID_BASE   = UI_PARENT_ID;
 type ModKey =
     | 'in' | 'assignee' | 'team' | 'tag' | 'status' | 'subject' | 'body'
     | 'name' | 'creator' | 'organization' | 'priority'
+    | 'product' | 'brand'
     | 'custom_key' | 'custom_val'
     | 'created' | 'updated'
     | 'channel';
@@ -50,6 +51,8 @@ interface ParsedQuery {
     status?: string;
     subject?: string;
     body?: string;
+    product?: string;
+    brand?: string;
     name?: string;
     creator?: string;
     organization?: string;
@@ -229,19 +232,48 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
         dd.addEventListener('change', syncToOriginalLocal);
         refsLocal.channel = wrap; return wrap;
     };
+    const buildStatusDropdown = () => {
+        const wrap = document.createElement('div'); wrap.className = CL_FIELD; wrap.appendChild(buildLabel('Status'));
+        const trig = document.createElement('button'); trig.innerHTML = 'Pick statuses <span>▼</span> '; trig.className = CL_DROP_TRIGGER; wrap.appendChild(trig);
+        const dd = document.createElement('div'); dd.className = CL_DROPDOWN; STATUS_VALUES.forEach(v => { const id = `kh-status-${v}${contextSuffix}`; dd.insertAdjacentHTML('beforeend', `<div><input type=\"checkbox\" id=\"${id}\" value=\"${v}\"> <label for=\"${id}\">${v}</label></div>`); });
+        const cls = document.createElement('button'); cls.textContent = 'Close'; cls.className = CL_CLOSE_BTN; cls.addEventListener('click', () => { dd.classList.remove('open'); openDropdownLocal = null; }); dd.append(cls); wrap.appendChild(dd);
+        trig.addEventListener('click', e => { e.stopPropagation(); const o = dd.classList.toggle('open'); openDropdownLocal = o ? dd : null; });
+        dd.addEventListener('change', syncToOriginalLocal);
+        (refsLocal as any).status = wrap; return wrap;
+    };
+    const buildPriorityDropdown = () => {
+        const wrap = document.createElement('div'); wrap.className = CL_FIELD; wrap.appendChild(buildLabel('Priority'));
+        const trig = document.createElement('button'); trig.innerHTML = 'Pick priorities <span>▼</span> '; trig.className = CL_DROP_TRIGGER; wrap.appendChild(trig);
+        const dd = document.createElement('div'); dd.className = CL_DROPDOWN; PRIORITY_VALUES.forEach(v => { const id = `kh-priority-${v}${contextSuffix}`; dd.insertAdjacentHTML('beforeend', `<div><input type=\"checkbox\" id=\"${id}\" value=\"${v}\"> <label for=\"${id}\">${v}</label></div>`); });
+        const cls = document.createElement('button'); cls.textContent = 'Close'; cls.className = CL_CLOSE_BTN; cls.addEventListener('click', () => { dd.classList.remove('open'); openDropdownLocal = null; }); dd.append(cls); wrap.appendChild(dd);
+        trig.addEventListener('click', e => { e.stopPropagation(); const o = dd.classList.toggle('open'); openDropdownLocal = o ? dd : null; });
+        dd.addEventListener('change', syncToOriginalLocal);
+        (refsLocal as any).priority = wrap; return wrap;
+    };
     const buildCustomField = () => {
         const w = document.createElement('div'); w.classList.add(CL_FIELD, EXTENSION_SELECTORS.searchEnhancerCustomField.replace(/^./, '')); w.append(buildLabel('Custom field'));
         const keyInp = document.createElement('input'); keyInp.type = 'text'; keyInp.placeholder = `Custom field's API key`; keyInp.className = CL_TEXT_INPUT; keyInp.addEventListener('input', syncToOriginalLocal);
         const valInp = document.createElement('input'); valInp.type = 'text'; valInp.placeholder = `Custom field's value`; valInp.className = CL_TEXT_INPUT; valInp.addEventListener('input', syncToOriginalLocal);
         refsLocal.custom_key = keyInp; refsLocal.custom_val = valInp; w.append(keyInp, valInp); return w;
     };
-    const buildDate = (key: 'created' | 'updated') => {
-        const w = document.createElement('div'); w.classList.add(CL_FIELD, EXTENSION_SELECTORS.searchEnhancerDateField.replace(/^./, '')); w.append(buildLabel(key === 'created' ? 'Creation date' : 'Update date'));
+    const buildDateRow = (key: 'created' | 'updated') => {
+        const row = document.createElement('div');
+        row.classList.add(EXTENSION_SELECTORS.searchEnhancerDateField.replace(/^./, ''));
+        const label = buildLabel(key === 'created' ? 'Creation date' : 'Update date');
         const wrap = document.createElement('div'); wrap.className = 'kh-date-wrap'; wrap.style.display = 'flex'; wrap.style.gap = '6px'; wrap.style.flex = '1 1 100%';
         const sel = document.createElement('select'); OP_VALUES.forEach(o => { const opt = document.createElement('option'); opt.value = o.op; opt.textContent = o.label; sel.append(opt); });
         const selWrapper = document.createElement('div'); selWrapper.className = 'kh-date-select-wrapper'; selWrapper.append(sel);
-        const dt = document.createElement('input'); dt.type = 'date'; [sel, dt].forEach(el => el.addEventListener('change', syncToOriginalLocal)); wrap.append(selWrapper, dt); w.append(wrap);
-        (refsLocal as any)[key] = w; return w;
+        const dt = document.createElement('input'); dt.type = 'date'; [sel, dt].forEach(el => el.addEventListener('change', syncToOriginalLocal));
+        wrap.append(selWrapper, dt);
+        row.append(label, wrap);
+        (refsLocal as any)[key] = row;
+        return row;
+    };
+    const buildDateGroup = () => {
+        const group = document.createElement('div');
+        group.className = CL_FIELD;
+        group.append(buildDateRow('created'), buildDateRow('updated'));
+        return group;
     };
 
     controlsLi.append(
@@ -249,10 +281,12 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
         buildText('subject', 'Subject'),
         buildText('body', 'Body'),
         buildText('tag', 'Tag'),
-        // Status, Priority
-        buildDropdown('status', 'Status', STATUS_VALUES),
-        buildDropdown('priority', 'Priority', PRIORITY_VALUES),
-        // Name, Creator, Organization
+        // Status (multi), Priority
+        buildStatusDropdown(),
+        buildPriorityDropdown(),
+        // Product, Brand, Name, Creator, Organization
+        buildText('product', 'Product'),
+        buildText('brand', 'Brand'),
         buildText('name', 'Name'),
         buildText('creator', 'Creator'),
         buildText('organization', 'Organization'),
@@ -263,17 +297,61 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
         buildText('team', 'Team'),
         // Custom Field
         buildCustomField(),
-        // Creation Date, Update Date
-        buildDate('created'),
-        buildDate('updated'),
+        // Creation/Update Dates (stacked in one field)
+        buildDateGroup(),
         // Search in
         buildInlineInCheckboxes()
     );
 
     const uiWrap = document.createElement('div');
     uiWrap.id = UI_PARENT_ID_LOCAL;
+    uiWrap.style.position = 'relative';
     uiWrap.setAttribute('data-kh-enhanced-ui', isResultsPage ? 'results' : 'quick');
     uiWrap.append(queryLi, controlsLi);
+
+    // Collapse/Expand toggle (pill at bottom)
+    const toggleWrap = document.createElement('div');
+    toggleWrap.style.position = 'absolute';
+    toggleWrap.style.left = '50%';
+    toggleWrap.style.bottom = '0';
+    toggleWrap.style.transform = 'translate(-50%, 50%)';
+    toggleWrap.style.zIndex = '2';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.style.display = 'inline-flex';
+    toggleBtn.style.alignItems = 'center';
+    toggleBtn.style.gap = '6px';
+    toggleBtn.style.padding = '6px 12px';
+    toggleBtn.style.borderRadius = '9999px';
+    toggleBtn.style.border = '1px solid rgba(0,0,0,0.15)';
+    toggleBtn.style.background = 'rgba(0,0,0,0.04)';
+    toggleBtn.style.cursor = 'pointer';
+    toggleBtn.style.font = 'inherit';
+
+    const toggleText = document.createElement('span');
+    const chevron = document.createElement('span');
+    chevron.style.display = 'inline-block';
+
+    let controlsVisible = true;
+    function applyToggleUI() {
+        toggleBtn.setAttribute('aria-expanded', String(controlsVisible));
+        toggleText.textContent = controlsVisible ? 'Hide filters' : 'Show filters';
+        chevron.textContent = controlsVisible ? '▲' : '▼';
+        controlsLi.style.display = controlsVisible ? '' : 'none';
+        console.debug('[KH Search] filters', controlsVisible ? 'expanded' : 'collapsed', { context: isResultsPage ? 'results' : 'quick' });
+    }
+    applyToggleUI();
+
+    toggleBtn.addEventListener('click', () => {
+        controlsVisible = !controlsVisible;
+        applyToggleUI();
+    });
+
+    toggleBtn.append(toggleText, chevron);
+    toggleWrap.appendChild(toggleBtn);
+    uiWrap.appendChild(toggleWrap);
+
     if (isResultsPage) host.append(uiWrap); else host.prepend(uiWrap);
 
     // Sync helpers
@@ -313,8 +391,13 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
         const chosen = Array.from((refsLocal.in as HTMLElement)!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(cb => cb.value);
         if (chosen.length === 1) parts.push(`in:${chosen[0]}`); else if (chosen.length > 1) parts.push('(' + chosen.map(v => `in:${v}`).join(' OR ') + ')');
         if (prefRememberSearchIn) { try { chrome.storage.sync.set({ searchInLastSelection: chosen }); } catch {} }
-        (['assignee','team','tag','subject','body','name','creator','organization'] as const).forEach(k => { const val = ((refsLocal as any)[k] as HTMLInputElement).value.trim(); if (val) { const needsQuotes = val.toLowerCase() !== 'null'; parts.push(`${k}:${needsQuotes ? `"${val}"` : val}`); } });
-        (['status','priority'] as const).forEach(k => { const el = (refsLocal as any)[k] as HTMLSelectElement | undefined; const val = el?.value ?? ''; if (val) parts.push(`${k}:${val}`); });
+        (['assignee','team','tag','subject','body','product','brand','name','creator','organization'] as const).forEach(k => { const val = ((refsLocal as any)[k] as HTMLInputElement).value.trim(); if (val) { const needsQuotes = val.toLowerCase() !== 'null'; parts.push(`${k}:${needsQuotes ? `"${val}"` : val}`); } });
+        if ((refsLocal as any).priority) {
+			const selP = Array.from(((refsLocal as any).priority as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(cb => cb.value);
+			console.debug('[KH Search] syncToOriginalLocal: priority[] =', selP);
+			if (selP.length === 1) parts.push(`priority:${selP[0]}`);
+			else if (selP.length > 1) parts.push(`priority:(${selP.join(' OR ')})`);
+		}
         if (refsLocal.channel) { const sel = Array.from((refsLocal.channel as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(cb => cb.value); if (sel.length === 1) parts.push(`channel:${sel[0]}`); else if (sel.length > 1) parts.push('(' + sel.map(v => `channel:${v}`).join(' OR ') + ')'); }
         const cfKey = (refsLocal.custom_key as HTMLInputElement)?.value?.trim() ?? ''; const cfVal = (refsLocal.custom_val as HTMLInputElement)?.value?.trim() ?? ''; if (cfKey && cfVal) parts.push(`${cfKey}:"${cfVal}"`);
         (['created','updated'] as const).forEach(k => { const w = (refsLocal as any)[k] as HTMLElement | undefined; if (!w) return; const sel = w.querySelector('select') as HTMLSelectElement; const d = w.querySelector('input[type="date"]') as HTMLInputElement; const op = sel?.value ?? ':'; const dv = d?.value ?? ''; if (dv) parts.push(`${k}${op}${dv}`); });
@@ -336,18 +419,63 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
         const parsed: any = {} as ParsedQuery;
         parsed.in = [...raw.matchAll(/\bin:([^\s()]+)/gi)].map(m => m[1]!).filter(Boolean);
         parsed.channel = [...raw.matchAll(/\bchannel:([^\s()]+)/gi)].map(m => m[1]!).filter(Boolean);
-        (['assignee','team','tag','subject','body','name','creator','organization'] as const).forEach(k => { const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|(null))`, 'i')); if (m) parsed[k] = (m[1] ?? m[2])!; });
-        (['status','priority'] as const).forEach(k => { const m = raw.match(new RegExp(`\\b${k}:([^\\s]+)`, 'i')); if (m && m[1]) parsed[k] = m[1]; });
-        for (const m of raw.matchAll(/(\w+):"([^"]+)"/g)) { const key = m[1]; const val = m[2]; if (key && !(['assignee','team','tag','subject','body','name','creator','organization','status','priority'] as readonly string[]).includes(key)) { parsed.custom_key = key; parsed.custom_val = val; break; } }
+        (['assignee','team','tag','subject','body','product','brand','name','creator','organization'] as const).forEach(k => { const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|(null))`, 'i')); if (m) parsed[k] = (m[1] ?? m[2])!; });
+        // priority (multi)
+        const prioritySet = new Set<string>();
+        for (const m of raw.matchAll(/\bpriority:\(([^)]+)\)/gi)) {
+            const inside = (m[1] || '').split(/\s+OR\s+/i).map(s => s.trim()).filter(Boolean);
+            inside.forEach(v => prioritySet.add(v));
+        }
+        for (const m of raw.matchAll(/\bpriority:([^\s()]+)/gi)) {
+            if (m[1]) prioritySet.add(m[1]);
+        }
+        if ((refsLocal as any).priority) {
+            const priorities = Array.from(prioritySet);
+            console.debug('[KH Search] syncFromOriginalLocal: parsed.priority[] =', priorities);
+            ((refsLocal as any).priority as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => {
+                cb.checked = priorities.includes(cb.value);
+            });
+        }
+        // status (multi)
+        const statusSet = new Set<string>();
+        for (const m of raw.matchAll(/\bstatus:\(([^)]+)\)/gi)) {
+            const inside = (m[1] || '').split(/\s+OR\s+/i).map(s => s.trim()).filter(Boolean);
+            inside.forEach(v => statusSet.add(v));
+        }
+        for (const m of raw.matchAll(/\bstatus:([^\s()]+)/gi)) {
+            if (m[1]) statusSet.add(m[1]);
+        }
+        if ((refsLocal as any).status) {
+            const statuses = Array.from(statusSet);
+            console.debug('[KH Search] syncFromOriginalLocal: parsed.status[] =', statuses);
+            ((refsLocal as any).status as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => {
+                cb.checked = statuses.includes(cb.value);
+            });
+        }
+        (['custom_key'] as const).forEach(k => { const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|(null))`, 'i')); if (m) parsed[k] = (m[1] ?? m[2])!; });
         [...raw.matchAll(/\b(created|updated)([:<>])(\d{4}-\d{2}-\d{2})/gi)].forEach(m => (parsed as any)[m[1] as 'created' | 'updated'] = `${m[2]}${m[3]}`);
-        let kw = raw.replace(/\bin:[^\s()]+/gi, '').replace(/\bchannel:[^\s()]+/gi, '').replace(/\b(?:assignee|team|tag|subject|body|name|creator|organization):(?:"[^"]*"|null)/gi, '').replace(/\b(?:status|priority):[^\s"]+/gi, '').replace(/\b(?:created|updated)(?:[:<>])\d{4}-\d{2}-\d{2}/gi, '');
+        let kw = raw
+            .replace(/\bin:[^\s()]+/gi, '')
+            .replace(/\bchannel:[^\s()]+/gi, '')
+            .replace(/\b(?:assignee|team|tag|subject|body|product|brand|name|creator|organization):(?:\"[^\"]*\"|null)/gi, '')
+            .replace(/\bstatus:\([^)]*\)/gi, '')
+            .replace(/\bstatus:[^\s()]+/gi, '')
+            .replace(/\bpriority:\([^)]*\)/gi, '')
+            .replace(/\bpriority:[^\s()]+/gi, '')
+            .replace(/\b(?:created|updated)(?:[:<>])\d{4}-\d{2}-\d{2}/gi, '');
         if (parsed.custom_key) { const esc = parsed.custom_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); kw = kw.replace(new RegExp(`\\b${esc}:"[^"]*"`, 'gi'), ''); }
         kw = kw.replace(/\s+OR\s+/gi, ' ').replace(/[()]/g, ' ').replace(/\s{2,}/g, ' ').trim(); if (/^(?:OR\s*)+$/i.test(kw)) kw = '';
         refsLocal.qbox!.value = kw;
         (refsLocal.in as HTMLElement)!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => { cb.checked = parsed.in?.includes(cb.value) ?? false; });
         if (refsLocal.channel) { (refsLocal.channel as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => { cb.checked = parsed.channel?.includes(cb.value) ?? false; }); }
-        (['assignee','team','tag','subject','body','name','creator','organization'] as const).forEach(k => { ((refsLocal as any)[k] as HTMLInputElement).value = parsed[k] ?? ''; });
-        (['status','priority'] as const).forEach(k => { ((refsLocal as any)[k] as HTMLSelectElement).value = parsed[k] ?? ''; });
+        (['assignee','team','tag','subject','body','product','brand','name','creator','organization'] as const).forEach(k => { ((refsLocal as any)[k] as HTMLInputElement).value = parsed[k] ?? ''; });
+        if ((refsLocal as any).priority) {
+            const priorities = Array.from(prioritySet);
+            console.debug('[KH Search] syncFromOriginalLocal: set priority[] checkboxes');
+            ((refsLocal as any).priority as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => {
+                cb.checked = priorities.includes(cb.value);
+            });
+        }
         if (parsed.custom_key)  (refsLocal.custom_key as HTMLInputElement).value = parsed.custom_key;
         if (parsed.custom_val)  (refsLocal.custom_val as HTMLInputElement).value = parsed.custom_val;
         (['created','updated'] as const).forEach(k => { const w = (refsLocal as any)[k] as HTMLElement | undefined; if (!w) return; const sel = w.querySelector('select') as HTMLSelectElement; const inp = w.querySelector('input[type="date"]') as HTMLInputElement; const pk = parsed[k]; if (pk && pk.length >= 2) { sel.value = pk.charAt(0); inp.value = pk.slice(1); } else { inp.value = ''; } });
@@ -625,7 +753,7 @@ function syncToOriginal(): void {
         });
 
     /* dropdowns */
-    (['status','priority'] as const).forEach(k => {
+    (['priority'] as const).forEach(k => {
         const val = (refs[k] as HTMLSelectElement).value;
         if (val) parts.push(`${k}:${val}`);
     });
@@ -689,7 +817,7 @@ function syncFromOriginal(ev?: Event): void {
         });
 
     /* dropdowns */
-    (['status','priority'] as const).forEach(k => {
+    (['priority'] as const).forEach(k => {
         const m = raw.match(new RegExp(`\\b${k}:([^\\s]+)`, 'i'));
         if (m && m[1]) parsed[k] = m[1] as string;
     });
@@ -698,7 +826,7 @@ function syncFromOriginal(ev?: Event): void {
     for (const m of raw.matchAll(/(\w+):"([^"]+)"/g)) {
         const key = m[1];
         const val = m[2];
-        if (key && !(['assignee','team','tag','subject','body','name','creator','organization','status','priority'] as readonly string[]).includes(key)) {
+        if (key && !(['assignee','team','tag','subject','body','name','creator','organization','priority'] as readonly string[]).includes(key)) {
             parsed.custom_key = key as string;
             parsed.custom_val = val as string;
             break;
@@ -714,8 +842,11 @@ function syncFromOriginal(ev?: Event): void {
     let kw = raw
         .replace(/\bin:[^\s()]+/gi, '')
         .replace(/\bchannel:[^\s()]+/gi, '')
-        .replace(/\b(?:assignee|team|tag|subject|body|name|creator|organization):(?:"[^"]*"|null)/gi, '')
-        .replace(/\b(?:status|priority):[^\s"]+/gi, '')
+        .replace(/\b(?:assignee|team|tag|subject|body|product|brand|name|creator|organization):(?:\"[^\"]*\"|null)/gi, '')
+        .replace(/\bstatus:\([^)]*\)/gi, '')
+        .replace(/\bstatus:[^\s()]+/gi, '')
+        .replace(/\bpriority:\([^)]*\)/gi, '')
+        .replace(/\bpriority:[^\s()]+/gi, '')
         .replace(/\b(?:created|updated)(?:[:<>])\d{4}-\d{2}-\d{2}/gi, '');
 
     /* --------- strip current custom-field pair from kw -------------------- */
@@ -754,7 +885,7 @@ function syncFromOriginal(ev?: Event): void {
             (refs[k] as HTMLInputElement).value = parsed[k] ?? '';
         });
 
-    (['status','priority'] as const).forEach(k => {
+    (['priority'] as const).forEach(k => {
         (refs[k] as HTMLSelectElement).value = parsed[k] ?? '';
     });
 

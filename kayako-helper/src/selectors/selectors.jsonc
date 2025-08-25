@@ -43,6 +43,12 @@
 
     "messageOrNote": ".message-or-note",
 
+    // ───────────── Layout containers (for resizable side panel) ─────────────
+    // Two-column parent of the content/timeline and the side panel
+    "layoutContainer": "[class*=ko-agent-content_layout__container_]",
+    // The vertical side panel column inside the layout container
+    "sidePanel": "[class*=ko-agent-content_layout__side-panel_]",
+
     "timelineItemActionButtonsWrapper": "[class*=ko-timeline-2_list_item__menu-wrapper_]",
     "feedItemMenu": ".ko-feed_item_menu",
 
