@@ -28,6 +28,15 @@ export function openSettingsModal(store: Store): void {
     modal.style.border = '1px solid #e5e7f2';
     modal.style.borderRadius = '12px';
     modal.style.background = '#fff';
+    modal.style.position = 'fixed';
+    modal.style.top = '64px';
+    modal.style.left = '64px';
+    modal.style.maxWidth = '960px';
+    modal.style.maxHeight = 'min(80vh, 720px)';
+    modal.style.boxShadow = '0 6px 24px rgba(17,24,39,.12)';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+    modal.style.zIndex = '2147483647';
     // Fixed selectors for the inline Add URL row (do not depend on generated types)
     // const NEW_LABEL_SEL = '.kh-exp-new-label';
     // const NEW_URL_SEL   = '.kh-exp-new-url';
@@ -40,20 +49,25 @@ export function openSettingsModal(store: Store): void {
     modal.innerHTML = /* html */`
         <style>
           /* ---------- buttons (Ephor-like) ---------- */
-          .kh-btn{padding:4px 12px;border:1px solid #c9ced6;border-radius:8px;background:#fff;
+          .kh-btn{padding:4px 12px;border:1px solid #c9ced6;border-radius:4px;background:#fff;
                   cursor:pointer;font:inherit;display:inline-flex;align-items:center;gap:4px;}
           .kh-btn:hover{background:#f5f7ff;border-color:#8aa4e6;}
-          .kh-btn-primary{background:#2e73e9;color:#fff;border-color:#2e73e9;}
+          .kh-btn-primary{background:#2e73e9;color:#fff;border:none;border-radius:4px;}
           .kh-btn-primary:hover{background:#255ecd;color:#fff;}
 
           /* ---------- inputs ---------- */
-          .kh-exp-input{border:1px solid #c9ced6;border-radius:8px;padding:6px 8px;font:inherit;background:#fff;}
+          .kh-exp-input{border:1px solid #c9ced6;border-radius:4px;padding:6px 8px;font:inherit;background:#fff;}
           .kh-exp-input:focus{outline:none;border-color:#8aa4e6;box-shadow:0 0 0 2px rgba(46,115,233,.15)}
-          .kh-exp-url-row{background:hsl(213 20% 97% / 1);padding:6px 8px;border:1px solid #e5e7f2;border-radius:10px;}
+          .kh-exp-url-row{background:hsl(210 10% 98% / 1);padding:6px 8px;border:1px solid #e5e7f2;border-radius:8px;}
           .kh-exp-provider-head{display:flex;align-items:center;gap:8px;}
 
-          /* Outermost provider wrapper with rounder borders */
-          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{border:1px solid #e5e7f2;border-radius:12px;padding:10px;margin:10px 0;background:#fafbff;}
+          /* Outermost provider wrapper with rounder borders (desaturated bg) */
+          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{border:1px solid #e5e7f2;border-radius:12px;padding:10px;margin:10px 0;background:#fafafa;}
+
+          /* Grouped URL fields */
+          .kh-exp-group{background:hsl(210 8% 99% / 1);border:1px solid #e8ebf2;border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;}
+          .kh-exp-row-head{display:flex;align-items:center;gap:8px;}
+          .kh-exp-row-head .kh-right{margin-left:auto;display:inline-flex;align-items:center;gap:10px;}
 
           /* Radio group layout */
           .${EXTENSION_SELECTORS.exportUrlMode.slice(1)}{display:flex;align-items:center;gap:8px;font-size:11px;}
@@ -76,8 +90,11 @@ export function openSettingsModal(store: Store): void {
         </style>
         <div class="kh-exp-header" style="display:flex;align-items:center;gap:12px;">
           <h2 style="margin:0;font-size:16px;">Export chat – settings</h2>
-          <button id="${EXTENSION_SELECTORS.exportSettingsClose.slice(1)}" class="kh-exp-close-btn kh-btn"
-                  style="margin-left:auto;">Close</button>
+          <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">
+            <button id="kh-exp-expand-all" class="kh-btn" title="Expand all sections">Expand all</button>
+            <button id="kh-exp-collapse-all" class="kh-btn" title="Collapse all sections">Collapse all</button>
+            <button id="${EXTENSION_SELECTORS.exportSettingsClose.slice(1)}" class="kh-exp-close-btn kh-btn">✕</button>
+          </span>
         </div>
 
         <p class="kh-exp-intro" style="margin:12px 0;">
@@ -89,10 +106,10 @@ export function openSettingsModal(store: Store): void {
           No active tab detected – selecting “Active tab” will behave like “New tab”.
         </div>
 
-        <div id="${EXTENSION_SELECTORS.exportSettingsContent.slice(1)}"></div>
+        <div id="${EXTENSION_SELECTORS.exportSettingsContent.slice(1)}" style="flex:1 1 auto; min-height:0; overflow:auto;"></div>
 
         <div class="kh-exp-footer" style="margin-top:16px;text-align:right;">
-          <button id="${EXTENSION_SELECTORS.exportAddProviderBtn.slice(1)}">➕ Add provider</button>
+          <button id="${EXTENSION_SELECTORS.exportAddProviderBtn.slice(1)}" class="kh-btn">➕ Add provider</button>
         </div>
     `;
     document.body.appendChild(modal);
@@ -152,12 +169,53 @@ export function openSettingsModal(store: Store): void {
                 rebuildSettingsUi(modal.querySelector(EXTENSION_SELECTORS.exportSettingsContent)! as HTMLElement, store));
         });
 
+    /* initial size/position: center within viewport and fit safely */
+    try {
+        const vw = window.innerWidth || 1280;
+        const vh = window.innerHeight || 800;
+        const width  = Math.min(920, Math.max(560, vw - 120));
+        const height = Math.min(600, Math.max(360, vh - 120));
+        modal.style.width = `${Math.round(width)}px`;
+        modal.style.height = `${Math.round(height)}px`;
+        modal.style.left = `${Math.round((vw - width) / 2)}px`;
+        modal.style.top  = `${Math.round(Math.max(40, (vh - height) / 2))}px`;
+    } catch {}
+
+    /* keep within viewport on resize */
+    const onWinResize = () => {
+        try {
+            const rect = modal.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight;
+            let left = rect.left, top = rect.top;
+            let width = rect.width, height = rect.height;
+            if (width > vw - 40) { width = Math.max(320, vw - 40); modal.style.width = `${Math.round(width)}px`; }
+            if (height > vh - 40) { height = Math.max(240, vh - 40); modal.style.height = `${Math.round(height)}px`; }
+            left = Math.max(0, Math.min(vw - width, left));
+            top  = Math.max(0, Math.min(vh - 40, top));
+            modal.style.left = `${Math.round(left)}px`;
+            modal.style.top  = `${Math.round(top)}px`;
+        } catch {}
+    };
+    window.addEventListener('resize', onWinResize);
+
     /* ask background if an active tab exists → update tiny notice */
     chrome.runtime.sendMessage({ action: 'exportChat.getStatus' },
         (res: {active:boolean}) => {
             if (!res?.active)
                 modal.querySelector(EXTENSION_SELECTORS.noActiveTabNotice)!.setAttribute('style','');
         });
+
+    /* expand / collapse all */
+    const expandAllBtn = modal.querySelector<HTMLButtonElement>('#kh-exp-expand-all');
+    const collapseAllBtn = modal.querySelector<HTMLButtonElement>('#kh-exp-collapse-all');
+    expandAllBtn?.addEventListener('click', () => {
+        console.info('[exportSettings] Expand all');
+        modal.querySelectorAll('.kh-acc-item').forEach(el => el.classList.add('kh-acc-open'));
+    });
+    collapseAllBtn?.addEventListener('click', () => {
+        console.info('[exportSettings] Collapse all');
+        modal.querySelectorAll('.kh-acc-item').forEach(el => el.classList.remove('kh-acc-open'));
+    });
 }
 
 /* ───────────────────────── settings UI (re)build ───────────────────────── */
@@ -275,12 +333,10 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         accItem.appendChild(accBody);
 
         const newRow = h(`
-          <div class="kh-exp-url-row" style="margin:6px 0;display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;">
-            <div style="display:flex;gap:6px;">
-              <input class="${NEW_LABEL_CLASS} kh-exp-input" placeholder="Name" style="flex:0 0 140px;">
-              <input class="${NEW_URL_CLASS} kh-exp-input" placeholder="URL" style="flex:1 1 auto;min-width:220px;">
-            </div>
-            <button class="${NEW_ADD_CLASS} kh-btn-primary" style="padding:6px 14px;justify-self:end;border-radius:999px;">Add URL</button>
+          <div class="kh-exp-url-row" style="margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input class="${NEW_LABEL_CLASS} kh-exp-input" placeholder="Name" style="flex:0 0 160px;min-width:140px;">
+            <input class="${NEW_URL_CLASS} kh-exp-input" placeholder="URL" style="flex:1 1 320px;min-width:220px;">
+            <button class="${NEW_ADD_CLASS} kh-btn-primary" style="padding:6px 12px;">Add URL</button>
           </div>
         `);
         accBody.appendChild(newRow);
@@ -300,7 +356,10 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
 
         /* Accordion toggle */
         const accHeader = accItem.querySelector('.kh-acc-header')! as HTMLElement;
-        accHeader.addEventListener('click', () => accItem.classList.toggle('kh-acc-open'));
+        accHeader.addEventListener('click', () => {
+            const isOpen = accItem.classList.toggle('kh-acc-open');
+            console.info('[exportSettings] Provider section toggle', { providerId: p.id, open: isOpen });
+        });
 
         /* header-level handlers */
         wrap.querySelector<HTMLInputElement>('input[name="exp-main-default"]')!.checked =
@@ -430,43 +489,51 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
             row.addEventListener('dragstart', ev => onUrlDragStart(ev, u.id, row));
             row.addEventListener('dragend',   () => { onUrlDragEnd(); commitUrlOrder(); });
 
-            /* ===== FIRST ROW – controls ===== */
-            const ctrlRow = h('<div style="display:flex;align-items:center;gap:8px;"></div>');
-            row.appendChild(ctrlRow);
+            /* ===== GROUPED FIELDS – Name, URL, Prompt, with controls on the Prompt row ===== */
+            const group = h('<div class="kh-exp-group"></div>');
+            row.appendChild(group);
 
-            /* “Make / ✔ Default URL” button */
-            const defBtnTxt = p.defaultUrlId === u.id ? '✔ Default URL' : 'Make default URL';
-            ctrlRow.appendChild(h(
-                `<button class="${EXTENSION_SELECTORS.exportSetDefaultUrlBtn.slice(1)}"
-                         style="background:none;border:0;padding:0;cursor:pointer;">${defBtnTxt}</button>`));
+            const nameUrlRow = h('<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>');
+            group.appendChild(nameUrlRow);
+            nameUrlRow.appendChild(h(
+                `<input class="${EXTENSION_SELECTORS.exportLabelInput.slice(1)} kh-exp-input" value="${u.label}" placeholder="Name" style="flex:0 0 180px;min-width:140px;">`));
+            nameUrlRow.appendChild(h(
+                `<input class="${EXTENSION_SELECTORS.exportUrlInput.slice(1)} kh-exp-input" value="${u.url}" placeholder="URL" style="flex:1 1 320px;min-width:220px;">`));
 
-            /* per-URL export-mode selector */
-            ctrlRow.appendChild(h(`
-                <span class="${EXTENSION_SELECTORS.exportUrlMode.slice(1)}"
-                      style="display:inline-flex;align-items:center;gap:4px;font-size:11px;">
-                  <label><input type="radio" name="exp-mode-${u.id}" value="new-tab"> Open new tab</label>
-                  <label><input type="radio" name="exp-mode-${u.id}" value="active-tab"> Use the selected Active tab</label>
-                </span>`));
+            /* Prompt row head with right-side controls */
+            const promptHead = h('<div class="kh-exp-row-head"></div>');
+            const promptLabel = h('<strong>Prompt</strong>');
+            const promptRight = h(`<span class="kh-right">
+                <button class="${EXTENSION_SELECTORS.exportSetDefaultUrlBtn.slice(1)} kh-btn" style="background:none;border:1px solid transparent;padding:2px 6px;">
+                  ${p.defaultUrlId === u.id ? '✔ Default URL' : 'Make default URL'}
+                </button>
+                <span class="${EXTENSION_SELECTORS.exportUrlMode.slice(1)}">
+                  <label><input type="radio" name="exp-mode-${u.id}" value="new-tab"> New tab</label>
+                  <label><input type="radio" name="exp-mode-${u.id}" value="active-tab"> Active tab</label>
+                </span>
+              </span>`);
+            promptHead.appendChild(promptLabel);
+            promptHead.appendChild(promptRight);
+            group.appendChild(promptHead);
 
-            /* “Delete URL” button (right-aligned) */
-            ctrlRow.appendChild(h(
-                `<button class="${EXTENSION_SELECTORS.exportDelUrlBtn.slice(1)}"
-                         style="background:none;border:0;padding:0;cursor:pointer;margin-left:auto;">Delete URL</button>`));
+            /* Prompt textarea */
+            group.appendChild(h(
+                `<textarea class="${EXTENSION_SELECTORS.exportPromptInput.slice(1)} kh-exp-input"
+                  style="width:100%;min-height:56px;resize:vertical;"
+                  placeholder="Prompt template (placeholders allowed)">${u.prompt}</textarea>`
+            ));
 
-            /* ===== SECOND ROW – text inputs + Join control for Ephor ===== */
-            const inputRow = h('<div style="display:flex;gap:6px;"></div>');
-            row.appendChild(inputRow);
-
-            inputRow.appendChild(h(
-                `<input class="${EXTENSION_SELECTORS.exportLabelInput.slice(1)} kh-exp-input" value="${u.label}" style="flex:0 0 140px;">`));
-            inputRow.appendChild(h(
-                `<input class="${EXTENSION_SELECTORS.exportUrlInput.slice(1)} kh-exp-input" value="${u.url}" style="flex:1 1 auto;">`));
+            /* Delete row under group */
+            const delRow = h('<div style="display:flex;align-items:center;justify-content:flex-end;margin-top:2px;"></div>');
+            delRow.appendChild(h(
+                `<button class="${EXTENSION_SELECTORS.exportDelUrlBtn.slice(1)}" style="background:none;border:0;padding:0;cursor:pointer;">Delete URL</button>`));
+            row.appendChild(delRow);
 
             /* Join button for Ephor project links */
             if (p.id === 'ephor') {
                 const projId = (() => { try { return new URL(u.url).pathname.split('/').pop() || ''; } catch { return ''; } })();
-                const joinBtn = h(`<button class="kh-btn" style="flex:0 0 auto;">Check…</button>`) as HTMLButtonElement;
-                inputRow.appendChild(joinBtn);
+                const joinBtn = h(`<button class="kh-btn" style="flex:0 0 auto;margin-left:6px;">Check…</button>`) as HTMLButtonElement;
+                nameUrlRow.appendChild(joinBtn);
 
                 const updateJoined = async () => {
                     joinBtn.disabled = true;
@@ -507,11 +574,7 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
                 });
             }
 
-            /* ===== THIRD ROW – prompt ===== */
-            row.appendChild(h(
-                `<textarea class="${EXTENSION_SELECTORS.exportPromptInput.slice(1)} kh-exp-input"
-                  style="width:100%;min-height:42px;resize:vertical;"
-                  placeholder="Prompt template (placeholders allowed)">${u.prompt}</textarea>`));
+            /* removed collapsible prompt; prompt always visible within group */
 
             /* field handlers */
             row.querySelector<HTMLInputElement>(EXTENSION_SELECTORS.exportLabelInput)!

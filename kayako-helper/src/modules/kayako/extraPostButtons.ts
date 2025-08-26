@@ -88,24 +88,90 @@ function addButtons(post: HTMLElement): void {
                 return;
             }
 
-            const sourceHtml = contentEl.innerHTML;
-            const cleanedHtml = extractCleanHtmlFromHtml(sourceHtml);
-            const cleanedText = extractCleanTextFromHtml(cleanedHtml);
+            let sourceHtml = '';
+            try {
+                sourceHtml = String(contentEl.innerHTML || '');
+                console.debug('[KH][CopyPost] Source HTML length:', sourceHtml.length);
+            } catch (e) {
+                console.warn('[KH][CopyPost] Failed reading innerHTML; using textContent fallback');
+            }
 
-            if (window.ClipboardItem) {
-                const data = new Map<string, Blob>();
-                data.set('text/html', new Blob([cleanedHtml], { type: 'text/html' }));
-                data.set('text/plain', new Blob([cleanedText], { type: 'text/plain' }));
-                navigator.clipboard.write([new window.ClipboardItem(data as any)])
-                    .then(() => {
-                        console.debug('[KH][CopyPost] Copied HTML + plain text', { htmlLen: cleanedHtml.length, textLen: cleanedText.length });
-                    })
+            let cleanedHtml = '';
+            try {
+                cleanedHtml = extractCleanHtmlFromHtml(sourceHtml);
+            } catch (e) {
+                console.warn('[KH][CopyPost] HTML sanitize failed; using raw HTML');
+                cleanedHtml = sourceHtml;
+            }
+
+            let cleanedText = '';
+            try {
+                cleanedText = extractCleanTextFromHtml(cleanedHtml || sourceHtml);
+            } catch (e) {
+                console.warn('[KH][CopyPost] Text extract failed; using element innerText');
+                cleanedText = sanitiseText(String((contentEl as HTMLElement).innerText || ''));
+            }
+
+            const attemptExecCommandFallback = () => {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = cleanedText;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    ta.remove();
+                    if (ok) {
+                        console.debug('[KH][CopyPost] Copied via execCommand fallback');
+                    } else {
+                        console.warn('[KH][CopyPost] execCommand copy returned false');
+                    }
+                } catch (e) {
+                    console.error('[KH][CopyPost] execCommand copy failed', e);
+                }
+            };
+
+            const writePlain = () => {
+                if (!navigator.clipboard?.writeText) {
+                    attemptExecCommandFallback();
+                    return;
+                }
+                navigator.clipboard.writeText(cleanedText)
+                    .then(() => console.debug('[KH][CopyPost] Copied plain text', { textLen: cleanedText.length }))
                     .catch(err => {
-                        console.error('[KH][CopyPost] Failed to write rich clipboard, falling back to text', err);
-                        navigator.clipboard.writeText(cleanedText).catch(console.error);
+                        console.error('[KH][CopyPost] Plain text clipboard write failed; using fallback', err);
+                        attemptExecCommandFallback();
                     });
+            };
+
+            if (window.ClipboardItem && navigator.clipboard?.write) {
+                try {
+                    // Ensure we provide a non-empty dictionary and at least plain text
+                    const items: Record<string, Blob> = {};
+                    if (cleanedHtml && cleanedHtml.trim().length > 0) {
+                        items['text/html'] = new Blob([cleanedHtml], { type: 'text/html' });
+                    }
+                    const safePlain = (cleanedText && cleanedText.trim().length > 0)
+                        ? cleanedText
+                        : sanitiseText(String((contentEl as HTMLElement).innerText || ''));
+                    items['text/plain'] = new Blob([safePlain], { type: 'text/plain' });
+
+                    navigator.clipboard.write([new window.ClipboardItem(items)])
+                        .then(() => {
+                            console.debug('[KH][CopyPost] Copied HTML + plain text', { htmlLen: cleanedHtml.length, textLen: (safePlain || '').length });
+                        })
+                        .catch(err => {
+                            console.error('[KH][CopyPost] Rich clipboard write failed; falling back to text', err);
+                            writePlain();
+                        });
+                } catch (e) {
+                    console.error('[KH][CopyPost] Rich clipboard path threw; falling back to text', e);
+                    writePlain();
+                }
             } else {
-                navigator.clipboard.writeText(cleanedText).catch(console.error);
+                writePlain();
             }
         } catch (err) {
             console.error('[KH][CopyPost] Unexpected error preparing copy text', err);
@@ -189,9 +255,17 @@ function extractCleanTextFromHtml(html: string): string {
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
 
-        // Remove Froala spacer wrappers and <br> which often introduce extra blank lines
-        tmp.querySelectorAll('[class*="br-wrapper"]').forEach(n => n.remove());
-        tmp.querySelectorAll('br').forEach(n => n.remove());
+        // Unwrap Froala spacer wrappers to preserve contents
+        Array.from(tmp.querySelectorAll('[class*="br-wrapper"]')).forEach(w => {
+            const wrapper = w as HTMLElement;
+            while (wrapper.firstChild) {
+                wrapper.parentNode?.insertBefore(wrapper.firstChild, wrapper);
+            }
+            wrapper.remove();
+        });
+
+        // Convert <br> to newline so plain text preserves line breaks
+        tmp.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
 
         // Remove empty elements
         Array.from(tmp.querySelectorAll('*')).forEach(el => {
@@ -212,9 +286,15 @@ function extractCleanHtmlFromHtml(html: string): string {
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
 
-        // Remove Froala spacer wrappers and <br> which often introduce extra blank lines
-        tmp.querySelectorAll('[class*="br-wrapper"]').forEach(n => n.remove());
-        tmp.querySelectorAll('br').forEach(n => n.remove());
+        // Unwrap Froala spacer wrappers while preserving child content
+        Array.from(tmp.querySelectorAll('[class*="br-wrapper"]')).forEach(w => {
+            const wrapper = w as HTMLElement;
+            while (wrapper.firstChild) {
+                wrapper.parentNode?.insertBefore(wrapper.firstChild, wrapper);
+            }
+            wrapper.remove();
+        });
+        // Keep <br> tags in HTML to preserve visible line breaks
 
         // Remove empty elements
         Array.from(tmp.querySelectorAll('*')).forEach(el => {

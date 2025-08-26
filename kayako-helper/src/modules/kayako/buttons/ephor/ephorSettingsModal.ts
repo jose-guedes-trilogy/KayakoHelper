@@ -491,6 +491,16 @@ export async function openEphorSettingsModal(
             if (scopeCbxWrap) scopeCbxWrap.style.display = useWorkflow ? "" : "none";
         } catch {}
 
+        // Grey out and disable New Chat button when multi-stage is selected
+        try {
+            if (refs.newChatBtn) {
+                refs.newChatBtn.disabled = useWorkflow;
+                refs.newChatBtn.style.opacity = useWorkflow ? ".45" : "";
+                refs.newChatBtn.style.pointerEvents = useWorkflow ? "none" : "";
+                try { log("UI", useWorkflow ? "New Chat disabled in multi-stage" : "New Chat enabled in single-stage"); } catch {}
+            }
+        } catch {}
+
         if (useWorkflow) {
             onStageChange();
         } else {
@@ -843,9 +853,10 @@ export async function openEphorSettingsModal(
         dlg.style.minWidth = "720px";
         dlg.innerHTML = `
           <header>Browse Projects</header>
-          <main style="display:grid;grid-template-columns:260px 1fr;gap:12px;min-height:340px;">
-            <div style="border:1px solid #adc1e3;border-radius:6px;padding:6px;overflow:auto;min-height:240px;">
-              <div id="kh-browse-proj-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <main style="display:grid;grid-template-columns:260px 1fr;gap:12px;min-height:340px;height:60vh;overflow:hidden;">
+            <div style="border:1px solid #adc1e3;border-radius:6px;padding:6px;min-height:240px;display:flex;flex-direction:column;gap:6px;">
+              <input id="kh-browse-proj-search" type="search" placeholder="Search projects…" style="padding:4px 6px;border:1px solid #cfd3d9;border-radius:4px;">
+              <div id="kh-browse-proj-list" style="flex:1 1 auto;overflow:auto;display:flex;flex-direction:column;gap:6px;"></div>
             </div>
             <div style="border:1px solid #adc1e3;border-radius:6px;padding:8px;">
               <p style="margin:0 0 6px;color:#445">Select a project on the left to see details.</p>
@@ -860,6 +871,18 @@ export async function openEphorSettingsModal(
         dlg.querySelector<HTMLButtonElement>("[data-act=close]")!.addEventListener("click", close);
         overlay.appendChild(dlg);
         modal.appendChild(overlay);
+
+        // Constrain dialog height and keep search visible at top; only inner panes scroll
+        try {
+            dlg.style.maxHeight = "80vh";
+            (dlg as any).style.display = "flex";
+            (dlg as any).style.flexDirection = "column";
+            const mainEl = dlg.querySelector<HTMLDivElement>("main");
+            if (mainEl) {
+                mainEl.style.overflow = "hidden";
+                mainEl.style.height = "60vh";
+            }
+        } catch {}
 
         type DefaultProj = { project_id: string; invite_link_id: string };
         const defaults = await import("../export-chat/defaultEphorProjects.json");
@@ -876,10 +899,22 @@ export async function openEphorSettingsModal(
 
         const listDiv = dlg.querySelector<HTMLDivElement>("#kh-browse-proj-list")!;
         const details = dlg.querySelector<HTMLDivElement>("#kh-browse-proj-details")!;
+        try { details.style.overflow = "auto"; } catch {}
+
+        const searchInp = dlg.querySelector<HTMLInputElement>("#kh-browse-proj-search");
+        let filter = "";
+        searchInp?.addEventListener("input", () => {
+            filter = (searchInp.value || "").toLowerCase();
+            try { log("UI", `Browse Projects: filter='${filter}'`); } catch {}
+            render();
+        });
 
         const render = () => {
             listDiv.textContent = "";
-            for (const [name, rec] of entries.sort((a,b)=>a[0].localeCompare(b[0]))) {
+            const filtered = !filter
+                ? entries
+                : entries.filter(([n]) => n.toLowerCase().includes(filter));
+            for (const [name, rec] of filtered.sort((a,b)=>a[0].localeCompare(b[0]))) {
                 const has = joinedIds.has(rec.project_id);
                 const row = document.createElement("div");
                 row.style.cssText = "display:flex;align-items:center;gap:8px;padding:4px;border:1px solid #ddd;border-radius:6px";
@@ -1399,13 +1434,27 @@ export async function openEphorSettingsModal(
             btn.title = `${si.name || "Instruction"}`;
             btn.addEventListener("click", () => {
                 const ta = refs.promptInput;
-                const { selectionStart, selectionEnd, value } = ta;
-                const before = value.slice(0, selectionStart);
-                const after = value.slice(selectionEnd);
-                ta.value = `${before}${si.body}${after}`;
-                const pos = before.length + si.body.length;
-                ta.setSelectionRange(pos, pos);
+                ta.focus();
+                // Prefer modern API that participates in the undo stack
+                try {
+                    ta.setSelectionRange(0, ta.value.length);
+                    // setRangeText is widely supported and integrates with undo
+                    // Replace entire content and move caret to end
+                    (ta as any).setRangeText ? ta.setRangeText(si.body, 0, ta.value.length, "end") : (ta.value = si.body);
+                } catch {
+                    // Fallback to deprecated execCommand; still improves undoability in some browsers
+                    try {
+                        ta.setSelectionRange(0, ta.value.length);
+                        // eslint-disable-next-line deprecation/deprecation
+                        document.execCommand("insertText", false, si.body);
+                    } catch {
+                        ta.value = si.body;
+                    }
+                }
+                const pos = (si.body || "").length;
+                try { ta.setSelectionRange(pos, pos); } catch {}
                 ta.dispatchEvent(new Event("input", { bubbles: true }));
+                try { log("UI", `Applied saved instruction: ${si.name || "Instruction"}`); } catch {}
             });
             refs.instrRow.appendChild(btn);
         }

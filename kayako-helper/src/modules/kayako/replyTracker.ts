@@ -7,7 +7,8 @@ import type { ToBackground } from '@/utils/messageTypes';
 
 export function bootReplyTracker(): void {
     /* guard for the correct host */
-    if (!/central-supportdesk\.kayako\.com$/.test(window.location.hostname)) return;
+    if (!/\.kayako\.com$/.test(window.location.hostname)) return;
+    try { console.debug('[KH] replyTracker active on host', window.location.hostname); } catch {}
 
     let activeTicketId: string | null = null;
     let metaObserver: MutationObserver | null = null;

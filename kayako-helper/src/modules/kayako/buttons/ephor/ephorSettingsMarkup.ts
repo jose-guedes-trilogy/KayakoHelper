@@ -88,12 +88,12 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
     #kh-ephor-project-list > *:nth-child(odd),
     #kh-ephor-channel-list > *:nth-child(odd),
     #kh-ephor-ai-list > *:nth-child(odd) {
-        background: hsl(213 20% 98% / 1);
+        background: hsl(213 90% 98% / 1);
     }
     #kh-ephor-project-list > *:nth-child(even),
     #kh-ephor-channel-list > *:nth-child(even),
     #kh-ephor-ai-list > *:nth-child(even) {
-        background: hsl(213 15% 94% / 1);
+        background: hsl(213 70% 94% / 1);
     }
     /* unified row hover */
     #kh-ephor-project-list > *:hover,
@@ -357,7 +357,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
     #kh-top-settings-row > .kh-seg-label { width:auto; min-width:auto; flex:0 0 auto; padding-left:32px; padding-right:32px; }
     
     .kh-seg {
-        background: hsl(213 20% 97% / 1);
+        background: hsl(213 80% 97% / 1);
         border: 1px solid var(--kh-input-border);
         border-radius: 8px;
         display: inline-flex;
@@ -497,7 +497,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
                  style="width:100%;padding:4px 6px;margin-bottom:8px;">
           <div id="kh-ephor-project-list"
                style="height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
-          <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+          <div style="margin-top:8px;display:flex;gap:8px;justify-content:space-between;">
             <button id="kh-ephor-browse-projects" class="kh-btn" title="Browse available projects">📚 Browse</button>
             <button id="kh-ephor-refresh-projects" class="kh-btn">🔄 Refresh Projects</button>
           </div>

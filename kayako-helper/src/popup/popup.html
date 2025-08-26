@@ -6,7 +6,7 @@
 
     <style>
         /* Aesthetics aligned with Ephor Settings & Assets Inspector */
-        body      { font-family: system-ui, sans-serif; margin: 0; width: 22rem; }
+        body      { font-family: system-ui, sans-serif; margin: 0; width: 600px; }
         :root{
             --kh-input-border: hsl(213deg 15% 84%);
             --kh-input-shadow: inset 0 0 4px 0 hsla(0,0%,0%,0.0325), inset 0 0 2px 0 hsla(0,0%,0%,0.0805), inset 0 0 1px 0 hsla(0,0%,0%,0.089);
@@ -22,6 +22,11 @@
         .kh-bar-btn { border: none; background: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-weight:600; }
         .kh-bar-btn:hover{ background:hsl(217 40% 98% / 1); color:#1a2b4f; border:1px solid #adc1e3; }
         .kh-bar-btn.active{ background:hsl(216 20% 98% / 1); color:#333; border:1px solid #cfd3d9; border-bottom-color: transparent; position: relative; top: 1px; }
+
+        /* Top-level tabs behave like tabs, not buttons, on hover */
+        nav .kh-bar-btn{ border:0; background:transparent; border-radius:0; }
+        nav .kh-bar-btn:hover{ background:#f8f8f8; border:0; border-bottom:2px solid #adc1e3; }
+        nav .kh-bar-btn.active{ background:#fff; border:0; border-bottom:2px solid dodgerblue; top:0; }
 
         /* Buttons */
         .kh-btn { padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; }
@@ -45,6 +50,9 @@
         ul{ list-style:none;padding-left:0; }
         li{ line-height:1.3; }
 
+        /* Headings */
+        h4{ text-align:center; font-size:1.15rem; margin:.8rem 0 .6rem; }
+
         #kh-ticket-info{ display:grid;grid-template-columns:max-content 1fr;gap:.5rem; }
         .kh-ticket-info-label{ font-weight:600; }
 
@@ -58,8 +66,10 @@
         #kh-pagination button[disabled]{ opacity:.4;cursor:default; }
 
         /* inner settings tabs */
-        #kh-settings-tabs{ display:flex;border-bottom:1px solid #ddd;margin:-.2rem 0 .6rem; gap:6px; }
-        #kh-settings-tabs button{ flex:1; }
+        #kh-settings-tabs{ display:flex;border-bottom:1px solid #ddd;margin:-.2rem 0 .6rem; gap:0; }
+        #kh-settings-tabs button{ flex:1; border:0; background:#f8f8f8; font-weight:600; cursor:pointer; border-radius:0; }
+        #kh-settings-tabs button.active{ background:#fff; border-bottom:2px solid dodgerblue; }
+        #kh-settings-tabs button:hover{ background:#fff; }
         #kh-settings-panels .settings-subsection{ display:none; }
         #kh-settings-panels .settings-subsection.active{ display:block; }
 
@@ -76,6 +86,20 @@
         .kh-date-cell.kh-selected{ background:#cfe3ff; font-weight:600; }
         .kh-date-weekday{ font-size:.75rem;color:#666; text-align:center; }
         .kh-date-actions{ display:flex;gap:.4rem;justify-content:flex-end;margin-top:.4rem; }
+
+        /* Date trigger look */
+        #kh-date-range-trigger{ display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .6rem; border:1px solid #cfd3d9; background:#f8fbff; border-radius:6px; }
+
+        /* Ticket list item styling */
+        #kh-ticket-list li.kh-ticket-item{ padding:.5rem .5rem; border-bottom:1px solid #eee; }
+        .kh-item-row{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+        .kh-item-main{ display:flex; align-items:baseline; gap:.35rem; }
+        .kh-item-subject{ color:#444; }
+        .kh-delete-btn{ border:1px solid #ccc; background:#fff; color:#555; border-radius:4px; padding:.1rem .4rem; cursor:pointer; }
+        .kh-delete-btn:hover{ background:#ffecec; border-color:#e7a1a1; color:#a11; }
+        .kh-item-meta{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.2rem; color:#555; }
+        .kh-badge{ display:inline-block; padding:.05rem .35rem; border-radius:999px; background:#eef3ff; border:1px solid #c7d6ff; font-size:.75rem; }
+        .kh-date{ font-size:.8rem; color:#666; }
     </style>
 </head>
 <body>
@@ -87,19 +111,12 @@
 </nav>
 
 <!-- Global: Copy open Kayako ticket URLs/IDs (outside of tabs) -->
-<div style="padding: 0 10px;">
+<div style="padding: 0 10px; text-align: center">
     <button id="kh-copy-open-tabs-btn" class="kh-btn"
             title="Left click: copy URLs. Right-click: copy IDs. Ctrl+Click: CSV"
             style="margin:.6rem 0 .4rem .5rem;">
         Copy all ticket URLs in this tab
     </button>
-    
-    <!-- Optional helper text -->
-    <div style="font-size:.8rem;color:#666;margin:.1rem .5rem .2rem;">
-        Tip: Right-click to copy IDs; Ctrl+Click for CSV
-    </div>
-    
-    <hr style="margin:.3rem .5rem;" />
     
     <!-- Date range display mirrors list filter; remains in Main tab UI -->
 </div>
@@ -112,7 +129,7 @@
         <div class="kh-ticket-info-label">Subject:</div>         <div><span id="kh-popup-ticket-info-subject">-</span></div>
         <div class="kh-ticket-info-label">Requester:</div>       <div><span id="kh-popup-ticket-info-requester-name">-</span></div>
         <div class="kh-ticket-info-label">Requester Email:</div> <div><span id="kh-popup-ticket-info-requester-email">-</span></div>
-        <div class="kh-ticket-info-label">Your Replies:</div>    <div><span id="kh-popup-ticket-info-reply-count">0</span></div>
+        <div class="kh-ticket-info-label">Your Tracked Replies:</div>    <div><span id="kh-popup-ticket-info-reply-count">0</span></div>
         <div class="kh-ticket-info-label">Product:</div>         <div><span id="kh-popup-ticket-info-product">-</span></div>
         <div class="kh-ticket-info-label">Last Access:</div>     <div><span id="kh-popup-ticket-info-last">-</span></div>
     </div>
@@ -121,9 +138,8 @@
     <label for="kh-popup-ticket-notes" style="display:block;margin:.8rem 0 .3rem;font-weight:600">Notes</label>
     <textarea id="kh-popup-ticket-notes" rows="4" style="width:100%;padding:.4rem;font-family:inherit" disabled></textarea>
 
-    <hr />
 
-    <h4>Tickets</h4>
+    <h4>Tracked Tickets</h4>
     <!-- sub-tabs -->
     <div id="kh-ticket-list-tabs">
         <button class="list-tab active" data-list="saved">Saved</button>
@@ -132,7 +148,7 @@
 
     <!-- Date range filter (single calendar with two selections) -->
     <div id="kh-date-filter" style="position:relative;margin:.25rem 0 .4rem 0;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <button id="kh-date-range-trigger" style="padding:.2rem .5rem;border:1px solid #ccc;background:#f8f8f8;cursor:pointer">Date range</button>
+        <button id="kh-date-range-trigger" style="padding:.2rem .5rem;border:1px solid #ccc;background:#f8f8f8;cursor:pointer">📅 Date range</button>
         <span id="kh-date-range-display" style="font-size:.85rem;color:#555">All dates</span>
 
         <div id="kh-date-range-picker" style="display:none;top:2.0rem;left:0">
@@ -176,7 +192,6 @@
             <div class="kh-popup-setting">
                 <label><input type="checkbox" id="kh-hide-messenger-checkbox" /> Hide Kayako Messenger</label>
             </div>
-            <hr />
             <div class="kh-popup-setting">
                 <label for="kh-send-in-chunks-wpm-limit">Max words per minute&nbsp;</label>
 
@@ -224,7 +239,6 @@
                 <input type="color" id="kh-ui-dark-bg-color" value="#1E1E1E" />
             </div>
 
-            <hr />
 
             <!-- Results page auto-update -->
             <div class="kh-popup-setting">

@@ -19,7 +19,7 @@ interface Prefs {
 }
 
 /* ─ constants & state ─ */
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 20;
 let currentPage = 0;
 const allTickets: Record<string, TicketData> = {};
 let currentTicketId: string | null = null;
@@ -357,6 +357,16 @@ function renderList(): void {
 
     /* paging */
     const pageCount = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+    try { console.debug('[KH] popup.renderList', {
+        mode: currentListMode,
+        term,
+        dateStart: dateState.start ? dateState.start.toISOString() : null,
+        dateEnd: dateState.end ? dateState.end.toISOString() : null,
+        total: Object.keys(allTickets).length,
+        filtered: filtered.length,
+        page: currentPage + 1,
+        pageCount,
+    }); } catch {}
     currentPage = Math.min(currentPage, pageCount - 1);
     const pageItems = filtered.slice(currentPage * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE + ITEMS_PER_PAGE);
 
@@ -364,17 +374,27 @@ function renderList(): void {
     refs.list.textContent = '';
     pageItems.forEach(([id, t]) => {
         const li = document.createElement('li');
-        li.style.marginBottom = '.4rem';
+        li.className = 'kh-ticket-item';
+        const product = (t as any).product || '';
+        const dateTxt = t.lastAccess ? formatDate(new Date(t.lastAccess)) : '';
         li.innerHTML = `
-            <a href="https://central-supportdesk.kayako.com/agent/conversations/${id}"
-               target="_blank" style="text-decoration:none"><strong>${id}</strong></a>
-            – ${t.subject || '(no subject)'}<br>
-            <small>${t.name}&nbsp;&lt;${t.email}&gt;</small>
-            <button data-id="${id}" title="Delete" style="margin-left:.5rem;cursor:pointer">🗑</button>
+            <div class="kh-item-row">
+                <div class="kh-item-main">
+                    <a href="https://central-supportdesk.kayako.com/agent/conversations/${id}" target="_blank" style="text-decoration:none"><strong>${id}</strong></a>
+                    <span class="kh-item-subject">– ${t.subject || '(no subject)'}</span>
+                </div>
+                <button class="kh-delete-btn" data-id="${id}" title="Delete">×</button>
+            </div>
+            <div class="kh-item-meta">
+                <span class="kh-badge">${product || '-'}</span>
+                <span class="kh-date">${dateTxt || '-'}</span>
+                <small>${t.name || ''}&nbsp;&lt;${t.email || ''}&gt;</small>
+            </div>
         `;
-        li.querySelector('button')!.addEventListener('click', ev => {
+        li.querySelector('.kh-delete-btn')!.addEventListener('click', ev => {
             const delId = (ev.currentTarget as HTMLButtonElement).dataset.id!;
             if (!confirm(`Delete ticket ${delId} from storage?`)) return;
+            try { console.debug('[KH] popup.deleteTicket', { ticketId: delId }); } catch {}
             chrome.runtime.sendMessage<ToBackground>({ action: 'deleteTicket', ticketId: delId });
             delete allTickets[delId];
             renderList();
@@ -506,6 +526,7 @@ function openDatePicker(): void {
     dateState.tempStart = dateState.start;
     dateState.tempEnd = dateState.end;
     renderCalendar();
+    try { console.debug('[KH] popup.datePicker.open'); } catch {}
 }
 function closeDatePicker(): void { if (refs.datePicker) refs.datePicker.style.display = 'none'; }
 
@@ -566,17 +587,20 @@ refs.dateTrigger?.addEventListener('click', (e) => {
     if (!refs.datePicker) return;
     e.stopPropagation();
     const visible = refs.datePicker.style.display === 'block';
-    if (visible) closeDatePicker(); else openDatePicker();
+    if (visible) { closeDatePicker(); try { console.debug('[KH] popup.datePicker.toggle', { open: false }); } catch {} }
+    else { openDatePicker(); try { console.debug('[KH] popup.datePicker.toggle', { open: true }); } catch {} }
 });
-refs.datePrev?.addEventListener('click', (e) => { e.stopPropagation(); dateState.monthCursor = addMonths(dateState.monthCursor, -1); renderCalendar(); });
-refs.dateNext?.addEventListener('click', (e) => { e.stopPropagation(); dateState.monthCursor = addMonths(dateState.monthCursor, +1); renderCalendar(); });
+refs.datePrev?.addEventListener('click', (e) => { e.stopPropagation(); dateState.monthCursor = addMonths(dateState.monthCursor, -1); renderCalendar(); try { console.debug('[KH] popup.datePicker.prev', { month: dateState.monthCursor }); } catch {} });
+refs.dateNext?.addEventListener('click', (e) => { e.stopPropagation(); dateState.monthCursor = addMonths(dateState.monthCursor, +1); renderCalendar(); try { console.debug('[KH] popup.datePicker.next', { month: dateState.monthCursor }); } catch {} });
 refs.dateClear?.addEventListener('click', (e) => {
     e.stopPropagation();
     dateState.start = null; dateState.end = null; dateState.tempStart = null; dateState.tempEnd = null; syncDateDisplay(); renderList(); closeDatePicker();
+    try { console.debug('[KH] popup.datePicker.clear'); } catch {}
 });
 refs.dateApply?.addEventListener('click', (e) => {
     e.stopPropagation();
     dateState.start = dateState.tempStart; dateState.end = dateState.tempEnd; syncDateDisplay(); renderList(); closeDatePicker();
+    try { console.debug('[KH] popup.datePicker.apply', { start: dateState.start, end: dateState.end }); } catch {}
 });
 
 // Close calendar when clicking outside
