@@ -2,6 +2,7 @@
 
 import type { ToBackground, FromBackground } from '@/utils/messageTypes';
 import { TicketData } from '@/background/replyDataBg.ts';
+import { sendMessageSafe } from '@/utils/sendMessageSafe';
 
 interface Prefs {
     trainingMode?: boolean;
@@ -23,7 +24,8 @@ const ITEMS_PER_PAGE = 20;
 let currentPage = 0;
 const allTickets: Record<string, TicketData> = {};
 let currentTicketId: string | null = null;
-let currentListMode: 'saved' | 'visited' = 'saved';
+let currentListMode: 'saved' | 'visited' | 'bookmarked' = 'saved';
+let currentTicketBookmarked = false;
 
 /* ─ UI references ─ */
 const refs = {
@@ -69,6 +71,7 @@ const refs = {
     lblProduct: document.getElementById('kh-popup-ticket-info-product')         as HTMLElement,
     lblLast   : document.getElementById('kh-popup-ticket-info-last')            as HTMLElement,
     txtNotes  : document.getElementById('kh-popup-ticket-notes')         as HTMLTextAreaElement,
+    bookmarkToggle: document.getElementById('kh-bookmark-toggle') as HTMLButtonElement,
 
     /* list & paging */
     listTabButtons: Array.from(document.querySelectorAll<HTMLButtonElement>('#kh-ticket-list-tabs .list-tab')),
@@ -111,11 +114,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }),
     );
 
-    /* sub-tabs (Saved / Visited) */
+    /* sub-tabs (Replied to / Visited / Bookmark) */
     refs.listTabButtons.forEach(btn =>
         btn.addEventListener('click', () => {
             refs.listTabButtons.forEach(b => b.classList.toggle('active', b === btn));
-            currentListMode = btn.dataset.list as 'saved' | 'visited';
+            currentListMode = btn.dataset.list as 'saved' | 'visited' | 'bookmarked';
             currentPage = 0;
             renderList();
         }),
@@ -169,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refs.chkTraining.addEventListener('change', () => {
         const enabled = refs.chkTraining.checked;
-        chrome.runtime.sendMessage<ToBackground>({ action: 'setTrainingMode', enabled });
+        sendMessageSafe<ToBackground>({ action: 'setTrainingMode', enabled }, 'popup:setTrainingMode');
         chrome.storage.sync.set({ trainingMode: enabled });
     });
     refs.chkHideMessenger?.addEventListener('change', () => {
@@ -179,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     refs.chkStyles.addEventListener('change', () => {
         const enabled = refs.chkStyles.checked;
-        chrome.runtime.sendMessage<ToBackground>({ action: 'setAllStylesEnabled', enabled });
+        sendMessageSafe<ToBackground>({ action: 'setAllStylesEnabled', enabled }, 'popup:setAllStylesEnabled');
         chrome.storage.sync.set({ allStyles: enabled });
     });
     refs.inpWpm.addEventListener('change', () => {
@@ -263,20 +266,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ticketId) return;
 
         refs.lblId.textContent = ticketId;
-        chrome.runtime.sendMessage<ToBackground>({ action: 'getStats', ticketId });
+        sendMessageSafe<ToBackground>({ action: 'getStats', ticketId }, 'popup:getStats');
+
+        // Bookmark toggle wiring
+        if (refs.bookmarkToggle) {
+            refs.bookmarkToggle.disabled = true; // enabled after stats arrive
+            refs.bookmarkToggle.addEventListener('click', () => {
+                if (!currentTicketId) return;
+                const next = !currentTicketBookmarked;
+                sendMessageSafe<ToBackground>({ action: 'setBookmark', ticketId: currentTicketId, bookmarked: next }, 'popup:setBookmark');
+                // Optimistic UI update
+                currentTicketBookmarked = next;
+                updateBookmarkButton(next);
+            });
+        }
 
         refs.txtNotes.disabled = false;
         refs.txtNotes.addEventListener('input', () => {
-            chrome.runtime.sendMessage<ToBackground>({
+            sendMessageSafe<ToBackground>({
                 action: 'saveNotes',
                 ticketId,
                 notes: refs.txtNotes.value.trim(),
-            });
+            }, 'popup:saveNotes');
         });
     });
 
     /* ticket list */
-    chrome.runtime.sendMessage<ToBackground>({ action: 'getAllTickets' });
+    sendMessageSafe<ToBackground>({ action: 'getAllTickets' }, 'popup:getAllTickets');
     refs.searchBox.addEventListener('input', () => { currentPage = 0; renderList(); });
 
     /* copy all open Kayako ticket URLs/IDs */
@@ -310,6 +326,10 @@ chrome.runtime.onMessage.addListener((msg: FromBackground) => {
             refs.txtNotes.value         = msg.notes ?? '';
             if (refs.lblProduct) refs.lblProduct.textContent = (msg as any).product || '-';
             if (refs.lblLast) refs.lblLast.textContent = (msg as any).lastAccess ? formatDate(new Date((msg as any).lastAccess)) : '-';
+            // Bookmark UI setup
+            currentTicketBookmarked = !!(msg as any).bookmarked;
+            updateBookmarkButton(currentTicketBookmarked);
+            if (refs.bookmarkToggle) refs.bookmarkToggle.disabled = false;
             break;
         }
         case 'allTickets': {
@@ -329,8 +349,10 @@ function renderList(): void {
         .filter(([_, t]) => {
             const inSaved   = t.count > 0;
             const inVisited = t.count === 0;
+            const isBookmarked = !!(t as any).bookmarked;
             if (currentListMode === 'saved' && !inSaved)   return false;
             if (currentListMode === 'visited' && !inVisited) return false;
+            if (currentListMode === 'bookmarked' && !isBookmarked) return false;
 
             /* search filter */
             const searchOk = (!term ||
@@ -395,7 +417,7 @@ function renderList(): void {
             const delId = (ev.currentTarget as HTMLButtonElement).dataset.id!;
             if (!confirm(`Delete ticket ${delId} from storage?`)) return;
             try { console.debug('[KH] popup.deleteTicket', { ticketId: delId }); } catch {}
-            chrome.runtime.sendMessage<ToBackground>({ action: 'deleteTicket', ticketId: delId });
+            sendMessageSafe<ToBackground>({ action: 'deleteTicket', ticketId: delId }, 'popup:deleteTicket');
             delete allTickets[delId];
             renderList();
         });
@@ -419,6 +441,20 @@ function makePageBtn(label: string, enabled: boolean, onClick: () => void): HTML
 }
 
 /* ─ util ─ */
+function updateBookmarkButton(isBookmarked: boolean): void {
+    const btn = refs.bookmarkToggle;
+    if (!btn) return;
+    if (isBookmarked) {
+        btn.textContent = '★ Bookmarked';
+        btn.title = 'Click to remove bookmark';
+        btn.classList.add('kh-btn-primary');
+    } else {
+        btn.textContent = '☆ Bookmark this ticket';
+        btn.title = 'Bookmark this ticket';
+        btn.classList.remove('kh-btn-primary');
+    }
+}
+
 function getCurrentTabTicketId(): Promise<string | null> {
     return new Promise(resolve => {
         chrome.tabs.query({ active: true, currentWindow: true }, tabs => {

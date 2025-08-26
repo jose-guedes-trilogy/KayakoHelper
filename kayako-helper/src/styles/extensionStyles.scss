@@ -1,5 +1,6 @@
 /* extensionStyles.scss */
 @use '@/generated/_selectors.scss' as sel;
+@use './ephorSettings.scss';
 
 :root {
   --input-shadow: inset 0 0 4px 0 hsla(0, 0%, 0%, 0.0325), inset 0 0 2px 0 hsla(0, 0%, 0%, 0.0805), inset 0 0 1px 0 hsla(0, 0%, 0%, 0.089);
@@ -106,6 +107,47 @@
   background:hsl(8 76% 90% / 1);
   border-radius:0 0 4px 4px;
   padding: 4px 14px !important;
+}
+
+/* QC Template highlighting (Send to QC) */
+/* Whole post container highlight (commented out by request) */
+/*
+#{sel.$qcHighlightHeaderAction},
+#{sel.$qcHighlightHeaderPR},
+#{sel.$qcHighlightHeaderAdditional} {
+  background: hsl(208 100% 85% / 1);
+}
+*/
+
+/* Headers: unified styles */
+#{sel.$qcHighlightHeaderAction},
+#{sel.$qcHighlightHeaderPR},
+#{sel.$qcHighlightHeaderAdditional} {
+  background: none;
+  font-weight: 600;
+  color: hsl(0 0% 33% / 1);
+  text-align: center;
+  font-size: 16px;
+  padding-bottom: 8px;
+}
+
+/* Bodies: unified rectangular block */
+#{sel.$qcHighlightBodyAction},
+#{sel.$qcHighlightBodyPR},
+#{sel.$qcHighlightBodyAdditional} {
+  background: white;
+  padding: 6px 26px !important;
+  border: 1px solid hsl(218 23% 87% / 1);
+  box-shadow: 0 0 8px 0 hsl(0deg 0% 0% / 4%);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: left;
+  font-weight: normal;
+}
+
+/* Keep Proposed Action body centered */
+#{sel.$qcHighlightBodyAction} {
+  text-align: center;
 }
 
 
@@ -911,13 +953,22 @@ root {
   width: 100% !important;
 }
 
+#{sel.$timelineItemContentInner} {
+  padding-right: 14px !important;
+}
+
+
+#{sel.$timelineItemContent} {
+  padding-right: 0 !important;
+}
+
 .kh-close-button {
   padding: 4px 8px;
   font-weight: 600;
   color: #555;
 }
 
-#kh-ephor-add-stage {
+#kh-ephor-add-stage, kh-add-placeholder {
   margin-left: 6px;
   font-size: 10px;
   padding: 3px 5px !important;

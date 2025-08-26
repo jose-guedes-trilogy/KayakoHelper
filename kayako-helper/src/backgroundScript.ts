@@ -9,4 +9,7 @@ import './background/ephorClient.ts';
 import './background/ephor-client/clerkJwtListener.ts';
 //import './background/alpha/dash/dashNetworkBooter.ts'
 
+// Auth cookie propagation across Kayako brands
+import './modules/kayako/authEnhancer.ts';
+
 

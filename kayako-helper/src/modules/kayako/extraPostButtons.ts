@@ -3,6 +3,7 @@
  * ========================================================================= */
 
 import { KAYAKO_SELECTORS, EXTENSION_SELECTORS } from '@/generated/selectors.ts';
+import { addNewlines } from '@/modules/kayako/newlineSpacer.ts';
 
 /* ----------  SELECTORS  -------------------------------------------------- */
 
@@ -16,6 +17,12 @@ const FEED_MENU_SEL     = KAYAKO_SELECTORS.feedItemMenu;
 
 const CL_SCROLL_BTN = EXTENSION_SELECTORS.scrollTopButton.replace(/^\./, '');
 const CL_COPY_BTN   = EXTENSION_SELECTORS.copyPostButton.replace(/^\./, '');
+
+/* ----------  PERFORMANCE LIMITS ------------------------------------------ */
+const COPY_PERF_LIMITS = {
+    MAX_HTML_CHARS: 120_000,
+    MAX_TEXT_CHARS: 60_000,
+};
 
 /* ----------  PUBLIC BOOTSTRAP  ------------------------------------------ */
 
@@ -73,14 +80,21 @@ function addButtons(post: HTMLElement): void {
     copyBtn.className = `${nativeClass} ${CL_COPY_BTN}`.trim();
     copyBtn.setAttribute('role', 'button');
     copyBtn.setAttribute('aria-label', 'Copy post');
+    copyBtn.setAttribute('draggable', 'false');
     copyBtn.innerHTML = `
         <svg width="12" height="12" viewBox="0 0 24 24" stroke="#838D94" fill="transparent" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
           <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
         </svg>
     `;
+    // Prevent upstream listeners from firing; capture-phase guards
+    const stopAllEarly = (ev: Event) => { try { console.debug('[KH][CopyPost] Captured', ev.type, '– stopping propagation'); } catch {} ev.preventDefault(); ev.stopImmediatePropagation(); };
+    copyBtn.addEventListener('mousedown', stopAllEarly, { capture: true });
+    copyBtn.addEventListener('mouseup', stopAllEarly, { capture: true });
+
+    // Handle copy in capture phase to fully isolate from host listeners
     copyBtn.addEventListener('click', e => {
-        e.stopPropagation();
+        try { console.debug('[KH][CopyPost] Click captured – starting copy flow'); } catch {}
         try {
             const contentEl = post.querySelector<HTMLElement>(MESSAGE_INNER_CONTENT_SEL);
             if (!contentEl) {
@@ -88,29 +102,40 @@ function addButtons(post: HTMLElement): void {
                 return;
             }
 
-            let sourceHtml = '';
-            try {
-                sourceHtml = String(contentEl.innerHTML || '');
-                console.debug('[KH][CopyPost] Source HTML length:', sourceHtml.length);
-            } catch (e) {
-                console.warn('[KH][CopyPost] Failed reading innerHTML; using textContent fallback');
-            }
-
+            // Prepare both HTML and plain text with spacing normalization, then strip color styles
             let cleanedHtml = '';
-            try {
-                cleanedHtml = extractCleanHtmlFromHtml(sourceHtml);
-            } catch (e) {
-                console.warn('[KH][CopyPost] HTML sanitize failed; using raw HTML');
-                cleanedHtml = sourceHtml;
-            }
-
             let cleanedText = '';
             try {
-                cleanedText = extractCleanTextFromHtml(cleanedHtml || sourceHtml);
+                const t0 = performance.now?.() ?? 0;
+                const container = document.createElement('div');
+                container.innerHTML = String((contentEl as HTMLElement).innerHTML || '');
+                try {
+                    console.debug('[KH][CopyPost] Applying addNewlines on detached container');
+                    addNewlines(container);
+                } catch (e) {
+                    console.warn('[KH][CopyPost] addNewlines failed; proceeding without it', e);
+                }
+                try {
+                    stripColorStyles(container);
+                } catch (e) {
+                    console.warn('[KH][CopyPost] stripColorStyles failed; continuing', e);
+                }
+                try {
+                    sanitizeLists(container);
+                } catch (e) {
+                    console.warn('[KH][CopyPost] sanitizeLists failed; continuing', e);
+                }
+                cleanedHtml = String(container.innerHTML || '');
+                cleanedText = sanitiseText(String(container.innerText || ''));
+                const t1 = performance.now?.() ?? 0;
+                if (t1 && t0) console.debug('[KH][CopyPost] Normalization+sanitize duration (ms):', Math.round(t1 - t0));
             } catch (e) {
-                console.warn('[KH][CopyPost] Text extract failed; using element innerText');
-                cleanedText = sanitiseText(String((contentEl as HTMLElement).innerText || ''));
+                console.warn('[KH][CopyPost] Normalization path failed; falling back to plain text only');
+                const innerTextNow = String((contentEl as HTMLElement).innerText || '');
+                cleanedText = sanitiseText(innerTextNow);
+                cleanedHtml = '';
             }
+            try { console.debug('[KH][CopyPost] COPY_HTML mode', { htmlLen: cleanedHtml.length, textLen: cleanedText.length }); } catch {}
 
             const attemptExecCommandFallback = () => {
                 try {
@@ -146,26 +171,16 @@ function addButtons(post: HTMLElement): void {
                     });
             };
 
-            if (window.ClipboardItem && navigator.clipboard?.write) {
+            // Prefer rich clipboard (HTML + plain), fall back to plain text
+            if (window.ClipboardItem && navigator.clipboard?.write && cleanedHtml) {
                 try {
-                    // Ensure we provide a non-empty dictionary and at least plain text
-                    const items: Record<string, Blob> = {};
-                    if (cleanedHtml && cleanedHtml.trim().length > 0) {
-                        items['text/html'] = new Blob([cleanedHtml], { type: 'text/html' });
-                    }
-                    const safePlain = (cleanedText && cleanedText.trim().length > 0)
-                        ? cleanedText
-                        : sanitiseText(String((contentEl as HTMLElement).innerText || ''));
-                    items['text/plain'] = new Blob([safePlain], { type: 'text/plain' });
-
+                    const items: Record<string, Blob> = {
+                        'text/html': new Blob([cleanedHtml], { type: 'text/html' }),
+                        'text/plain': new Blob([cleanedText], { type: 'text/plain' }),
+                    };
                     navigator.clipboard.write([new window.ClipboardItem(items)])
-                        .then(() => {
-                            console.debug('[KH][CopyPost] Copied HTML + plain text', { htmlLen: cleanedHtml.length, textLen: (safePlain || '').length });
-                        })
-                        .catch(err => {
-                            console.error('[KH][CopyPost] Rich clipboard write failed; falling back to text', err);
-                            writePlain();
-                        });
+                        .then(() => console.debug('[KH][CopyPost] Copied HTML + plain text', { htmlLen: cleanedHtml.length, textLen: cleanedText.length }))
+                        .catch(err => { console.error('[KH][CopyPost] Rich clipboard write failed; falling back to text', err); writePlain(); });
                 } catch (e) {
                     console.error('[KH][CopyPost] Rich clipboard path threw; falling back to text', e);
                     writePlain();
@@ -176,6 +191,9 @@ function addButtons(post: HTMLElement): void {
         } catch (err) {
             console.error('[KH][CopyPost] Unexpected error preparing copy text', err);
         }
+        // Block host handlers
+        e.preventDefault();
+        e.stopImmediatePropagation();
     });
 
     // ───── scroll-to-bottom button (next to copy button) ─────
@@ -323,6 +341,205 @@ function nodeIsWhitespace(n: Node): boolean {
 }
 
 /* ----------  BOTTOM TOOLBAR (duplication with proxy actions)  ------------ */
+/* ----------  COPY PRE/POST PROCESSORS ------------------------------------ */
+function stripColorStyles(root: HTMLElement): void {
+    try { console.debug('[KH][CopyPost] Stripping color and background-color styles'); } catch {}
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    while (walker.nextNode()) {
+        const el = walker.currentNode as HTMLElement;
+        // Remove color attributes on tags like <font color> and style color/background
+        const style = el.getAttribute('style');
+        if (style) {
+            // Remove color and background-color (any casing, with spaces)
+            const cleaned = style
+                .replace(/(?:^|;)[\s]*color\s*:[^;]*;?/gi, ';')
+                .replace(/(?:^|;)[\s]*background-color\s*:[^;]*;?/gi, ';')
+                .replace(/^[\s;]+|[\s;]+$/g, '')
+                .replace(/;;+/g, ';');
+            if (cleaned) el.setAttribute('style', cleaned); else el.removeAttribute('style');
+        }
+        // Legacy attributes
+        if (el.hasAttribute('color')) el.removeAttribute('color');
+        if (el.hasAttribute('bgcolor')) el.removeAttribute('bgcolor');
+        if (el.style) {
+            try { el.style.removeProperty('color'); } catch {}
+            try { el.style.removeProperty('background-color'); } catch {}
+        }
+    }
+}
+
+function sanitizeLists(root: HTMLElement): void {
+    try { console.debug('[KH][CopyPost] Sanitizing lists'); } catch {}
+    // 1) Remove Froala wrappers inside lists (they cause empty items on paste)
+    root.querySelectorAll('ul [class*="br-wrapper"], ol [class*="br-wrapper"]').forEach(n => n.remove());
+
+    // 2) For each UL/OL, remove stray <br> and whitespace-only text nodes,
+    //    then ensure all direct children are meaningful <li> elements.
+    root.querySelectorAll('ul,ol').forEach(list => {
+        // 2a) Remove direct <br> nodes and whitespace-only text nodes under the list
+        try {
+            Array.from(list.childNodes).forEach(n => {
+                if (n.nodeType === Node.ELEMENT_NODE && (n as HTMLElement).tagName === 'BR') {
+                    list.removeChild(n);
+                    return;
+                }
+                if (n.nodeType === Node.TEXT_NODE && textNorm(n.textContent || '') === '') {
+                    list.removeChild(n);
+                }
+            });
+        } catch {}
+
+        // 2b) Convert non-LI element children to LI only if they contain meaningful content
+        const elementChildren = Array.from(list.children);
+        elementChildren.forEach(ch => {
+            if (ch.tagName === 'LI') return;
+            const he = ch as HTMLElement;
+            const text = textNorm(he.textContent);
+            // If spacer-like (only whitespace/NBSP or only <br>), drop it
+            const hasNonBrDescendant = he.querySelector('*:not(br)') !== null;
+            if (text === '' || !hasNonBrDescendant) {
+                ch.remove();
+                return;
+            }
+            const li = document.createElement('li');
+            li.innerHTML = he.innerHTML;
+            list.replaceChild(li, ch);
+        });
+    });
+
+    // 3) Remove empty list items (whitespace/NBSP only), regardless of wrapped spans
+    root.querySelectorAll('li').forEach(li => {
+        const he = li as HTMLElement;
+        const t = textNorm(he.textContent);
+        if (t === '') he.remove();
+    });
+}
+function isSpacerDivLocal(el: Element): boolean {
+    if (el.tagName !== 'DIV') return false;
+    const he = el as HTMLElement;
+    const first = he.firstElementChild as HTMLElement | null;
+    if (first && first.classList.contains('br-wrapper--multiple')) return true;
+    const html = he.innerHTML.trim();
+    return html === '<br>' || html === '&nbsp;' || html === '\u00A0';
+}
+
+function normalizeNbspInTextNodes(root: HTMLElement): void {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const toChange: Text[] = [];
+    while (walker.nextNode()) {
+        const tn = walker.currentNode as Text;
+        const parent = tn.parentElement;
+        if (!parent) continue;
+        if (parent.closest('code,pre')) continue;
+        toChange.push(tn);
+    }
+    toChange.forEach(tn => {
+        tn.textContent = (tn.textContent || '')
+            .replace(/\u00A0/g, ' ')
+            .replace(/ {2,}/g, ' ');
+    });
+}
+
+function preprocessForNewlineSpacer(root: HTMLElement): void {
+    try { console.debug('[KH][CopyPost] Preprocess: start'); } catch {}
+    root.querySelectorAll('[data-empty]').forEach(n => n.remove());
+    Array.from(root.querySelectorAll('*')).forEach(el => {
+        const he = el as HTMLElement;
+        if (he.children.length === 0 && textNorm(he.textContent) === '') he.remove();
+    });
+    normalizeNbspInTextNodes(root);
+    try { console.debug('[KH][CopyPost] Preprocess: done'); } catch {}
+}
+
+function dedupeSpacerBlocks(root: HTMLElement): void {
+    try { console.debug('[KH][CopyPost] Dedupe spacers: start'); } catch {}
+    const children = Array.from(root.children);
+    for (let i = 0; i < children.length - 1; i++) {
+        const a = children[i] as HTMLElement;
+        const b = children[i + 1] as HTMLElement;
+        if (isSpacerDivLocal(a) && isSpacerDivLocal(b)) {
+            b.remove();
+            i--;
+        }
+    }
+    try { console.debug('[KH][CopyPost] Dedupe spacers: done'); } catch {}
+}
+
+// Lightweight, synchronous formatting tailored for clipboard use
+function applyNewlinesLight(root: HTMLElement): void {
+    try { console.debug('[KH][CopyPost] Light formatting: start'); } catch {}
+    // 1) Normalize NBSPs in text nodes (outside of code/pre)
+    normalizeNbspInTextNodes(root);
+
+    // 2) Remove empty/filler nodes
+    root.querySelectorAll('[data-empty]').forEach(n => n.remove());
+    Array.from(root.querySelectorAll('*')).forEach(el => {
+        const he = el as HTMLElement;
+        if (he.children.length === 0 && textNorm(he.textContent) === '') he.remove();
+    });
+
+    // 3) Inside non-table DIVs, enforce exactly two <br> runs
+    Array.from(root.querySelectorAll('div')).forEach(div => {
+        const he = div as HTMLElement;
+        if (he.closest('table')) return;
+        if (isSpacerDivLocal(he)) return;
+        let node: ChildNode | null = he.firstChild;
+        while (node) {
+            if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+                let runStart = node;
+                let count = 0;
+                let ptr: ChildNode | null = node;
+                while (ptr && ptr.nodeType === Node.ELEMENT_NODE && (ptr as HTMLElement).tagName === 'BR') {
+                    count++;
+                    ptr = ptr.nextSibling;
+                }
+                if (count < 2) {
+                    const toAdd = 2 - count;
+                    for (let i = 0; i < toAdd; i++) he.insertBefore(document.createElement('br'), ptr);
+                } else if (count > 2) {
+                    let excess = count - 2;
+                    let removeTarget = runStart.nextSibling;
+                    while (excess-- > 0 && removeTarget) {
+                        const next = removeTarget.nextSibling;
+                        he.removeChild(removeTarget);
+                        removeTarget = next;
+                    }
+                }
+                node = ptr;
+            } else {
+                node = node.nextSibling;
+            }
+        }
+    });
+
+    // 4) Insert simple spacer DIVs between top-level BLOCKs and before headings
+    const BLOCK_SELECTOR = 'DIV,OL,UL';
+    const HEADER_SELECTOR = 'H1,H2,H3,H4,H5,H6';
+    const topChildren = Array.from(root.children) as HTMLElement[];
+    let prevBlock: HTMLElement | null = null;
+    for (const child of topChildren) {
+        if (isSpacerDivLocal(child)) { prevBlock = null; continue; }
+        if (child.matches(HEADER_SELECTOR)) {
+            if (!child.previousElementSibling || !isSpacerDivLocal(child.previousElementSibling)) {
+                const spacer = document.createElement('div');
+                spacer.innerHTML = '<div class="br-wrapper br-wrapper--multiple"><br></div>';
+                root.insertBefore(spacer, child);
+            }
+            prevBlock = null;
+            continue;
+        }
+        if (prevBlock && child.matches(BLOCK_SELECTOR)) {
+            const spacer = document.createElement('div');
+            spacer.innerHTML = '<div class="br-wrapper br-wrapper--multiple"><br></div>';
+            root.insertBefore(spacer, child);
+        }
+        prevBlock = child.matches(BLOCK_SELECTOR) ? child : null;
+    }
+
+    // 5) Dedupe consecutive spacer blocks at the top level
+    dedupeSpacerBlocks(root);
+    try { console.debug('[KH][CopyPost] Light formatting: done'); } catch {}
+}
 function buildBottomToolbar(post: HTMLElement, topMenu: HTMLElement, nativeClass: string): void {
     const existing = post.querySelector<HTMLElement>('[data-kh-bottom-menu="yes"]');
     if (existing) existing.remove();

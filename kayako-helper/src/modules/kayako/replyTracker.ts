@@ -4,6 +4,9 @@
 import { KAYAKO_SELECTORS } from '@/generated/selectors';
 import { currentConvId }    from '@/utils/location';
 import type { ToBackground } from '@/utils/messageTypes';
+import { sendMessageSafe } from '@/utils/sendMessageSafe';
+
+// use shared sendMessageSafe
 
 export function bootReplyTracker(): void {
     /* guard for the correct host */
@@ -20,7 +23,7 @@ export function bootReplyTracker(): void {
         e => {
             const btn = (e.target as Element).closest(KAYAKO_SELECTORS.sendButtonPublicReply) as Element | null;
             if (!btn || !activeTicketId) return;
-            chrome.runtime.sendMessage<ToBackground>({ action: 'incrementReply', ticketId: activeTicketId });
+            sendMessageSafe<ToBackground>({ action: 'incrementReply', ticketId: activeTicketId });
         },
         true,
     );
@@ -30,7 +33,7 @@ export function bootReplyTracker(): void {
         activeTicketId = ticketId;
 
         /* make sure it’s registered as visited immediately */
-        chrome.runtime.sendMessage<ToBackground>({ action: 'visitTicket', ticketId });
+        sendMessageSafe<ToBackground>({ action: 'visitTicket', ticketId });
 
         /* stop previous observer */
         metaObserver?.disconnect();
@@ -50,7 +53,7 @@ export function bootReplyTracker(): void {
             if (name === lastSent.name && email === lastSent.email && subject === lastSent.subject && product === lastSent.product) return;
 
             try { console.debug('[KH] replyTracker.saveMetadata', { ticketId, name, email, subject, product }); } catch {}
-            chrome.runtime.sendMessage<ToBackground>({ action: 'saveMetadata', ticketId, name, email, subject, product });
+            sendMessageSafe<ToBackground>({ action: 'saveMetadata', ticketId, name, email, subject, product });
             lastSent = { name, email, subject, product };
         };
         trySave();

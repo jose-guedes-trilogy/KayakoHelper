@@ -81,13 +81,6 @@ export interface ModalRefs {
 /* ------------------------------------------------------------------ */
 export function createSettingsModal() {
     const modal = Object.assign(document.createElement("div"), { id: "kh-ephor-settings-modal" });
-    modal.style.cssText = `
-      position:fixed;top:90px;left:50%;transform:translateX(-50%);
-      width:min(980px, calc(100vw - 16px));background:#fff;border:1px solid #ccc;border-radius:6px;padding:0 20px 16px;
-      z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.2);
-      max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;
-      contain:inline-size;
-      font-family:system-ui;font-size:13px;display:flex;flex-direction:column;gap:12px;`;
 
     modal.innerHTML = EPHOR_SETTINGS_MARKUP;
 
@@ -95,7 +88,8 @@ export function createSettingsModal() {
 
     // Convert from centered (translateX) to absolute px the first time we drag.
     const ensureAbsolutePosition = () => {
-        if (modal.style.transform !== "none") {
+        const computed = window.getComputedStyle(modal).transform;
+        if (computed && computed !== "none") {
             const rect = modal.getBoundingClientRect();
             modal.style.transform = "none";
             modal.style.left = `${rect.left}px`;
@@ -149,6 +143,8 @@ export function createSettingsModal() {
 
     // Keep only vertical clamping on resize; do not touch horizontal.
     window.addEventListener("resize", () => {
+        // Convert to absolute px before clamping so translateY(-50%) doesn't skew math
+        ensureAbsolutePosition();
         const rect = modal.getBoundingClientRect();
         const newTop = clampY(rect.top, rect.height);
         modal.style.top = `${newTop}px`;

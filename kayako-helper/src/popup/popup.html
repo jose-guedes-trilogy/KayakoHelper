@@ -29,9 +29,9 @@
         nav .kh-bar-btn.active{ background:#fff; border:0; border-bottom:2px solid dodgerblue; top:0; }
 
         /* Buttons */
-        .kh-btn { padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; }
+        .kh-btn { padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04); }
         .kh-btn:hover { background:#f5f7ff; border-color:#99a; }
-        .kh-btn:active { transform:translateY(1px); }
+        .kh-btn:active { transform:translateY(1px); box-shadow: 0 1px 1px rgba(0,0,0,.03); }
         .kh-btn-primary { background:#2e73e9; color:#fff; border-color:#2e73e9; }
         .kh-btn-primary:hover { background:#255ecd; color:#fff; }
 
@@ -134,6 +134,11 @@
         <div class="kh-ticket-info-label">Last Access:</div>     <div><span id="kh-popup-ticket-info-last">-</span></div>
     </div>
 
+    <!-- Bookmark toggle -->
+    <div style="margin:.5rem 0 .3rem;">
+        <button id="kh-bookmark-toggle" class="kh-btn" title="Bookmark this ticket" disabled>☆ Bookmark this ticket</button>
+    </div>
+
     <!-- Notes -->
     <label for="kh-popup-ticket-notes" style="display:block;margin:.8rem 0 .3rem;font-weight:600">Notes</label>
     <textarea id="kh-popup-ticket-notes" rows="4" style="width:100%;padding:.4rem;font-family:inherit" disabled></textarea>
@@ -142,8 +147,9 @@
     <h4>Tracked Tickets</h4>
     <!-- sub-tabs -->
     <div id="kh-ticket-list-tabs">
-        <button class="list-tab active" data-list="saved">Saved</button>
+        <button class="list-tab active" data-list="saved">Replied to</button>
         <button class="list-tab"        data-list="visited">Visited</button>
+        <button class="list-tab"        data-list="bookmarked">Bookmark</button>
     </div>
 
     <!-- Date range filter (single calendar with two selections) -->

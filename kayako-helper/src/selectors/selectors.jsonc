@@ -285,6 +285,8 @@
     "copyChatButton": "#kh-copy-chat-btn",
     "newLinesButton": "#kh-newlines-btn",
     "sendToQcButton": "#kh-send-to-qc-btn",
+    // Right half (▾) of the split “Send to QC” button (editor header)
+    "sendToQcButtonRight": "#kh-send-to-qc-btn-right",
     "exportChatButton": "#kh-export-chat-btn",
     "exportChatButtonRight": "#kh-export-chat-btn-right",
     "ephorButton": "#kh-export-chat-btn-right",
@@ -302,6 +304,23 @@
     "atlasHighlightBody": ".kh-atlas-highlight-body",
     "atlasHighlightHeaderFileUploaded": ".kh-atlas-highlight-header-file-uploaded",
     "atlasHighlightBodyFileUploaded": ".kh-atlas-highlight-body-file-uploaded",
+
+    // QC Template section highlighters (Send to QC template inside timeline items)
+    // Header/body for each section; kept separate to allow distinct colors
+    // 1) "What is your proposed action?"
+    "qcHighlightHeaderAction": ".kh-qc-highlight-header-action",
+    "qcHighlightBodyAction": ".kh-qc-highlight-body-action",
+    // 2) "What is the PR to the customer?"
+    "qcHighlightHeaderPR": ".kh-qc-highlight-header-pr",
+    "qcHighlightBodyPR": ".kh-qc-highlight-body-pr",
+    // 3) "Additional Context?"
+    "qcHighlightHeaderAdditional": ".kh-qc-highlight-header-additional",
+    "qcHighlightBodyAdditional": ".kh-qc-highlight-body-additional",
+
+    // QC Template controls
+    "qcPrevButton": ".kh-qc-prev-btn",
+    "qcNextButton": ".kh-qc-next-btn",
+    "qcToggleButton": ".kh-qc-toggle-btn",
 
     "unifiedSearchQueryInputId": "#kh-query-only-input",
     "unifiedSearchElementsParentId": "#kh-enhanced-search-ui-elements",
@@ -361,6 +380,20 @@
 
     "exportUrlMode"         : ".kh-exp-mode",            // per‑URL “New / Active tab” selector
     "noActiveTabNotice"     : ".kh-no-active-tab",        // tiny warning when no active tab exists
+
+    // Per-provider search and lazy list controls (sanitized, resilient)
+    "exportSearchInput"     : ".kh-exp-search-input",
+    "exportSearchClear"     : ".kh-exp-search-clear",
+    "exportShowMoreBtn"     : ".kh-exp-show-more",
+
+    // Two-column settings layout selectors
+    "exportLinkItem"        : ".kh-exp-link-item",
+    "exportLinkItemActive"  : ".kh-exp-link-active",
+    "exportDetailPane"      : ".kh-exp-detail",
+
+    // Button to open shared Ephor Placeholders manager (appears in Export Chat footer, same row as “Add provider”)
+    // Stable class-based selector to avoid brittle ids
+    "exportCannedBtn"       : ".kh-exp-canned-btn",
 
     /* ─ Assets Inspector ────────────────────────────────────── */
     "assetsButton":            "#kh-assets-btn",

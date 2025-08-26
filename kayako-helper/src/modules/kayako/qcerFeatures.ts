@@ -144,6 +144,25 @@ async function onQcClick(post: HTMLElement): Promise<void> {
             hadTextExtraction: !!extractedText,
             editorSample: editor.innerText.slice(0, 120)
         });
+
+        // Add required tags as requested
+        try {
+            console.debug('[KH][QCer] Adding tags to ticket…');
+            await addTag('kyk_send_customer');
+            await addTag('soldelproc_start');
+            console.debug('[KH][QCer] Tags added successfully.');
+        } catch (e) {
+            console.warn('[KH][QCer] Failed to add one or more tags:', e);
+        }
+
+        // Refocus reply editor and place caret at end
+        try {
+            editor.focus();
+            placeCaretAtEnd(editor);
+            console.debug('[KH][QCer] Focus returned to reply editor.');
+        } catch (e) {
+            console.debug('[KH][QCer] Could not refocus reply editor:', e);
+        }
     } catch (err) {
         console.error('[KH][QCer] Failed to process QC extraction:', err);
         alert('QC extraction failed: ' + (err as Error).message);
@@ -258,6 +277,9 @@ function extractProposedResponseHtml(html: string): string | null {
         while (resultRoot.lastElementChild && textNorm(resultRoot.lastElementChild.textContent) === '') {
             resultRoot.removeChild(resultRoot.lastElementChild);
         }
+
+        // Strip non-text styling (extension classes, inline styles, wrappers)
+        try { stripNonTextStyling(resultRoot); } catch (e) { console.debug('[KH][QCer] stripNonTextStyling failed:', e); }
 
         const cleaned = resultRoot.innerHTML.trim();
         return cleaned.length ? cleaned : null;
@@ -430,4 +452,75 @@ function simulateClick(el: HTMLElement): void {
     );
 }
 
+
+
+/* ----------  TAG HELPERS (shared pattern with SendToQC)  ------------------ */
+function simulateEnter(el: HTMLElement): void {
+    ['keydown', 'keypress', 'keyup'].forEach(type =>
+        el.dispatchEvent(
+            new KeyboardEvent(type, {
+                bubbles   : true,
+                cancelable: true,
+                key       : 'Enter',
+                code      : 'Enter',
+                keyCode   : 13,
+                which     : 13,
+                charCode  : type === 'keypress' ? 13 : 0,
+            }),
+        )
+    );
+}
+
+async function addTag(tag: string): Promise<void> {
+    const input = document.querySelector<HTMLInputElement>('input[placeholder="Add a tag..."]');
+    if (!input) throw new Error('Tag input not found');
+
+    input.focus();
+    input.value = tag;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => requestAnimationFrame(r));
+    simulateEnter(input);
+    await new Promise(r => setTimeout(r));
+}
+
+/* ----------  EDITOR CARET / SANITIZATION HELPERS  ------------------------- */
+function placeCaretAtEnd(el: HTMLElement): void {
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    } catch {}
+}
+
+function stripNonTextStyling(root: HTMLElement): void {
+    // Remove extension wrappers by unwrapping
+    Array.from(root.querySelectorAll<HTMLElement>('[data-kh-qc-wrap]')).forEach(w => {
+        const parent = w.parentElement; if (!parent) return;
+        while (w.firstChild) parent.insertBefore(w.firstChild, w);
+        w.remove();
+    });
+
+    // Remove inline styles and extension/Kayako classes; drop data-kh* attrs
+    const all = Array.from(root.querySelectorAll<HTMLElement>('*'));
+    for (const el of all) {
+        try { el.removeAttribute('style'); } catch {}
+        try {
+            const keep = Array.from(el.classList).filter(c => !(c.startsWith('kh-') || c.startsWith('ko-')));
+            if (keep.length !== el.classList.length) {
+                if (keep.length) el.className = keep.join(' '); else el.removeAttribute('class');
+            }
+        } catch {}
+        try {
+            Array.from(el.attributes).forEach(attr => {
+                const n = attr.name.toLowerCase();
+                if (n.startsWith('data-kh')) el.removeAttribute(attr.name);
+            });
+        } catch {}
+    }
+}
 

@@ -30,6 +30,18 @@ import {HeaderSlot, registerEditorHeaderButton} from "@/modules/kayako/buttons/b
 /* ------------------------------------------------------------------ */
 
 const BTN_ID = EXTENSION_SELECTORS.sendToQcButton;   // <─ CHANGED
+const MENU_ID = EXTENSION_SELECTORS.sendToQcButtonRight; // right-half id for split button
+
+const DEFAULT_ACTION = 'Send to customer';
+const ACTION_OPTIONS: readonly string[] = [
+    'Send to customer',
+    'Send to L2',
+    'Send to external team',
+    'Waiting for vendor',
+    'Close ticket',
+    'Send to L1',
+    'Elevate to BU',
+];
 
 /* Settings keys (sync storage) */
 const STORAGE_KEYS = {
@@ -93,7 +105,9 @@ export function bootSendToQcButton(): void {
 
     registerEditorHeaderButton({
         id   : BTN_ID,
-        type : 'simple',
+        type : 'split',
+        rightId: MENU_ID,
+        rightLabel: '▾',
         slot : HeaderSlot.THIRD,
         label,
         headerFilter: (headerEl: HTMLElement) => {
@@ -106,9 +120,36 @@ export function bootSendToQcButton(): void {
         },
         async onClick(btn) {
             const setState = (s: UiState) => { uiState=s; btn.textContent=label(); };
-            await handleClick(btn, setState);
+            console.info('[KH][SendToQC] Default action selected:', DEFAULT_ACTION);
+            await handleClick(btn, setState, DEFAULT_ACTION);
             if (uiState !== 'idle') {
                 setTimeout(() => { setState('idle'); }, RESET_MS);
+            }
+        },
+        buildMenu(menu: HTMLElement) {
+            try {
+                const clsItem = EXTENSION_SELECTORS.twoPartBtnDropdownItem.replace(/^\./,'');
+                // Idempotent rebuild
+                menu.textContent = '';
+                for (const action of ACTION_OPTIONS) {
+                    const li = document.createElement('div');
+                    li.className = clsItem;
+                    li.textContent = action;
+                    li.addEventListener('click', async (ev) => {
+                        ev.stopPropagation();
+                        const leftBtn = document.getElementById(BTN_ID.replace(/^#/,'')) as HTMLButtonElement | null;
+                        if (!leftBtn) return;
+                        const setState = (s: UiState) => { uiState=s; leftBtn.textContent=label(); };
+                        console.info('[KH][SendToQC] Menu action selected:', action);
+                        await handleClick(leftBtn, setState, action);
+                        if (uiState !== 'idle') {
+                            setTimeout(() => { setState('idle'); }, RESET_MS);
+                        }
+                    });
+                    menu.appendChild(li);
+                }
+            } catch (e) {
+                console.warn('[KH][SendToQC] Failed to build menu', e);
             }
         },
     });
@@ -121,14 +162,15 @@ export function bootSendToQcButton(): void {
 async function handleClick(
     self: HTMLButtonElement,
     setState: (s: UiState) => void,
+    action: string = DEFAULT_ACTION,
 ): Promise<void> {
 
     setState('work');
 
     try {
-        console.debug('[KH][SendToQC] Clicked. Settings:', { qcTemplateOnly });
+        console.debug('[KH][SendToQC] Clicked. Settings:', { qcTemplateOnly, action });
         const clipHtml = qcTemplateOnly ? null : await readClipboardHtml();
-        const html = buildTemplate(clipHtml).replace(/(\r\n|\r|\n)/g, ' ');
+        const html = buildTemplate(clipHtml, action).replace(/(\r\n|\r|\n)/g, ' ');
         const editor = document.querySelector<HTMLElement>(KAYAKO_SELECTORS.textEditorReplyArea);
         if (!editor) throw new Error('Reply editor not found');
         editor.innerHTML = html;
@@ -209,11 +251,27 @@ function normalizeParagraphs(fragment: string): string {
         h.innerHTML = `<strong>${h.innerHTML}</strong>`;
     });
 
-    tmp.querySelectorAll('*').forEach(el =>
+    tmp.querySelectorAll('*').forEach(el => {
+        // Remove data-* attributes
         Array.from(el.attributes).forEach(attr => {
             if (attr.name.startsWith('data-')) el.removeAttribute(attr.name);
-        }),
-    );
+        });
+        // Strip color and background-color styles, keep other styles intact
+        const style = (el as HTMLElement).getAttribute('style');
+        if (style) {
+            const cleaned = style
+                .split(';')
+                .map(s => s.trim())
+                .filter(Boolean)
+                .filter(rule => {
+                    const k = rule.split(':')[0]?.trim().toLowerCase();
+                    return k !== 'color' && k !== 'background-color';
+                })
+                .join('; ');
+            if (cleaned) (el as HTMLElement).setAttribute('style', cleaned);
+            else (el as HTMLElement).removeAttribute('style');
+        }
+    });
 
     tmp.querySelectorAll('hr').forEach(hr => hr.remove());
 
@@ -232,13 +290,13 @@ function normalizeParagraphs(fragment: string): string {
     return tmp.innerHTML;
 }
 
-function buildTemplate(clip: string | null): string {
+function buildTemplate(clip: string | null, action: string = DEFAULT_ACTION): string {
     const body = (clip === null)
         ? ''
         : normalizeParagraphs(clip || '<i>(clipboard empty)</i>');
     return (
         `What is your proposed action?<br><br>
-• Send to customer<br><br>
+• ${action}<br><br>
 ===============================================================<br>
 What is the PR to the customer?<br><br>
 ${body}<br><br>

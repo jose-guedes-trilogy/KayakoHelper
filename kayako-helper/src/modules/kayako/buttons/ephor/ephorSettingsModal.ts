@@ -438,8 +438,9 @@ export async function openEphorSettingsModal(
 
     function setMainTab(t: "settings" | "outputs") {
         const isSettings = t === "settings";
-        refs.paneSettings.style.display = isSettings ? "block" : "none";
-        refs.paneOutputs.style.display = isSettings ? "none" : "block";
+        // Use class-based visibility to avoid conflicts with .kh-hidden !important
+        refs.paneSettings.classList.toggle("kh-hidden", !isSettings);
+        refs.paneOutputs.classList.toggle("kh-hidden", isSettings);
         refs.tabSettingsBtn.classList.toggle("active", isSettings);
         refs.tabOutputsBtn.classList.toggle("active", !isSettings);
 
@@ -987,6 +988,9 @@ export async function openEphorSettingsModal(
     refs.cancelBtn.addEventListener("click", () => {
         abortCtl?.abort();
     });
+
+    // Ensure Cancel is hidden initially
+    try { refs.cancelBtn.style.display = "none"; } catch {}
 
     refs.sendBtn.addEventListener("click", async () => {
         if (isSending) return;
@@ -1591,25 +1595,75 @@ export async function openEphorSettingsModal(
     rebuildSavedInstructionButtons();
 
     /* ------------------------------------------------------------------ *
-     * Collapsible sections                                              *
+     * Collapsible sections                                               *
      * ------------------------------------------------------------------ */
-    function wireCollapse(titleSel: string, bodySel: string, collapsedSel: string): void {
+    // Grouped collapse for Projects/Chats/Models grid (clicking any title toggles all three)
+    (function wireGroupedGridCollapse(){
+        const t1 = modal.querySelector<HTMLElement>("#kh-title-projects");
+        const t2 = modal.querySelector<HTMLElement>("#kh-title-chats");
+        const t3 = modal.querySelector<HTMLElement>("#kh-title-models");
+        const b1 = modal.querySelector<HTMLElement>("#kh-proj-body");
+        const b2 = modal.querySelector<HTMLElement>("#kh-chat-body");
+        const b3 = modal.querySelector<HTMLElement>("#kh-model-body");
+        const c1 = modal.querySelector<HTMLElement>("#kh-proj-collapsed");
+        const c2 = modal.querySelector<HTMLElement>("#kh-chat-collapsed");
+        const c3 = modal.querySelector<HTMLElement>("#kh-model-collapsed");
+        if (!(t1 && t2 && t3 && b1 && b2 && b3 && c1 && c2 && c3)) return;
+        let collapsed = false;
+        const apply = () => {
+            const disp = collapsed ? "none" : "";
+            const dispInv = collapsed ? "block" : "none";
+            b1.style.display = disp; b2.style.display = disp; b3.style.display = disp;
+            c1.style.display = dispInv; c2.style.display = dispInv; c3.style.display = dispInv;
+        };
+        const onClick = () => {
+            collapsed = !collapsed; apply();
+            try { log("UI", `Grid collapsed → ${collapsed}`); } catch {}
+        };
+        t1.addEventListener("click", onClick);
+        t2.addEventListener("click", onClick);
+        t3.addEventListener("click", onClick);
+        apply();
+    })();
+
+    // Independent collapses for sections 4 and 5
+    function wireSingleCollapse(titleSel: string, bodySel: string, collapsedSel: string): void {
         const title = modal.querySelector<HTMLElement>(titleSel);
         const body = modal.querySelector<HTMLElement>(bodySel);
         const collapsed = modal.querySelector<HTMLElement>(collapsedSel);
-        if (!title || !body || !collapsed) return;
-        title.style.cursor = "pointer";
+        if (!(title && body && collapsed)) return;
         let isCollapsed = false;
         const update = () => {
             body.style.display = isCollapsed ? "none" : "";
             collapsed.style.display = isCollapsed ? "block" : "none";
         };
-        title.addEventListener("click", () => { isCollapsed = !isCollapsed; update(); });
+        title.addEventListener("click", () => {
+            isCollapsed = !isCollapsed; update();
+            try { log("UI", `${titleSel} collapsed → ${isCollapsed}`); } catch {}
+        });
         update();
     }
-    wireCollapse("#kh-title-projects", "#kh-proj-body", "#kh-proj-collapsed");
-    wireCollapse("#kh-title-chats", "#kh-chat-body", "#kh-chat-collapsed");
-    wireCollapse("#kh-title-models", "#kh-model-body", "#kh-model-collapsed");
+    wireSingleCollapse("#kh-title-instr", "#kh-instr-body", "#kh-instr-collapsed");
+    wireSingleCollapse("#kh-title-default", "#kh-default-section", "#kh-default-collapsed");
+
+    // Include Default Instructions checkbox hides the whole Default area and its toolbar-left
+    (function wireIncludeDefaultToggle(){
+        const cbx = modal.querySelector<HTMLInputElement>("#kh-include-default");
+        const section = modal.querySelector<HTMLElement>("#kh-default-section");
+        const collapsedNote = modal.querySelector<HTMLElement>("#kh-default-collapsed");
+        const leftToolbar = modal.querySelector<HTMLElement>("#kh-default-toolbar-left");
+        if (!cbx || !section || !leftToolbar || !collapsedNote) return;
+        const apply = () => {
+            const on = cbx.checked;
+            section.style.display = on ? "" : "none";
+            leftToolbar.style.display = on ? "" : "none";
+            // Hide the collapsed-note when excluded entirely; otherwise preserve its state
+            if (!on) collapsedNote.style.display = "none";
+            try { log("UI", `Include Default Instructions → ${on}`); } catch {}
+        };
+        cbx.addEventListener("change", apply);
+        apply();
+    })();
 
     /* ------------------------------------------------------------------ *
      * AI Selections (presets)                                            *

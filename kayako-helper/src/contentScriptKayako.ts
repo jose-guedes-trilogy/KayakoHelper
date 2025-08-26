@@ -31,6 +31,7 @@ import {bootEphorButton} from "@/modules/kayako/buttons/ephor/buttonEphor.ts";
 import "@/modules/ephor/clerkTokenInjector.ts";
 import { bootSideConversations } from '@/modules/kayako/sideConversations.ts';
 import { bootQcerFeatures } from '@/modules/kayako/qcerFeatures.ts';
+import { bootQcTemplateHighlighter } from '@/modules/kayako/qcTemplateHighlighter.ts';
 
 import {bootCredProbeClient, bootRequestReplicator} from "@/modules/alpha/dash/RequestReplicator.ts";
 import {bootUiAesthetics} from "@/modules/kayako/ui-enhancement/uiAesthetics.ts";
@@ -44,6 +45,7 @@ setUpUI();
 bootLocationWatcher();
 
 bootAtlasHighlighter();
+bootQcTemplateHighlighter();
 bootLightboxEnhancer();
 bootReplyResizer();
 bootTrainingMode();

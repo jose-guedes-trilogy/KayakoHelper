@@ -77,6 +77,8 @@ export interface KayakoSelectors {
   customFieldContainer: string;
   fieldContainer: string;
   fieldSelectTrigger: string;
+  fieldSelectPlaceholder: string;
+  fieldSelectPowerRoot: string;
   channelSelectorMessengerAfter: string;
   ccedEmailContainer: string;
   ccedEmail: string;
@@ -180,6 +182,7 @@ export interface ExtensionSelectors {
   copyChatButton: string;
   newLinesButton: string;
   sendToQcButton: string;
+  sendToQcButtonRight: string;
   exportChatButton: string;
   exportChatButtonRight: string;
   ephorButton: string;
@@ -194,6 +197,15 @@ export interface ExtensionSelectors {
   atlasHighlightBody: string;
   atlasHighlightHeaderFileUploaded: string;
   atlasHighlightBodyFileUploaded: string;
+  qcHighlightHeaderAction: string;
+  qcHighlightBodyAction: string;
+  qcHighlightHeaderPR: string;
+  qcHighlightBodyPR: string;
+  qcHighlightHeaderAdditional: string;
+  qcHighlightBodyAdditional: string;
+  qcPrevButton: string;
+  qcNextButton: string;
+  qcToggleButton: string;
   unifiedSearchQueryInputId: string;
   unifiedSearchElementsParentId: string;
   searchResultsButtonContainer: string;
@@ -230,6 +242,13 @@ export interface ExtensionSelectors {
   exportSetDefaultUrlBtn: string;
   exportUrlMode: string;
   noActiveTabNotice: string;
+  exportSearchInput: string;
+  exportSearchClear: string;
+  exportShowMoreBtn: string;
+  exportLinkItem: string;
+  exportLinkItemActive: string;
+  exportDetailPane: string;
+  exportCannedBtn: string;
   assetsButton: string;
   assetsButtonLabel: string;
   assetsModal: string;
@@ -375,6 +394,9 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   customFieldContainer: "[class*=ko-info-bar_field_select_trigger__header_]",
   fieldContainer: "[class*=ko-info-bar_item__container_]",
   fieldSelectTrigger: "[class*=ko-info-bar_field_select_trigger__trigger_]",
+  fieldSelectPlaceholder:
+    "[class*=ko-info-bar_field_select_trigger__placeholder_]",
+  fieldSelectPowerRoot: "[class*=ko-info-bar_field_select__power-select_]",
   channelSelectorMessengerAfter:
     "[class*=channel-type--messenger] [class*=ko-channel-selector__trigger--active_]:after",
   ccedEmailContainer: "[class*=ko-case-content_cc__option-item-membrane_]",
@@ -512,6 +534,7 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   copyChatButton: "#kh-copy-chat-btn",
   newLinesButton: "#kh-newlines-btn",
   sendToQcButton: "#kh-send-to-qc-btn",
+  sendToQcButtonRight: "#kh-send-to-qc-btn-right",
   exportChatButton: "#kh-export-chat-btn",
   exportChatButtonRight: "#kh-export-chat-btn-right",
   ephorButton: "#kh-export-chat-btn-right",
@@ -526,6 +549,15 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   atlasHighlightBody: ".kh-atlas-highlight-body",
   atlasHighlightHeaderFileUploaded: ".kh-atlas-highlight-header-file-uploaded",
   atlasHighlightBodyFileUploaded: ".kh-atlas-highlight-body-file-uploaded",
+  qcHighlightHeaderAction: ".kh-qc-highlight-header-action",
+  qcHighlightBodyAction: ".kh-qc-highlight-body-action",
+  qcHighlightHeaderPR: ".kh-qc-highlight-header-pr",
+  qcHighlightBodyPR: ".kh-qc-highlight-body-pr",
+  qcHighlightHeaderAdditional: ".kh-qc-highlight-header-additional",
+  qcHighlightBodyAdditional: ".kh-qc-highlight-body-additional",
+  qcPrevButton: ".kh-qc-prev-btn",
+  qcNextButton: ".kh-qc-next-btn",
+  qcToggleButton: ".kh-qc-toggle-btn",
   unifiedSearchQueryInputId: "#kh-query-only-input",
   unifiedSearchElementsParentId: "#kh-enhanced-search-ui-elements",
   searchResultsButtonContainer: "#kh-search-results-button-container",
@@ -562,6 +594,13 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   exportSetDefaultUrlBtn: ".kh-exp-set-default-url",
   exportUrlMode: ".kh-exp-mode",
   noActiveTabNotice: ".kh-no-active-tab",
+  exportSearchInput: ".kh-exp-search-input",
+  exportSearchClear: ".kh-exp-search-clear",
+  exportShowMoreBtn: ".kh-exp-show-more",
+  exportLinkItem: ".kh-exp-link-item",
+  exportLinkItemActive: ".kh-exp-link-active",
+  exportDetailPane: ".kh-exp-detail",
+  exportCannedBtn: ".kh-exp-canned-btn",
   assetsButton: "#kh-assets-btn",
   assetsButtonLabel: ".kh-assets-btn-label",
   assetsModal: ".kh-assets-modal",

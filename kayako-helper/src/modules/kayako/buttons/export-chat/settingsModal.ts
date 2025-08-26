@@ -31,12 +31,16 @@ export function openSettingsModal(store: Store): void {
     modal.style.position = 'fixed';
     modal.style.top = '64px';
     modal.style.left = '64px';
-    modal.style.maxWidth = '960px';
-    modal.style.maxHeight = 'min(80vh, 720px)';
+    modal.style.right = 'auto';
+    // Ensure no CSS transform interferes with pixel positioning during drag
+    modal.style.transform = 'none';
+    modal.style.maxWidth = 'min(96vw, 960px)';
+    modal.style.maxHeight = 'min(90vh, 720px)';
     modal.style.boxShadow = '0 6px 24px rgba(17,24,39,.12)';
     modal.style.display = 'flex';
     modal.style.flexDirection = 'column';
     modal.style.zIndex = '2147483647';
+    modal.style.visibility = 'hidden';
     // Fixed selectors for the inline Add URL row (do not depend on generated types)
     // const NEW_LABEL_SEL = '.kh-exp-new-label';
     // const NEW_URL_SEL   = '.kh-exp-new-url';
@@ -50,9 +54,9 @@ export function openSettingsModal(store: Store): void {
         <style>
           /* ---------- buttons (Ephor-like) ---------- */
           .kh-btn{padding:4px 12px;border:1px solid #c9ced6;border-radius:4px;background:#fff;
-                  cursor:pointer;font:inherit;display:inline-flex;align-items:center;gap:4px;}
+                  cursor:pointer;font:inherit;display:inline-flex;align-items:center;gap:4px;box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04);}
           .kh-btn:hover{background:#f5f7ff;border-color:#8aa4e6;}
-          .kh-btn-primary{background:#2e73e9;color:#fff;border:none;border-radius:4px;}
+          .kh-btn-primary{background:#2e73e9;color:#fff;border:none;border-radius:4px;box-shadow: 0 1px 1px rgba(0,0,0,.06), 0 2px 3px rgba(0,0,0,.05);}
           .kh-btn-primary:hover{background:#255ecd;color:#fff;}
 
           /* ---------- inputs ---------- */
@@ -81,7 +85,7 @@ export function openSettingsModal(store: Store): void {
           .kh-acc-header { display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; }
           .kh-acc-chevron { margin-left:auto; transition:transform .2s ease; }
           .kh-acc-open .kh-acc-chevron { transform:rotate(90deg); }
-          .kh-acc-body { display:none; padding:6px 0 10px; }
+          .kh-acc-body { display:block; padding:6px 0 10px; }
           .kh-acc-open .kh-acc-body { display:block; }
 
           /* Search */
@@ -91,8 +95,7 @@ export function openSettingsModal(store: Store): void {
         <div class="kh-exp-header" style="display:flex;align-items:center;gap:12px;">
           <h2 style="margin:0;font-size:16px;">Export chat – settings</h2>
           <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;">
-            <button id="kh-exp-expand-all" class="kh-btn" title="Expand all sections">Expand all</button>
-            <button id="kh-exp-collapse-all" class="kh-btn" title="Collapse all sections">Collapse all</button>
+            
             <button id="${EXTENSION_SELECTORS.exportSettingsClose.slice(1)}" class="kh-exp-close-btn kh-btn">✕</button>
           </span>
         </div>
@@ -136,12 +139,24 @@ export function openSettingsModal(store: Store): void {
             !(e.target as HTMLElement).closest('.kh-exp-close-btn');
         if (!isPadding && !isHeader) return;
 
-        const dx = e.clientX - modal.offsetLeft;
-        const dy = e.clientY - modal.offsetTop;
+        const startRect = modal.getBoundingClientRect();
+        const dx = e.clientX - startRect.left;
+        const dy = e.clientY - startRect.top;
 
         const move = (ev: MouseEvent) => {
-            modal.style.left = ev.clientX - dx + 'px';
-            modal.style.top  = ev.clientY - dy + 'px';
+            let left = ev.clientX - dx;
+            let top  = ev.clientY - dy;
+            try {
+                const rect = modal.getBoundingClientRect();
+                const vw = window.innerWidth || 0;
+                const vh = window.innerHeight || 0;
+                const maxLeft = Math.max(0, vw - rect.width);
+                const maxTop  = Math.max(0, vh - rect.height);
+                left = Math.min(Math.max(0, left), maxLeft);
+                top  = Math.min(Math.max(0, top),  maxTop);
+            } catch {}
+            modal.style.left = left + 'px';
+            modal.style.top  = top  + 'px';
         };
         const up = () => {
             window.removeEventListener('mousemove', move);
@@ -173,13 +188,33 @@ export function openSettingsModal(store: Store): void {
     try {
         const vw = window.innerWidth || 1280;
         const vh = window.innerHeight || 800;
-        const width  = Math.min(920, Math.max(560, vw - 120));
-        const height = Math.min(600, Math.max(360, vh - 120));
+        const width  = Math.min(920, Math.max(560, vw - 40));
+        const height = Math.min(600, Math.max(360, vh - 80));
         modal.style.width = `${Math.round(width)}px`;
         modal.style.height = `${Math.round(height)}px`;
         modal.style.left = `${Math.round((vw - width) / 2)}px`;
         modal.style.top  = `${Math.round(Math.max(40, (vh - height) / 2))}px`;
-    } catch {}
+        console.info('[exportSettings] initial center', { left: modal.style.left, top: modal.style.top, width: modal.style.width, height: modal.style.height });
+        // re-center after layout to avoid initial paint offset and then show
+        const recenter = () => {
+            try {
+                const rect = modal.getBoundingClientRect();
+                const vw2 = window.innerWidth || 0;
+                const vh2 = window.innerHeight || 0;
+                let w = rect.width;
+                let h = rect.height;
+                if (w > vw2 - 40) { w = Math.max(320, vw2 - 40); modal.style.width = `${Math.round(w)}px`; }
+                if (h > vh2 - 40) { h = Math.max(240, vh2 - 40); modal.style.height = `${Math.round(h)}px`; }
+                const left = Math.round((vw2 - w) / 2);
+                const top  = Math.round(Math.max(40, (vh2 - h) / 2));
+                modal.style.left = `${Math.max(0, left)}px`;
+                modal.style.top  = `${Math.max(0, top)}px`;
+                console.info('[exportSettings] recentered', { left: modal.style.left, top: modal.style.top, width: modal.style.width, height: modal.style.height });
+            } catch {}
+            modal.style.visibility = '';
+        };
+        requestAnimationFrame(() => requestAnimationFrame(recenter));
+    } catch { modal.style.visibility = ''; }
 
     /* keep within viewport on resize */
     const onWinResize = () => {
@@ -205,17 +240,7 @@ export function openSettingsModal(store: Store): void {
                 modal.querySelector(EXTENSION_SELECTORS.noActiveTabNotice)!.setAttribute('style','');
         });
 
-    /* expand / collapse all */
-    const expandAllBtn = modal.querySelector<HTMLButtonElement>('#kh-exp-expand-all');
-    const collapseAllBtn = modal.querySelector<HTMLButtonElement>('#kh-exp-collapse-all');
-    expandAllBtn?.addEventListener('click', () => {
-        console.info('[exportSettings] Expand all');
-        modal.querySelectorAll('.kh-acc-item').forEach(el => el.classList.add('kh-acc-open'));
-    });
-    collapseAllBtn?.addEventListener('click', () => {
-        console.info('[exportSettings] Collapse all');
-        modal.querySelectorAll('.kh-acc-item').forEach(el => el.classList.remove('kh-acc-open'));
-    });
+    /* expand/collapse controls removed */
 }
 
 /* ───────────────────────── settings UI (re)build ───────────────────────── */
@@ -323,12 +348,9 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         wrap.appendChild(acc);
 
         /* Section: Manage links (accordion item) */
-        const accItem = h(`<div class="kh-acc-item kh-acc-open"></div>`);
+        const accItem = h(`<div class="kh-acc-item"></div>`);
         acc.appendChild(accItem);
-        accItem.appendChild(h(`<div class="kh-acc-header">
-            <span>Links</span>
-            <span class="kh-acc-chevron">▸</span>
-        </div>`));
+        // no accordion header (collapse/expand removed)
         const accBody = h(`<div class="kh-acc-body"></div>`);
         accItem.appendChild(accBody);
 
@@ -344,22 +366,31 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         /* Search bar */
         const searchRow = h(`
           <div class="kh-exp-search">
-            <input class="kh-exp-input kh-exp-search-input" placeholder="Search links by name or URL…">
-            <button class="kh-btn kh-exp-search-clear" title="Clear">✕</button>
+            <input class="kh-exp-input ${EXTENSION_SELECTORS.exportSearchInput.slice(1)}" placeholder="Search links by name or URL…">
+            <button class="kh-btn ${EXTENSION_SELECTORS.exportSearchClear.replace(/^\./,'')}" title="Clear">✕</button>
           </div>
         `);
         accBody.appendChild(searchRow);
 
+        /* two-column container */
+        const twoCol = h(`<div style="display:flex;gap:12px;align-items:flex-start;"></div>`);
+        accBody.appendChild(twoCol);
+        const listCol = h(`<div style="flex:0 0 320px;min-width:240px;max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:6px;"></div>`);
+        const detailCol = h(`<div class="${EXTENSION_SELECTORS.exportDetailPane.slice(1)}" style="flex:1 1 auto;min-width:260px;"></div>`);
+        twoCol.appendChild(listCol);
+        twoCol.appendChild(detailCol);
+
         /* url-list container */
         const urlList = h(`<div class="${EXTENSION_SELECTORS.exportUrlList.slice(1)}"></div>`);
-        accBody.appendChild(urlList);
+        listCol.appendChild(urlList);
 
-        /* Accordion toggle */
-        const accHeader = accItem.querySelector('.kh-acc-header')! as HTMLElement;
-        accHeader.addEventListener('click', () => {
-            const isOpen = accItem.classList.toggle('kh-acc-open');
-            console.info('[exportSettings] Provider section toggle', { providerId: p.id, open: isOpen });
-        });
+        /* Show more button (lazy rendering) */
+        const showMoreWrap = h(`<div style="display:flex;justify-content:center;margin:6px 0;">
+          <button class="kh-btn ${EXTENSION_SELECTORS.exportShowMoreBtn.replace(/^\./,'')}" style="display:none;">Show more…</button>
+        </div>`);
+        listCol.appendChild(showMoreWrap);
+
+        // accordion removed: always visible body content
 
         /* header-level handlers */
         wrap.querySelector<HTMLInputElement>('input[name="exp-main-default"]')!.checked =
@@ -467,40 +498,35 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
             saveStore(store);
         };
 
-        /* ─ URL rows ─ */
-        const renderRows = (term: string): void => {
-            urlList.textContent = '';
-            const q = term.trim().toLowerCase();
-            const items = q ? p.urls.filter(u => u.label.toLowerCase().includes(q) || u.url.toLowerCase().includes(q)) : p.urls;
-            for (const u of items) {
-            const row = h(`<div class="${EXTENSION_SELECTORS.exportUrlRow.slice(1)}" draggable="true"
-                               style="display:flex;flex-direction:column;gap:4px;"></div>`);
-            (row as HTMLElement).dataset['urlId'] = u.id;
-            urlList.appendChild(row);
+        /* ─ URL rows with paging ─ */
+        const PAGE_SIZE = 50;
+        let shownCount = 0;
+        let lastQuery = '';
+        let selectedId: string | null = null;
 
-            row.addEventListener('dragover', ev => {
-                ev.preventDefault();
-                if (dragUrlId) {
-                    const rect = row.getBoundingClientRect();
-                    const before = ev.clientY < rect.top + rect.height / 2;
-                    moveUrlPreview(row, before);
-                }
-            });
-            row.addEventListener('dragstart', ev => onUrlDragStart(ev, u.id, row));
-            row.addEventListener('dragend',   () => { onUrlDragEnd(); commitUrlOrder(); });
+        /* render details for a single URL into the detail pane */
+        const renderDetail = (u: UrlEntry | undefined): void => {
+            const pane = detailCol as HTMLElement;
+            pane.textContent = '';
+            if (!u) {
+                pane.appendChild(h('<div style="color:#666;font-size:12px;">Select a link on the left to edit its details.</div>'));
+                return;
+            }
 
-            /* ===== GROUPED FIELDS – Name, URL, Prompt, with controls on the Prompt row ===== */
             const group = h('<div class="kh-exp-group"></div>');
-            row.appendChild(group);
+            pane.appendChild(group);
 
             const nameUrlRow = h('<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>');
             group.appendChild(nameUrlRow);
-            nameUrlRow.appendChild(h(
-                `<input class="${EXTENSION_SELECTORS.exportLabelInput.slice(1)} kh-exp-input" value="${u.label}" placeholder="Name" style="flex:0 0 180px;min-width:140px;">`));
-            nameUrlRow.appendChild(h(
-                `<input class="${EXTENSION_SELECTORS.exportUrlInput.slice(1)} kh-exp-input" value="${u.url}" placeholder="URL" style="flex:1 1 320px;min-width:220px;">`));
+            const nameInputEl = h(
+                `<input class="${EXTENSION_SELECTORS.exportLabelInput.slice(1)} kh-exp-input" value="${u.label}" placeholder="Name" style="flex:0 0 220px;min-width:180px;">`
+            ) as HTMLInputElement;
+            const urlInputEl = h(
+                `<input class="${EXTENSION_SELECTORS.exportUrlInput.slice(1)} kh-exp-input" value="${u.url}" placeholder="URL" style="flex:1 1 420px;min-width:260px;">`
+            ) as HTMLInputElement;
+            nameUrlRow.appendChild(nameInputEl);
+            nameUrlRow.appendChild(urlInputEl);
 
-            /* Prompt row head with right-side controls */
             const promptHead = h('<div class="kh-exp-row-head"></div>');
             const promptLabel = h('<strong>Prompt</strong>');
             const promptRight = h(`<span class="kh-right">
@@ -516,109 +542,119 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
             promptHead.appendChild(promptRight);
             group.appendChild(promptHead);
 
-            /* Prompt textarea */
-            group.appendChild(h(
+            const promptTextarea = h(
                 `<textarea class="${EXTENSION_SELECTORS.exportPromptInput.slice(1)} kh-exp-input"
-                  style="width:100%;min-height:56px;resize:vertical;"
+                  style="width:100%;min-height:120px;resize:vertical;"
                   placeholder="Prompt template (placeholders allowed)">${u.prompt}</textarea>`
-            ));
+            ) as HTMLTextAreaElement;
+            group.appendChild(promptTextarea);
 
-            /* Delete row under group */
-            const delRow = h('<div style="display:flex;align-items:center;justify-content:flex-end;margin-top:2px;"></div>');
-            delRow.appendChild(h(
-                `<button class="${EXTENSION_SELECTORS.exportDelUrlBtn.slice(1)}" style="background:none;border:0;padding:0;cursor:pointer;">Delete URL</button>`));
-            row.appendChild(delRow);
+            const footerRow = h('<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:6px;"></div>');
+            const delBtn = h(`<button class="${EXTENSION_SELECTORS.exportDelUrlBtn.slice(1)}" style="background:none;border:0;padding:0;cursor:pointer;">Delete URL</button>`) as HTMLButtonElement;
+            footerRow.appendChild(delBtn);
+            group.appendChild(footerRow);
 
-            /* Join button for Ephor project links */
-            if (p.id === 'ephor') {
-                const projId = (() => { try { return new URL(u.url).pathname.split('/').pop() || ''; } catch { return ''; } })();
-                const joinBtn = h(`<button class="kh-btn" style="flex:0 0 auto;margin-left:6px;">Check…</button>`) as HTMLButtonElement;
-                nameUrlRow.appendChild(joinBtn);
+            /* autosave handlers */
+            nameInputEl.addEventListener('change', e => { u.label = (e.target as HTMLInputElement).value; void saveStore(store); });
+            urlInputEl .addEventListener('change', e => { u.url   = (e.target as HTMLInputElement).value; void saveStore(store); });
+            promptTextarea.addEventListener('change', e => { u.prompt= (e.target as HTMLTextAreaElement).value; void saveStore(store); });
 
-                const updateJoined = async () => {
-                    joinBtn.disabled = true;
-                    try {
-                        const joined = await ensureEphorJoinedIds();
-                        const has = joined.has(projId);
-                        joinBtn.textContent = has ? 'Joined' : 'Join';
-                        joinBtn.classList.toggle('kh-btn-primary', !has);
-                        joinBtn.disabled = false;
-                    } catch (err) {
-                        console.warn('[exportSettings] failed updating Ephor join state', err);
-                        joinBtn.textContent = 'Join';
-                        joinBtn.disabled = false;
-                    }
-                };
-                joinBtn.disabled = true;
-                void updateJoined();
-
-                joinBtn.addEventListener('click', async () => {
-                    if (joinBtn.textContent === 'Joined') return;
-                    const invite = EPHOR_PROJECT_INVITES[projId];
-                    if (!invite) { alert('Join link not found for this project.'); return; }
-                    joinBtn.textContent = 'Joining…';
-                    joinBtn.disabled = true;
-                    const resp = await new Promise<{ ok: boolean; joined?: boolean; error?: any }>(r =>
-                        chrome.runtime.sendMessage({ action: 'ephor.joinByInvite', inviteId: invite, projectId: projId }, r));
-                    if (resp?.ok && resp.joined) {
-                        joinBtn.textContent = 'Joined';
-                        joinBtn.classList.remove('kh-btn-primary');
-                        joinBtn.disabled = false;
-                        // update cache eagerly so subsequent rows reflect joined status without refetch
-                        try { (await ensureEphorJoinedIds()).add(projId); } catch { /* ignore */ }
-                    } else {
-                        joinBtn.textContent = 'Join';
-                        joinBtn.disabled = false;
-                        alert('Could not join project – open ephor.ai and sign in, then try again.');
-                    }
-                });
-            }
-
-            /* removed collapsible prompt; prompt always visible within group */
-
-            /* field handlers */
-            row.querySelector<HTMLInputElement>(EXTENSION_SELECTORS.exportLabelInput)!
-                .addEventListener('change', e => { u.label = (e.target as HTMLInputElement).value; saveStore(store); });
-            row.querySelector<HTMLInputElement>(EXTENSION_SELECTORS.exportUrlInput)!
-                .addEventListener('change', e => { u.url   = (e.target as HTMLInputElement).value; saveStore(store); });
-            row.querySelector<HTMLTextAreaElement>(EXTENSION_SELECTORS.exportPromptInput)!
-                .addEventListener('change', e => { u.prompt= (e.target as HTMLTextAreaElement).value; saveStore(store); });
-
-            /* mode radio */
-            const modeRadios = row.querySelectorAll<HTMLInputElement>(`input[name="exp-mode-${u.id}"]`);
+            const modeRadios = group.querySelectorAll<HTMLInputElement>(`input[name="exp-mode-${u.id}"]`);
             modeRadios.forEach(r => { r.checked = r.value === (u.mode ?? 'new-tab'); });
-            modeRadios.forEach(r => r.addEventListener('change', () => {
-                u.mode = r.value as ExportMode; saveStore(store);
-            }));
+            modeRadios.forEach(r => r.addEventListener('change', () => { u.mode = r.value as ExportMode; void saveStore(store); }));
 
-            /* default selector button handler */
-            row.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportSetDefaultUrlBtn)!
+            group.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportSetDefaultUrlBtn)!
                 .addEventListener('click', () => {
                     if (p.defaultUrlId !== u.id) {
                         p.defaultUrlId = u.id;
-                        saveStore(store).then(() => rebuildSettingsUi(target, store));
+                        void saveStore(store);
+                        renderDetail(u); // refresh button label
                     }
                 });
 
-            /* delete URL handler */
-            row.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportDelUrlBtn)!
-                .addEventListener('click', () => {
-                    if (!confirm('Delete this URL?')) return;
-                    p.urls = p.urls.filter(x => x.id !== u.id);
-                    if (p.defaultUrlId === u.id) p.defaultUrlId = null;
-                    autoSetDefaultUrl(p);
-                    saveStore(store).then(() => rebuildSettingsUi(target, store));
+            delBtn.addEventListener('click', () => {
+                if (!confirm('Delete this URL?')) return;
+                p.urls = p.urls.filter(x => x.id !== u.id);
+                if (p.defaultUrlId === u.id) p.defaultUrlId = null;
+                autoSetDefaultUrl(p);
+                void saveStore(store).then(() => rebuildSettingsUi(target, store));
+            });
+        };
+
+        const renderRows = (term: string, append = false): void => {
+            const q = (term || '').trim().toLowerCase();
+            if (!append || q !== lastQuery) {
+                urlList.textContent = '';
+                shownCount = 0;
+                lastQuery = q;
+            }
+            const items = q ? p.urls.filter(u => u.label.toLowerCase().includes(q) || u.url.toLowerCase().includes(q)) : p.urls;
+            const nextEnd = Math.min(items.length, shownCount + PAGE_SIZE);
+            console.info('[exportSettings] renderRows', { providerId: p.id, q, total: items.length, from: shownCount, to: nextEnd });
+            for (let i = shownCount; i < nextEnd; i++) {
+                const u = items[i]!;
+                const row = h(`<div class="${EXTENSION_SELECTORS.exportLinkItem.slice(1)}" draggable="true"
+                               style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e5e7f2;border-radius:8px;cursor:pointer;"></div>`);
+                row.textContent = u.label;
+                (row as HTMLElement).dataset['urlId'] = u.id;
+                if (u.id === selectedId) row.classList.add(EXTENSION_SELECTORS.exportLinkItemActive.replace(/^\./,''));
+                urlList.appendChild(row);
+
+                row.addEventListener('dragover', ev => {
+                    ev.preventDefault();
+                    if (dragUrlId) {
+                        const rect = row.getBoundingClientRect();
+                        const before = ev.clientY < rect.top + rect.height / 2;
+                        moveUrlPreview(row, before);
+                    }
                 });
+                row.addEventListener('dragstart', ev => onUrlDragStart(ev, u.id, row));
+                row.addEventListener('dragend',   () => { onUrlDragEnd(); commitUrlOrder(); });
+
+                row.addEventListener('click', () => {
+                    selectedId = u.id;
+                    Array.from(urlList.children).forEach(c => (c as HTMLElement).classList.remove(EXTENSION_SELECTORS.exportLinkItemActive.replace(/^\./,'')));
+                    row.classList.add(EXTENSION_SELECTORS.exportLinkItemActive.replace(/^\./,''));
+                    renderDetail(u);
+                });
+
+                /* Join button hint for Ephor entries: render a status tag in list (optional minimal UI) */
+                if (p.id === 'ephor') {
+                    const projId = (() => { try { return new URL(u.url).pathname.split('/').pop() || ''; } catch { return ''; } })();
+                    const statusTag = h('<span style="margin-left:auto;font-size:11px;color:#666;">…</span>');
+                    row.appendChild(statusTag);
+                    (async () => {
+                        try {
+                            const joined = await ensureEphorJoinedIds();
+                            statusTag.textContent = joined.has(projId) ? 'Joined' : 'Invite';
+                        } catch { statusTag.textContent = ''; }
+                    })();
+                }
+            }
+            shownCount = nextEnd;
+            const showMoreBtn = showMoreWrap.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportShowMoreBtn)!;
+            if (shownCount < items.length) {
+                showMoreBtn.style.display = '';
+                showMoreBtn.disabled = false;
+            } else {
+                showMoreBtn.style.display = 'none';
             }
         };
 
         renderRows('');
+        // initialize detail with first item if present
+        if (p.urls.length) { selectedId = p.urls[0]!.id; renderDetail(p.urls[0]!); }
 
         /* Search handlers */
-        const searchInput = accBody.querySelector<HTMLInputElement>('.kh-exp-search-input')!;
-        const searchClear = accBody.querySelector<HTMLButtonElement>('.kh-exp-search-clear')!;
+        const searchInput = accBody.querySelector<HTMLInputElement>(EXTENSION_SELECTORS.exportSearchInput)!;
+        const searchClear = accBody.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportSearchClear)!;
+        const showMoreBtn = accBody.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportShowMoreBtn)!;
         const doFilter = () => renderRows(searchInput.value || '');
         searchInput.addEventListener('input', doFilter);
         searchClear.addEventListener('click', () => { searchInput.value = ''; doFilter(); });
+        showMoreBtn.addEventListener('click', () => {
+            showMoreBtn.disabled = true;
+            renderRows(searchInput.value || '', true);
+        });
     }
 }

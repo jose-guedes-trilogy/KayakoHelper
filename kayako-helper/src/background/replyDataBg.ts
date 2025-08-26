@@ -10,6 +10,7 @@ export interface TicketData {
     notes ?: string;
     product?: string;
     lastAccess: number;
+    bookmarked?: boolean;
 }
 
 const STORAGE_KEY = 'ticketData';
@@ -36,7 +37,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
         /* visited stub (always runs first) */
         case 'visitTicket': {
             const now  = Date.now();
-            const base = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '' , lastAccess: now };
+            const base = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '' , lastAccess: now, bookmarked: false };
             tickets[msg.ticketId] = { ...base, lastAccess: now };
             save(tickets);
             break;
@@ -44,7 +45,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
 
         /* metadata */
         case 'saveMetadata': {
-            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', product: '', lastAccess: Date.now() };
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', product: '', lastAccess: Date.now(), bookmarked: false };
             tickets[msg.ticketId] = {
                 ...t,
                 name:    msg.name    || t.name,
@@ -58,7 +59,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
 
         /* notes */
         case 'saveNotes': {
-            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', lastAccess: Date.now() };
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', lastAccess: Date.now(), bookmarked: false };
             tickets[msg.ticketId] = { ...t, notes: msg.notes };
             save(tickets);
             break;
@@ -66,15 +67,25 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
 
         /* reply counter */
         case 'incrementReply': {
-            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', lastAccess: Date.now() };
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', lastAccess: Date.now(), bookmarked: false };
             tickets[msg.ticketId] = { ...t, count: t.count + 1 };
             save(tickets);
             break;
         }
 
+        /* bookmark toggle */
+        case 'setBookmark': {
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', lastAccess: Date.now(), bookmarked: false };
+            tickets[msg.ticketId] = { ...t, bookmarked: !!msg.bookmarked };
+            save(tickets);
+            // Broadcast updated list so popup can refresh
+            chrome.runtime.sendMessage<FromBackground>({ action: 'allTickets', tickets });
+            break;
+        }
+
         /* stats for one */
         case 'getStats': {
-            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', product: '', lastAccess: 0 };
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', product: '', lastAccess: 0, bookmarked: false };
             chrome.runtime.sendMessage<FromBackground>({
                 action : 'stats',
                 ticketId: msg.ticketId,
@@ -85,6 +96,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
                 notes : t.notes ?? '',
                 product: t.product,
                 lastAccess: t.lastAccess,
+                bookmarked: !!t.bookmarked,
             });
             break;
         }

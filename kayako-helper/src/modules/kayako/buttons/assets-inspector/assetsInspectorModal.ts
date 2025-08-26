@@ -226,9 +226,9 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} .kh-assets-headerbar { position: relative; display:flex; align-items:center; gap:12px; margin-bottom:8px; cursor: move; -webkit-user-select: none; user-select: none; }
       ${MODAL_SEL} .kh-assets-headerbar h2 { flex:1 1 auto; text-align:center; margin:0; font-size:16px; color:#1f2937; }
       ${MODAL_SEL} .kh-assets-close { position:absolute; right:8px; top:50%; transform:translateY(-50%); margin:0; }
-      ${MODAL_SEL} .kh-btn{ padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; }
+      ${MODAL_SEL} .kh-btn{ padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04); }
       ${MODAL_SEL} .kh-btn:hover{ background:#f5f7ff; border-color:#99a; }
-      ${MODAL_SEL} .kh-btn:active{ transform:translateY(1px); }
+      ${MODAL_SEL} .kh-btn:active{ transform:translateY(1px); box-shadow: 0 1px 1px rgba(0,0,0,.03); }
       ${MODAL_SEL} .kh-assets-close:active{ transform:translateY(-50%); }
       ${MODAL_SEL} ${NAV_SEL} { display:flex; gap: 8px; list-style:none; padding: 4px 0; margin: 0 0 6px 0; }
       ${MODAL_SEL} ${PANE_SEL} { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
@@ -237,7 +237,7 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} ${GRID_SEL} { display:block; }
       ${MODAL_SEL} ${POST_GROUP_SEL} { background: #fff; border: 1px solid #e7eaee; border-radius: 10px; box-shadow: 0 2px 8px rgba(17,24,39,.06); margin: 12px 0; overflow: hidden; }
       ${MODAL_SEL} ${GROUP_HEADER_SEL} { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: linear-gradient(180deg, #f8fafc, #f3f5f7); border-bottom: 1px solid #edf0f3; gap: 10px; }
-      ${MODAL_SEL} ${GROUP_HEADER_SEL} .title { display:flex; align-items:center; gap:8px; font-weight: 600; color: #374151; }
+      ${MODAL_SEL} ${GROUP_HEADER_SEL} .title { display:flex; align-items:center; gap:8px; font-weight: 600; color: #374151; font-size: 14px; }
       ${MODAL_SEL} ${GROUP_HEADER_SEL} .actions { display: flex; align-items: center; gap: 8px; }
       ${MODAL_SEL} ${JUMP_BTN_SEL} { padding: 2px 8px; border: 1px solid #d3d9df; background: #ffffff; border-radius: 6px; cursor: pointer; color: #4b5563; }
       ${MODAL_SEL} .kh-pill-btn { padding: 6px 10px; border: 1px solid #d3d9df; background: #f9fafb; color: #374151; border-radius: 999px; cursor: pointer; transition: background .2s, box-shadow .2s; display: inline-flex; align-items: center; gap: 6px; }
@@ -255,17 +255,18 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} .kh-thumb { width: 100%; height: 96px; border: 1px solid #e6ebf0; border-radius: 8px; object-fit: cover; background: #f8fafc; }
       ${MODAL_SEL} .kh-toolbar { display: flex; gap: 8px; padding: 6px 12px; }
       ${MODAL_SEL} .kh-links-intro { color:#374151; padding: 6px 12px; }
-      ${MODAL_SEL} .kh-links-table { display:grid; grid-template-columns: 96px 1fr; gap:0; }
-      ${MODAL_SEL} .kh-links-table .header-cell { font-weight:600; color:#4b5563; padding:8px 12px; border-bottom:1px solid #edf0f3; background:#f9fafb; }
+      ${MODAL_SEL} .kh-links-table { display:grid; grid-template-columns: 96px 1fr; gap:0; font-size:14px; }
+      ${MODAL_SEL} .kh-links-table .header-cell { font-weight:600; color:#4b5563; padding:8px 12px; border-bottom:1px solid #edf0f3; background:#f9fafb; font-size:14px; }
       ${MODAL_SEL} .kh-links-table .row { display:contents; }
-      ${MODAL_SEL} .kh-links-table .cell { padding:8px 12px; border-bottom:1px solid #f1f3f5; }
+      ${MODAL_SEL} .kh-links-table .cell { padding:8px 12px; border-bottom:1px solid #f1f3f5; font-size:14px; }
+      ${MODAL_SEL} .kh-links-table ${JUMP_BTN_SEL} { font-size:14px; }
       ${MODAL_SEL} ${LINK_TEXT_SEL}, ${MODAL_SEL} ${LINK_URL_SEL} { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
-      ${MODAL_SEL} ${LINK_TEXT_SEL} { color:#111827; }
-      ${MODAL_SEL} ${LINK_URL_SEL} { color:#2563eb; }
+      ${MODAL_SEL} ${LINK_TEXT_SEL} { color:#111827; font-size:14px; }
+      ${MODAL_SEL} ${LINK_URL_SEL} { color:#2563eb; font-size:14px; }
       ${MODAL_SEL} ${LINK_TEXT_SEL}, ${MODAL_SEL} ${LINK_URL_SEL} { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
-      ${MODAL_SEL} ${LINK_TEXT_SEL} { color:#111827; }
-      ${MODAL_SEL} ${LINK_URL_SEL} { color:#2563eb; }
-      ${MODAL_SEL} .kh-assets-empty { text-align:center; padding:24px; font-size:15px; color:#6b7280; position: relative; top: 50px; }
+      ${MODAL_SEL} ${LINK_TEXT_SEL} { color:#111827; font-size:14px; }
+      ${MODAL_SEL} ${LINK_URL_SEL} { color:#2563eb; font-size:14px; }
+      ${MODAL_SEL} .kh-assets-empty { text-align:center; padding:24px; font-size:14px; color:#6b7280; position: relative; top: 50px; }
       ${MODAL_SEL} ${SEARCHBAR_SEL} { display:flex; gap:8px; padding: 6px 12px; align-items:center; }
       ${MODAL_SEL} ${SEARCHBAR_SEL} input { min-width: 0; padding: 6px 10px; border:1px solid #d3d9df; border-radius:6px; font:inherit; }
       ${MODAL_SEL} ${SEARCHBAR_SEL} ${SEARCH_INPUT_SEL} { flex: 0 0 220px; margin-left: auto; }

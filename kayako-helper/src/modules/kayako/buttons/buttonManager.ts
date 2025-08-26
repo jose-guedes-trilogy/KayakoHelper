@@ -399,11 +399,17 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                 const delay = sCfg.hideDelayMs ?? 250;
                 const show = () => { if (hideTo){clearTimeout(hideTo);hideTo=null;} menu.style.display='flex'; };
                 const hide = () => { hideTo = window.setTimeout(()=>{menu.style.display='none';}, delay); };
+                const toggle = () => {
+                    if (hideTo) { clearTimeout(hideTo); hideTo = null; }
+                    const visible = menu.style.display !== 'none';
+                    menu.style.display = visible ? 'none' : 'flex';
+                };
 
                 right.addEventListener('mouseenter',show);
                 right.addEventListener('mouseleave',hide);
                 menu .addEventListener('mouseenter',show);
                 menu .addEventListener('mouseleave',hide);
+                right.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); toggle(); });
             }
 
             /* rebuild dropdown every cycle */
