@@ -6,6 +6,7 @@ import {
 
 import { getState, PAGE_LIMIT } from './assetsInspectorData.ts';
 import JSZip from 'jszip';
+import { openAssetsLightbox } from './assetsLightbox.ts';
 
 const {
     assetsModal          : MODAL_SEL,
@@ -38,6 +39,9 @@ const SEARCHBAR_SEL = '.kh-assets-searchbar';
 const SEARCH_INPUT_SEL = '.kh-assets-search-input';
 // removed extension search input
 // const SEARCH_EXT_SEL = '.kh-assets-ext-input';
+// Links tab helpers (also added to selectors.jsonc)
+const LINK_TEXT_SEL = '.kh-links-text';
+const LINK_URL_SEL = '.kh-links-url';
 
 /* Jump-to-post helper (unchanged logic) */
 import { KAYAKO_SELECTORS } from '@/generated/selectors.ts';
@@ -242,9 +246,9 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} ${FILE_ROW_SEL} { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f1f3f5; }
       ${MODAL_SEL} ${FILENAME_SEL} { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; flex: 1 1 auto; min-width: 0; }
       ${MODAL_SEL} ${FILE_ROW_SEL} > div:first-child { flex: 1 1 auto; min-width: 0; }
-      ${MODAL_SEL} ${COPY_URL_BTN_SEL} { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; }
+      ${MODAL_SEL} ${COPY_URL_BTN_SEL} { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; display:inline-flex; align-items:center; }
       ${MODAL_SEL} ${COPY_URL_BTN_SEL}:hover { background: #eef2f7; }
-      ${MODAL_SEL} .kh-assets-copy-img { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; }
+      ${MODAL_SEL} .kh-assets-copy-img { border: none; background: transparent; cursor: pointer; padding: 4px; border-radius: 6px; display:inline-flex; align-items:center; }
       ${MODAL_SEL} .kh-assets-copy-img:hover { background: #eef2f7; }
       ${MODAL_SEL} .kh-image-grid { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
       ${MODAL_SEL} .kh-image-item { display: flex; flex-direction: column; gap: 6px; }
@@ -255,6 +259,13 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} .kh-links-table .header-cell { font-weight:600; color:#4b5563; padding:8px 12px; border-bottom:1px solid #edf0f3; background:#f9fafb; }
       ${MODAL_SEL} .kh-links-table .row { display:contents; }
       ${MODAL_SEL} .kh-links-table .cell { padding:8px 12px; border-bottom:1px solid #f1f3f5; }
+      ${MODAL_SEL} ${LINK_TEXT_SEL}, ${MODAL_SEL} ${LINK_URL_SEL} { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+      ${MODAL_SEL} ${LINK_TEXT_SEL} { color:#111827; }
+      ${MODAL_SEL} ${LINK_URL_SEL} { color:#2563eb; }
+      ${MODAL_SEL} ${LINK_TEXT_SEL}, ${MODAL_SEL} ${LINK_URL_SEL} { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+      ${MODAL_SEL} ${LINK_TEXT_SEL} { color:#111827; }
+      ${MODAL_SEL} ${LINK_URL_SEL} { color:#2563eb; }
+      ${MODAL_SEL} .kh-assets-empty { text-align:center; padding:24px; font-size:15px; color:#6b7280; position: relative; top: 50px; }
       ${MODAL_SEL} ${SEARCHBAR_SEL} { display:flex; gap:8px; padding: 6px 12px; align-items:center; }
       ${MODAL_SEL} ${SEARCHBAR_SEL} input { min-width: 0; padding: 6px 10px; border:1px solid #d3d9df; border-radius:6px; font:inherit; }
       ${MODAL_SEL} ${SEARCHBAR_SEL} ${SEARCH_INPUT_SEL} { flex: 0 0 220px; margin-left: auto; }
@@ -312,7 +323,7 @@ const renderSummary = (modal: HTMLElement) => {
 };
 
 /* Links tab – categorized table with descriptive header */
-const buildGrid = (items: { url:string; post:number }[]) => {
+const buildGrid = (items: { url:string; post:number; text?: string }[]) => {
     const grid = document.createElement('div');
     grid.className = GRID_SEL.slice(1);
 
@@ -354,7 +365,8 @@ const buildGrid = (items: { url:string; post:number }[]) => {
         const thContent = Object.assign(document.createElement('div'), { className: 'header-cell' }); thContent.textContent = 'Content';
         table.append(thPost, thContent);
 
-        for (const { url, post } of cat.rows) {
+        for (const it of cat.rows as Array<{ url: string; post: number; text?: string }>) {
+            const { url, post, text } = it;
             const rowFrag = document.createDocumentFragment();
             const postCell = Object.assign(document.createElement('div'), { className: 'cell' });
             const postBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
@@ -363,13 +375,28 @@ const buildGrid = (items: { url:string; post:number }[]) => {
             postCell.appendChild(postBtn);
 
             const contentCell = Object.assign(document.createElement('div'), { className: 'cell' });
-            const link = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', textContent: url });
-            const tools = document.createElement('span'); tools.style.display = 'inline-flex'; tools.style.gap = '6px'; tools.style.marginLeft = '8px';
+            const tools = document.createElement('span'); tools.style.display = 'inline-flex'; tools.style.alignItems = 'center'; tools.style.gap = '6px'; tools.style.marginLeft = '8px';
             const copyBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
             copyBtn.appendChild(createLinkIconSvg());
             copyBtn.addEventListener('click', async () => { log('Copy link URL', { post, url }); await copyToClipboard(url); });
             tools.appendChild(copyBtn);
-            contentCell.append(link, tools);
+
+            // Optional hyperlink text line (show when provided)
+            const shownText = (text || '').trim();
+            if (shownText) {
+                const textSpan = document.createElement('span');
+                textSpan.className = LINK_TEXT_SEL.slice(1);
+                textSpan.textContent = shownText;
+                textSpan.title = shownText;
+                contentCell.appendChild(textSpan);
+            }
+
+            // URL line
+            const a = document.createElement('a');
+            a.className = LINK_URL_SEL.slice(1);
+            a.href = url; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = url; a.title = url;
+            contentCell.append(a, tools);
 
             rowFrag.append(postCell, contentCell);
             table.appendChild(rowFrag);
@@ -434,6 +461,8 @@ const buildAttachmentGroups = (items: { url:string; post:number }[]) => {
             const domName = findAttachmentFilenameInDom(url, post);
             const pretty = domName || fileNameFromUrl(url);
             const nameEl = Object.assign(document.createElement('span'), { className: FILENAME_SEL.slice(1), textContent: pretty });
+            // Show full URL on hover over attachment filename
+            nameEl.title = url;
             left.appendChild(nameEl);
 
             const right = document.createElement('div');
@@ -524,9 +553,19 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
         header.append(title, actions);
 
         const grid = Object.assign(document.createElement('div'), { className: 'kh-image-grid' });
-        for (const url of files) {
+        for (let i = 0; i < files.length; i++) {
+            const urlMaybe = files[i];
+            if (!urlMaybe) continue;
+            const url: string = urlMaybe;
             const item = Object.assign(document.createElement('div'), { className: 'kh-image-item' });
             const a = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', title: 'Open full-size image' });
+            a.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                try {
+                    log('Open assets gallery', { post, index: i, total: files.length, url });
+                } catch {}
+                openAssetsLightbox(files, i);
+            });
             const img = Object.assign(document.createElement('img'), { src: url, className: 'kh-thumb', loading: 'lazy' });
             a.appendChild(img);
             const meta = document.createElement('div');
@@ -534,9 +573,12 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
             const domDerivedName = findAttachmentFilenameInDom(url, post);
             const prettyName = domDerivedName || fileNameFromQueryParams(url) || fileNameFromUrl(url);
             const name = Object.assign(document.createElement('div'), { className: FILENAME_SEL.slice(1), textContent: prettyName });
+            // Show full file name on hover over image name
+            name.title = prettyName;
             // Buttons row: [Copy URL] [Copy Image]
             const actions = document.createElement('div');
             actions.style.display = 'inline-flex';
+            actions.style.alignItems = 'center';
             actions.style.gap = '4px';
             const copyUrlBtn = Object.assign(document.createElement('button'), { className: COPY_URL_BTN_SEL.slice(1), title: 'Copy URL to clipboard' });
             copyUrlBtn.appendChild(createLinkIconSvg());
@@ -615,7 +657,7 @@ export const renderPane = (
     box.innerHTML = '';
 
     if (state.isLoading) { box.textContent = 'Loading…'; return; }
-    const items = state.cache[tab];
+    const items = state.cache[tab] as any;
 
     // Read search inputs
     const searchInput = modal.querySelector<HTMLInputElement>(SEARCH_INPUT_SEL);
@@ -641,15 +683,23 @@ export const renderPane = (
     };
     const filtered = (() => {
         if (tab === 'links') {
-            // Keep header rows, filter non-headers
-            return items.filter(it => it.url.startsWith('--- ') || matchesText(it.url));
+            // Keep header rows, filter non-headers. Match on URL or hyperlink text when available
+            return (items as Array<{ url: string; post: number; text?: string }>).
+                filter((it: { url: string; post: number; text?: string }) => it.url.startsWith('--- ') || matchesText(it.url) || (it.text ? matchesText(it.text) : false));
         }
-        return items.filter(it => fileMatches(it.url, it.post));
+        return (items as Array<{ url: string; post: number }>).
+            filter((it: { url: string; post: number }) => fileMatches(it.url, it.post));
     })();
 
     log('Search filter', { tab, query: q, exts, before: items.length, after: filtered.length });
 
-    if (!filtered.length) { box.textContent = '— None found —'; return; }
+    if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.className = 'kh-assets-empty';
+        empty.textContent = 'None found';
+        box.appendChild(empty);
+        return;
+    }
 
     if (tab === 'images') { box.appendChild(buildImagesGroups(filtered)); return; }
     if (tab === 'attachments') { box.appendChild(buildAttachmentGroups(filtered)); return; }
@@ -686,12 +736,10 @@ export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: (
         let dragging = false;
         let startX = 0, startY = 0;
         let boxLeft = 0, boxTop = 0;
-        const onDown = (e: MouseEvent) => {
-            if ((e.target as HTMLElement).closest('.kh-assets-close')) return;
-            dragging = true;
+        const beginDrag = (clientX: number, clientY: number) => {
             const rect = (modal as HTMLElement).getBoundingClientRect();
-            startX = e.clientX;
-            startY = e.clientY;
+            startX = clientX;
+            startY = clientY;
             boxLeft = rect.left;
             boxTop = rect.top;
             // Ensure left/top control and allow horizontal dragging
@@ -701,11 +749,16 @@ export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: (
             (modal as HTMLElement).style.width = `${Math.round(rect.width)}px`;
             (modal as HTMLElement).style.left = `${Math.round(rect.left)}px`;
             (modal as HTMLElement).style.top = `${Math.round(rect.top)}px`;
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp, { once: true });
+        };
+        const onDown = (e: MouseEvent) => {
+            if ((e.target as HTMLElement).closest('.kh-assets-close')) return;
+            dragging = true;
+            beginDrag(e.clientX, e.clientY);
+            document.addEventListener('mousemove', onMove as any);
+            document.addEventListener('mouseup', onUp as any, { once: true });
             e.preventDefault();
         };
-        const onMove = (e: MouseEvent) => {
+        const onMove = (e: MouseEvent | PointerEvent) => {
             if (!dragging) return;
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
@@ -724,9 +777,21 @@ export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: (
             dragging = false;
             // Keep width auto after drag ends
             (modal as HTMLElement).style.width = '';
-            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mousemove', onMove as any);
+            header.removeEventListener('pointermove', onMove as any);
         };
+        // Mouse fallback
         header.addEventListener('mousedown', onDown);
+        // Pointer events for more reliable horizontal dragging
+        header.addEventListener('pointerdown', (e: PointerEvent) => {
+            if ((e.target as HTMLElement).closest('.kh-assets-close')) return;
+            dragging = true;
+            try { (header as any).setPointerCapture?.(e.pointerId); } catch {}
+            beginDrag(e.clientX, e.clientY);
+            header.addEventListener('pointermove', onMove as any);
+            header.addEventListener('pointerup', onUp as any, { once: true });
+            e.preventDefault();
+        });
     }
     setActiveTab(modal, 'links');   // default
 };

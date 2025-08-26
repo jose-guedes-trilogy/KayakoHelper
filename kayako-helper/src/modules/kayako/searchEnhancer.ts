@@ -322,22 +322,30 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
     toggleBtn.style.display = 'inline-flex';
     toggleBtn.style.alignItems = 'center';
     toggleBtn.style.gap = '6px';
-    toggleBtn.style.padding = '6px 12px';
+    toggleBtn.style.padding = '4px 12px';
     toggleBtn.style.borderRadius = '9999px';
     toggleBtn.style.border = '1px solid rgba(0,0,0,0.15)';
     toggleBtn.style.background = 'rgba(0,0,0,0.04)';
+    toggleBtn.style.boxShadow = 'rgba(237, 237, 237,0.5) 0px 1px 4px 1px, rgba(235, 235, 235, 0.15) 0px 0px 0px 1px, rgba(161, 161, 161, 0.05) 0px 4px 18px 4px;';
     toggleBtn.style.cursor = 'pointer';
     toggleBtn.style.font = 'inherit';
+    toggleBtn.style.color = '#292929;';
 
     const toggleText = document.createElement('span');
     const chevron = document.createElement('span');
     chevron.style.display = 'inline-block';
+    chevron.style.transform = 'scaleY(0.8)';
+    chevron.style.fontSize = '10px';
+    chevron.style.position = 'relative';
+    chevron.style.top = '1px';
+    chevron.style.color = '#3b3b3b';
 
     let controlsVisible = true;
     function applyToggleUI() {
         toggleBtn.setAttribute('aria-expanded', String(controlsVisible));
+        toggleBtn.className = 'toggle-button';
         toggleText.textContent = controlsVisible ? 'Hide filters' : 'Show filters';
-        chevron.textContent = controlsVisible ? '▲' : '▼';
+        chevron.innerHTML = controlsVisible ? `▲` : `▼`;
         controlsLi.style.display = controlsVisible ? '' : 'none';
         console.debug('[KH Search] filters', controlsVisible ? 'expanded' : 'collapsed', { context: isResultsPage ? 'results' : 'quick' });
     }

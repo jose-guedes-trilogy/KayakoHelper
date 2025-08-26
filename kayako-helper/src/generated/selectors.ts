@@ -26,6 +26,7 @@ export interface KayakoSelectors {
   conversationWindowHeaderRightButtonArea: string;
   completeTicketButton: string;
   trashTicketButton: string;
+  sideConversationContainer: string;
   sideConversationIcon: string;
   messageOrNote: string;
   layoutContainer: string;
@@ -75,6 +76,7 @@ export interface KayakoSelectors {
   sendButtonNoteRightSection: string;
   customFieldContainer: string;
   fieldContainer: string;
+  fieldSelectTrigger: string;
   channelSelectorMessengerAfter: string;
   ccedEmailContainer: string;
   ccedEmail: string;
@@ -255,6 +257,16 @@ export interface ExtensionSelectors {
   assetsDownloadAllTicketAttachmentsZipBtn: string;
   linksIntro: string;
   linksTable: string;
+  assetsLinkText: string;
+  assetsLinkUrl: string;
+  assetsLightboxWrap: string;
+  assetsLightboxBackdrop: string;
+  assetsLightboxImage: string;
+  assetsLightboxCopyBtn: string;
+  assetsLightboxOpenBtn: string;
+  assetsLightboxPrevBtn: string;
+  assetsLightboxNextBtn: string;
+  assetsLightboxCounter: string;
   ticketPreviewTooltip: string;
   ticketPreviewPost: string;
   ticketPreviewMeta: string;
@@ -293,6 +305,8 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
   conversationWindowHeaderRightButtonArea: "[class*=ko-tabs__right_]",
   completeTicketButton: "[class*=ko-case-content__complete_]",
   trashTicketButton: "[class*=ko-case-content__trash_]",
+  sideConversationContainer:
+    "[class*=side-conversations-panel__side-panel_][class*=side-conversations-panel__open_]",
   sideConversationIcon:
     "[class*=ko-case-content__side-conversations_][class*=ko-case-content__selected_] svg path, [class*=ko-case-content__side-conversations_]:hover:not([aria-disabled]) svg path",
   messageOrNote: ".message-or-note",
@@ -360,6 +374,7 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
     "[class*=ko-case-content__send-and-set-trigger_][class*=ko-case-content__note-trigger_]",
   customFieldContainer: "[class*=ko-info-bar_field_select_trigger__header_]",
   fieldContainer: "[class*=ko-info-bar_item__container_]",
+  fieldSelectTrigger: "[class*=ko-info-bar_field_select_trigger__trigger_]",
   channelSelectorMessengerAfter:
     "[class*=channel-type--messenger] [class*=ko-channel-selector__trigger--active_]:after",
   ccedEmailContainer: "[class*=ko-case-content_cc__option-item-membrane_]",
@@ -574,6 +589,16 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   assetsDownloadAllTicketAttachmentsZipBtn: ".kh-assets-dl-attach-all-zip",
   linksIntro: ".kh-links-intro",
   linksTable: ".kh-links-table",
+  assetsLinkText: ".kh-links-text",
+  assetsLinkUrl: ".kh-links-url",
+  assetsLightboxWrap: ".kh-assets-lightbox-wrap",
+  assetsLightboxBackdrop: ".kh-assets-lightbox-backdrop",
+  assetsLightboxImage: ".kh-assets-lightbox-img",
+  assetsLightboxCopyBtn: ".kh-assets-lightbox-copy",
+  assetsLightboxOpenBtn: ".kh-assets-lightbox-open",
+  assetsLightboxPrevBtn: ".kh-assets-lightbox-prev",
+  assetsLightboxNextBtn: ".kh-assets-lightbox-next",
+  assetsLightboxCounter: ".kh-assets-lightbox-count",
   ticketPreviewTooltip: ".kh-ticket-preview-tooltip",
   ticketPreviewPost: ".kh-ticket-preview-post",
   ticketPreviewMeta: ".kh-ticket-preview-meta",

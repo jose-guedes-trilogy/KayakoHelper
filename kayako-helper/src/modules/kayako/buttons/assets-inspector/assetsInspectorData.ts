@@ -16,6 +16,12 @@ export interface PostWithAssets extends Post {
     download_all?: string;
 }
 
+/**
+ * Represents a link discovered in a post. When available, includes the
+ * visible anchor text for improved UI display and filtering.
+ */
+export interface LinkItem { url: string; post: number; text?: string }
+
 /* ───────────── Helpers ───────────── */
 
 const IMG_EXT_RE      = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -28,6 +34,50 @@ const extractUrls = (html?: string): string[] => {
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) out.add(m[0]);
     return [...out];
+};
+
+/** Remove terminal commas/periods accidentally appended to URLs (e.g., Kayako compose). */
+const sanitizeUrl = (raw: string): string => {
+    try {
+        let u = (raw || '').trim();
+        // Only trim trailing commas or periods (ASCII + some common unicode fullwidth variants)
+        const TRIM_CHARS = /[.,\uFF0C\u3002]+$/u;
+        const original = u;
+        while (TRIM_CHARS.test(u)) u = u.replace(TRIM_CHARS, '');
+        if (u !== original) {
+            try { console.log('[AssetsInspector] Sanitized URL', { original, sanitized: u }); } catch {}
+        }
+        return u;
+    } catch { return raw; }
+};
+
+/** Parse <a href="...">text</a> anchors from the HTML and return href + text. */
+const extractAnchors = (html?: string): Array<{ url: string; text: string }> => {
+    try {
+        const src = html ?? '';
+        if (!src || !src.toLowerCase().includes('<a')) return [];
+        const tmp = document.createElement('div');
+        tmp.innerHTML = src;
+        const out: Array<{ url: string; text: string }> = [];
+        tmp.querySelectorAll('a[href]').forEach(a => {
+            const href = (a.getAttribute('href') || '').trim();
+            if (!href) return;
+            if (/^(?:javascript:|mailto:)/i.test(href)) return;
+            const text = (a.textContent || '').trim();
+            let absolute = href;
+            if (!/^https?:/i.test(href)) {
+                try {
+                    const base = (typeof location !== 'undefined' && (location as any)?.href) ? (location as any).href : undefined as unknown as string;
+                    absolute = base ? new URL(href, base).toString() : new URL(href).toString();
+                } catch { /* keep original */ }
+            }
+            out.push({ url: sanitizeUrl(absolute), text });
+        });
+        return out;
+    } catch (err) {
+        try { console.warn('[AssetsInspector] extractAnchors failed', err); } catch {}
+        return [];
+    }
 };
 
 const grabInlineImageSrc = (html?: string): string[] => {
@@ -92,8 +142,12 @@ export const CATEGORY_LABELS = {
 
 let fetched     = 0;
 let totalPosts  = 0;
-let cache: Record<'links'|'images'|'attachments', { url: string; post: number }[]> =
-    { links: [], images: [], attachments: [] };
+type CacheType = {
+    links: LinkItem[];
+    images: { url: string; post: number }[];
+    attachments: { url: string; post: number }[];
+};
+let cache: CacheType = { links: [], images: [], attachments: [] };
 let isLoading   = false;
 
 export const PAGE_LIMIT = PAGE_SIZE;
@@ -123,27 +177,40 @@ export async function loadAssets(limit: number): Promise<void> {
             const inlineImgs = new Set(grabInlineImageSrc(p.contents));
             inlineImgs.forEach(u => cache.images.push({ url: u, post: p.id }));
 
+            // First, collect anchors with their visible text
+            const anchors = extractAnchors(p.contents);
+            const anchorUrlSet = new Set(anchors.map(a => a.url));
+            anchors.forEach(({ url, text }) => {
+                const clean = sanitizeUrl(url);
+                cache.links.push({ url: clean, post: p.id, text });
+                if (isProbablyImage(clean)) cache.images.push({ url: clean, post: p.id });
+            });
+
+            // Then, collect any remaining bare URLs not already covered by anchors
             extractUrls(p.contents).forEach(u => {
                 if (inlineImgs.has(u)) return;
-                cache.links.push({ url: u, post: p.id });
-                if (isProbablyImage(u)) cache.images.push({ url: u, post: p.id });
+                if (anchorUrlSet.has(u)) return;
+                const clean = sanitizeUrl(u);
+                cache.links.push({ url: clean, post: p.id });
+                if (isProbablyImage(clean)) cache.images.push({ url: clean, post: p.id });
             });
 
             let hasNonImageAttachment = false;
             for (const att of p.attachments ?? []) {
                 const dl = att.url_download ?? att.url;
                 if (!dl) continue;
+                const clean = sanitizeUrl(dl);
                 if (att.type?.startsWith('image/')) {
                     // Image attachments should appear only in Images, not in Attachments
-                    cache.images.push({ url: dl, post: p.id });
+                    cache.images.push({ url: clean, post: p.id });
                 } else {
-                    cache.attachments.push({ url: dl, post: p.id });
+                    cache.attachments.push({ url: clean, post: p.id });
                     hasNonImageAttachment = true;
                 }
             }
             // Only include download_all when there is at least one non-image attachment
             if (hasNonImageAttachment && p.download_all)
-                cache.attachments.push({ url: p.download_all, post: p.id });
+                cache.attachments.push({ url: sanitizeUrl(p.download_all), post: p.id });
         }
 
         /* dedupe */

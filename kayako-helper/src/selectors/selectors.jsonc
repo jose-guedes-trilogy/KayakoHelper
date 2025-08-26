@@ -37,6 +37,7 @@
     "completeTicketButton": "[class*=ko-case-content__complete_]",
     "trashTicketButton": "[class*=ko-case-content__trash_]",
 
+    "sideConversationContainer": "[class*=side-conversations-panel__side-panel_][class*=side-conversations-panel__open_]",
     "sideConversationIcon": "[class*=ko-case-content__side-conversations_][class*=ko-case-content__selected_] svg path, [class*=ko-case-content__side-conversations_]:hover:not([aria-disabled]) svg path",
 
     /* END Conversation Window Header */
@@ -114,6 +115,12 @@
 
     "customFieldContainer": "[class*=ko-info-bar_field_select_trigger__header_]",
     "fieldContainer": "[class*=ko-info-bar_item__container_]",
+    // Trigger container for select-type info-bar fields (e.g., Product); used to read current value safely
+    "fieldSelectTrigger": "[class*=ko-info-bar_field_select_trigger__trigger_]",
+    // Placeholder element inside trigger that renders current selection; prefer textContent or title
+    "fieldSelectPlaceholder": "[class*=ko-info-bar_field_select_trigger__placeholder_]",
+    // Root element for power-select fields in the info bar
+    "fieldSelectPowerRoot": "[class*=ko-info-bar_field_select__power-select_]",
 
     "channelSelectorMessengerAfter": "[class*=channel-type--messenger] [class*=ko-channel-selector__trigger--active_]:after",
 
@@ -387,7 +394,25 @@
     // Links tab intro + table (sanitized, resilient)
     "linksIntro":              ".kh-links-intro",
     "linksTable":              ".kh-links-table",
+    // Links tab content rows
+    "assetsLinkText":          ".kh-links-text", // first line: hyperlink text (ellipsis + tooltip)
+    "assetsLinkUrl":           ".kh-links-url", // second line: URL (ellipsis + tooltip)
 
+
+    // Assets inspector lightbox (parity with Kayako gallery)
+    // Backdrop+container wrapper for custom gallery
+    "assetsLightboxWrap": ".kh-assets-lightbox-wrap",
+    // Backdrop element clicking which closes the gallery
+    "assetsLightboxBackdrop": ".kh-assets-lightbox-backdrop",
+    // Large image element shown in lightbox
+    "assetsLightboxImage": ".kh-assets-lightbox-img",
+    // Top-right toolbar buttons
+    "assetsLightboxCopyBtn": ".kh-assets-lightbox-copy",
+    "assetsLightboxOpenBtn": ".kh-assets-lightbox-open",
+    // Side navigation buttons and top-left counter
+    "assetsLightboxPrevBtn": ".kh-assets-lightbox-prev",
+    "assetsLightboxNextBtn": ".kh-assets-lightbox-next",
+    "assetsLightboxCounter": ".kh-assets-lightbox-count",
 
     /* Ticket preview tooltip */
 

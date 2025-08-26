@@ -327,7 +327,7 @@
   display: none;
   position: absolute;
   top: 24px;
-  left: 0;
+  right: 0;
   z-index: 9999;
   background: #fff;
   border: 1px solid #d0d3d6;
@@ -902,6 +902,15 @@ root {
   padding: 6px 14px 16px;
 }
 
+#{sel.$assetsLinkUrl} {
+  color: hsl(221 46% 62% / 1);
+}
+
+#{sel.$sideConversationContainer} {
+  max-width: unset !important;
+  width: 100% !important;
+}
+
 .kh-close-button {
   padding: 4px 8px;
   font-weight: 600;
@@ -965,7 +974,7 @@ root {
 
 .kh-date-wrap {
   > input {
-    max-width: 100px;
+    max-width: 110px;
   }
 }
 
@@ -986,4 +995,17 @@ root {
   display: flex;
   align-items: center;
   justify-content: space-between;
+
+  div {
+    display: flex;
+    gap: 16px;
+  }
+}
+
+.toggle-button {
+  background: white !important;
+}
+
+.kh-links-url {
+  color: hsl(218deg 44.74% 63.22%) !important;
 }

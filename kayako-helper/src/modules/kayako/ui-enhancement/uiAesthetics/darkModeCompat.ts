@@ -155,20 +155,36 @@ export function initDarkModeCompat(): void {
         });
 
         chrome.storage.onChanged.addListener((changes, area) => {
-            if (area !== 'sync') return;
-            const hasCompat = KEY_COMPAT in changes;
-            const hasText = KEY_TEXT in changes;
-            const hasBg = KEY_BG in changes;
-            if (!(hasCompat || hasText || hasBg)) return;
+            try {
+                if (area !== 'sync') return;
 
-            const enabled = (hasCompat ? !!changes[KEY_COMPAT]!.newValue : compatEnabled);
-            const textColor = (hasText ? (changes[KEY_TEXT]!.newValue as string) : currentText);
-            const bgColor = (hasBg ? (changes[KEY_BG]!.newValue as string) : currentBg);
+                const hasCompat = Object.prototype.hasOwnProperty.call(changes, KEY_COMPAT);
+                const hasText = Object.prototype.hasOwnProperty.call(changes, KEY_TEXT);
+                const hasBg = Object.prototype.hasOwnProperty.call(changes, KEY_BG);
+                if (!(hasCompat || hasText || hasBg)) return;
 
-            applyState({ enabled, textColor, bgColor });
+                const enabled = hasCompat ? !!changes[KEY_COMPAT]?.newValue : compatEnabled;
+                const textColor = hasText ? (changes[KEY_TEXT]?.newValue as string) : currentText;
+                const bgColor = hasBg ? (changes[KEY_BG]?.newValue as string) : currentBg;
 
-            if (enabled && (hasText || hasBg)) tagTargets(true, textColor, bgColor);
+                applyState({ enabled, textColor, bgColor });
+
+                if (enabled && (hasText || hasBg)) tagTargets(true, textColor, bgColor);
+            } catch (err) {
+                try {
+                    console.warn('[OH][DarkModeCompat] Skipping storage.onChanged due to invalidated context', err);
+                } catch {}
+            }
         });
+
+        // Clean up in case the page unloads while the extension is reloading
+        try {
+            const removeHandler = () => {
+                try { chrome.storage.onChanged.removeListener?.(() => {}); } catch {}
+                try { window.removeEventListener('unload', removeHandler); } catch {}
+            };
+            window.addEventListener('unload', removeHandler);
+        } catch {}
     } catch {
         // no-op if storage isn't available yet
     }

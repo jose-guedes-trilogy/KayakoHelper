@@ -3,7 +3,7 @@
 export type ToBackground =
     | { action: 'createFolder';   ticketId: string; location: 'V' | 'DOWNLOADS' }
     | { action: 'visitTicket';    ticketId: string }                  // NEW
-    | { action: 'saveMetadata';   ticketId: string; name: string; email: string; subject: string }
+    | { action: 'saveMetadata';   ticketId: string; name: string; email: string; subject: string; product?: string }
     | { action: 'saveNotes';      ticketId: string; notes: string }
     | { action: 'incrementReply'; ticketId: string }
     | { action: 'setTrainingMode';         enabled: boolean }
@@ -16,7 +16,7 @@ export type ToBackground =
 
 export type FromBackground =
     | { action: 'createFolderResult'; success: boolean; alreadyExisted?: boolean; path?: string; error?: string }
-    | { action: 'stats'; ticketId: string; count: number; name: string; email: string; subject: string; notes: string }
+    | { action: 'stats'; ticketId: string; count: number; name: string; email: string; subject: string; notes: string; product?: string; lastAccess?: number }
     | { action: 'allTickets';
-    tickets: Record<string, { count: number; name: string; email: string; subject: string; notes: string }> }
+    tickets: Record<string, { count: number; name: string; email: string; subject: string; notes: string; product?: string; lastAccess?: number }> }
     | { action: 'trainingMode'; enabled: boolean };

@@ -247,18 +247,18 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
         margin-bottom: 6px;
     }
     
-    #kh-model-tabs button {
-        border: none;
-        background: none;
-        padding: 4px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
+    /*#kh-model-tabs button {*/
+    /*    border: none;*/
+    /*    background: none;*/
+    /*    padding: 4px 10px;*/
+    /*    border-radius: 4px;*/
+    /*    cursor: pointer;*/
+    /*}*/
     
-    #kh-model-tabs button.active {
-        background: #2e73e9;
-        color: #fff;
-    }
+    /*#kh-model-tabs button.active {*/
+    /*    background: #2e73e9;*/
+    /*    color: #fff;*/
+    /*}*/
     
     #kh-model-content textarea {
         width: 100%;
@@ -397,6 +397,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
     .kh-ephor-header h2{position:absolute;left:50%;transform:translateX(-50%);}
 
     /* ---------- rounded scrollbars (WebKit) ---------- */
+    #kh-ephor-settings-modal{contain:content;}
     #kh-ephor-project-list::-webkit-scrollbar,
     #kh-ephor-channel-list::-webkit-scrollbar,
     #kh-ephor-ai-list::-webkit-scrollbar,
@@ -496,7 +497,8 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
                  style="width:100%;padding:4px 6px;margin-bottom:8px;">
           <div id="kh-ephor-project-list"
                style="height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;"></div>
-          <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+          <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+            <button id="kh-ephor-browse-projects" class="kh-btn" title="Browse available projects">📚 Browse</button>
             <button id="kh-ephor-refresh-projects" class="kh-btn">🔄 Refresh Projects</button>
           </div>
         </div>
@@ -541,7 +543,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
       <div>
         <p id="kh-title-models" style="margin:0 0 4px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;">
           <span>3. Select AI Models</span>
-          <span id="kh-model-saved-note" style="color:#2e73e9;font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;"></span>
+          <span id="kh-model-saved-note" style="color:#2e73e9;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;"></span>
         </p>
         <div id="kh-model-body">
           <input id="kh-ephor-model-search" type="search" placeholder="Search models…"

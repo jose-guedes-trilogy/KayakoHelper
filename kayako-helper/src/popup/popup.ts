@@ -66,6 +66,8 @@ const refs = {
     lblName   : document.getElementById('kh-popup-ticket-info-requester-name')  as HTMLElement,
     lblEmail  : document.getElementById('kh-popup-ticket-info-requester-email') as HTMLElement,
     lblReplies: document.getElementById('kh-popup-ticket-info-reply-count')     as HTMLElement,
+    lblProduct: document.getElementById('kh-popup-ticket-info-product')         as HTMLElement,
+    lblLast   : document.getElementById('kh-popup-ticket-info-last')            as HTMLElement,
     txtNotes  : document.getElementById('kh-popup-ticket-notes')         as HTMLTextAreaElement,
 
     /* list & paging */
@@ -78,6 +80,16 @@ const refs = {
 
     /* copy open tabs button */
     copyOpenTabsBtn: document.getElementById('kh-copy-open-tabs-btn') as HTMLButtonElement,
+    /* date range filter */
+    dateTrigger: document.getElementById('kh-date-range-trigger') as HTMLButtonElement,
+    datePicker : document.getElementById('kh-date-range-picker') as HTMLElement,
+    dateMonth  : document.getElementById('kh-date-month') as HTMLElement,
+    dateGrid   : document.getElementById('kh-date-grid') as HTMLElement,
+    datePrev   : document.getElementById('kh-date-prev') as HTMLButtonElement,
+    dateNext   : document.getElementById('kh-date-next') as HTMLButtonElement,
+    dateApply  : document.getElementById('kh-date-apply') as HTMLButtonElement,
+    dateClear  : document.getElementById('kh-date-clear') as HTMLButtonElement,
+    dateDisplay: document.getElementById('kh-date-range-display') as HTMLElement,
 };
 
 
@@ -296,6 +308,8 @@ chrome.runtime.onMessage.addListener((msg: FromBackground) => {
             refs.lblEmail.textContent   = msg.email   || '-';
             refs.lblReplies.textContent = msg.count.toString();
             refs.txtNotes.value         = msg.notes ?? '';
+            if (refs.lblProduct) refs.lblProduct.textContent = (msg as any).product || '-';
+            if (refs.lblLast) refs.lblLast.textContent = (msg as any).lastAccess ? formatDate(new Date((msg as any).lastAccess)) : '-';
             break;
         }
         case 'allTickets': {
@@ -319,12 +333,25 @@ function renderList(): void {
             if (currentListMode === 'visited' && !inVisited) return false;
 
             /* search filter */
-            return !term ||
+            const searchOk = (!term ||
                 _.includes(term) ||
-                t.subject.toLowerCase().includes(term) ||
-                t.name.toLowerCase().includes(term) ||
-                t.email.toLowerCase().includes(term) ||
-                (t.notes ?? '').toLowerCase().includes(term);
+                (t.subject || '').toLowerCase().includes(term) ||
+                (t.name || '').toLowerCase().includes(term) ||
+                (t.email || '').toLowerCase().includes(term) ||
+                (t.notes ?? '').toLowerCase().includes(term) ||
+                (t as any).product?.toLowerCase?.().includes(term));
+
+            if (!searchOk) return false;
+
+            /* date range filter */
+            if (dateState.start || dateState.end) {
+                const ts = t.lastAccess || 0;
+                if (!ts) return false;
+                const d = startOfDay(new Date(ts)).getTime();
+                if (dateState.start && d < startOfDay(dateState.start).getTime()) return false;
+                if (dateState.end && d > startOfDay(dateState.end).getTime()) return false;
+            }
+            return true;
         })
         .sort((a, b) => (b[1].lastAccess ?? 0) - (a[1].lastAccess ?? 0));   // newest first
 
@@ -454,3 +481,112 @@ function saveDefaultInSelection(): void {
     if (refs.defArts?.checked)  defs.push('Articles');
     chrome.storage.sync.set({ searchInDefaults: defs });
 }
+
+/* ─ date range picker state + helpers ─ */
+type DateState = { monthCursor: Date; start: Date | null; end: Date | null; tempStart: Date | null; tempEnd: Date | null };
+const dateState: DateState = {
+    monthCursor: startOfMonth(new Date()),
+    start: null,
+    end: null,
+    tempStart: null,
+    tempEnd: null,
+};
+
+function startOfMonth(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function endOfMonth(d: Date): Date { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+function startOfDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function isSameDay(a: Date, b: Date): boolean { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function addMonths(d: Date, n: number): Date { const nd = new Date(d); nd.setMonth(nd.getMonth()+n); return startOfMonth(nd); }
+function formatMonth(d: Date): string { return d.toLocaleString(undefined, { month: 'long', year: 'numeric' }); }
+function formatDate(d: Date): string { return d.toLocaleDateString(); }
+
+function openDatePicker(): void {
+    if (!refs.datePicker) return;
+    refs.datePicker.style.display = 'block';
+    dateState.tempStart = dateState.start;
+    dateState.tempEnd = dateState.end;
+    renderCalendar();
+}
+function closeDatePicker(): void { if (refs.datePicker) refs.datePicker.style.display = 'none'; }
+
+function renderCalendar(): void {
+    if (!refs.dateGrid || !refs.dateMonth) return;
+    const first = startOfMonth(dateState.monthCursor);
+    const last = endOfMonth(dateState.monthCursor);
+    const firstWeekday = new Date(first).getDay();
+    refs.dateMonth.textContent = formatMonth(first);
+
+    const daysInMonth = last.getDate();
+    const weekdays = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+    const cells: string[] = [];
+    // header row
+    cells.push(...weekdays.map(w => `<div class="kh-date-weekday">${w}</div>`));
+    // blank leading cells
+    for (let i=0;i<firstWeekday;i++) cells.push('<div></div>');
+    for (let day=1; day<=daysInMonth; day++) {
+        const cur = new Date(first.getFullYear(), first.getMonth(), day);
+        const inRange = dateState.tempStart && dateState.tempEnd && cur >= startOfDay(dateState.tempStart) && cur <= startOfDay(dateState.tempEnd);
+        const selected = (dateState.tempStart && isSameDay(cur, dateState.tempStart)) || (dateState.tempEnd && isSameDay(cur, dateState.tempEnd));
+        const cls = `kh-date-cell${inRange ? ' kh-in-range' : ''}${selected ? ' kh-selected' : ''}`;
+        cells.push(`<div class="${cls}" data-day="${day}">${day}</div>`);
+    }
+    refs.dateGrid.innerHTML = cells.join('');
+
+    refs.dateGrid.querySelectorAll<HTMLElement>('.kh-date-cell[data-day]').forEach(cell => {
+        cell.addEventListener('click', () => {
+            const day = Number(cell.dataset.day);
+            const clicked = new Date(first.getFullYear(), first.getMonth(), day);
+            if (!dateState.tempStart || (dateState.tempStart && dateState.tempEnd)) {
+                dateState.tempStart = clicked;
+                dateState.tempEnd = null;
+            } else if (clicked < dateState.tempStart) {
+                dateState.tempEnd = dateState.tempStart;
+                dateState.tempStart = clicked;
+            } else {
+                dateState.tempEnd = clicked;
+            }
+            renderCalendar();
+        });
+    });
+}
+
+function syncDateDisplay(): void {
+    if (!refs.dateDisplay) return;
+    if (dateState.start && dateState.end) {
+        refs.dateDisplay.textContent = `${formatDate(dateState.start)} – ${formatDate(dateState.end)}`;
+    } else if (dateState.start) {
+        refs.dateDisplay.textContent = `${formatDate(dateState.start)} – …`;
+    } else {
+        refs.dateDisplay.textContent = 'All dates';
+    }
+}
+
+// Wire up picker controls
+refs.dateTrigger?.addEventListener('click', (e) => {
+    if (!refs.datePicker) return;
+    e.stopPropagation();
+    const visible = refs.datePicker.style.display === 'block';
+    if (visible) closeDatePicker(); else openDatePicker();
+});
+refs.datePrev?.addEventListener('click', (e) => { e.stopPropagation(); dateState.monthCursor = addMonths(dateState.monthCursor, -1); renderCalendar(); });
+refs.dateNext?.addEventListener('click', (e) => { e.stopPropagation(); dateState.monthCursor = addMonths(dateState.monthCursor, +1); renderCalendar(); });
+refs.dateClear?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dateState.start = null; dateState.end = null; dateState.tempStart = null; dateState.tempEnd = null; syncDateDisplay(); renderList(); closeDatePicker();
+});
+refs.dateApply?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dateState.start = dateState.tempStart; dateState.end = dateState.tempEnd; syncDateDisplay(); renderList(); closeDatePicker();
+});
+
+// Close calendar when clicking outside
+document.addEventListener('click', (e) => {
+    const target = e.target as Node;
+    if (!refs.datePicker || !refs.dateTrigger) return;
+    // Keep open when clicking inside picker
+    if (refs.datePicker.contains(target) || refs.dateTrigger.contains(target)) return;
+    closeDatePicker();
+});
+
+// Prevent immediate close when interacting inside picker
+refs.datePicker?.addEventListener('click', (e) => { e.stopPropagation(); });

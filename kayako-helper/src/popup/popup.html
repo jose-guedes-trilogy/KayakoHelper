@@ -5,13 +5,39 @@
     <title>Kayako Helper</title>
 
     <style>
+        /* Aesthetics aligned with Ephor Settings & Assets Inspector */
         body      { font-family: system-ui, sans-serif; margin: 0; width: 22rem; }
-        nav       { display:flex;border-bottom:1px solid #ddd; }
-        nav button{ flex:1;padding:.6rem 0;border:0;background:#f8f8f8;font-weight:600;cursor:pointer; }
-        nav button.active{ background:#fff;border-bottom:2px solid dodgerblue; }
+        :root{
+            --kh-input-border: hsl(213deg 15% 84%);
+            --kh-input-shadow: inset 0 0 4px 0 hsla(0,0%,0%,0.0325), inset 0 0 2px 0 hsla(0,0%,0%,0.0805), inset 0 0 1px 0 hsla(0,0%,0%,0.089);
+            --kh-input-bg: #fff;
+        }
 
-        section   { display:none;padding:1rem; }
+        /* Container feel */
+        section   { display:none;padding:1rem; background:#fff; border:1px solid hsl(213deg 15% 88%); border-radius:8px; box-shadow:0 6px 18px rgba(17,24,39,.06); margin:10px; }
         section.active{ display:block; }
+
+        /* Tabs (top-level + settings) */
+        nav       { display:flex;border-bottom:1px solid #ddd; padding: 6px 10px 0; }
+        .kh-bar-btn { border: none; background: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-weight:600; }
+        .kh-bar-btn:hover{ background:hsl(217 40% 98% / 1); color:#1a2b4f; border:1px solid #adc1e3; }
+        .kh-bar-btn.active{ background:hsl(216 20% 98% / 1); color:#333; border:1px solid #cfd3d9; border-bottom-color: transparent; position: relative; top: 1px; }
+
+        /* Buttons */
+        .kh-btn { padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; }
+        .kh-btn:hover { background:#f5f7ff; border-color:#99a; }
+        .kh-btn:active { transform:translateY(1px); }
+        .kh-btn-primary { background:#2e73e9; color:#fff; border-color:#2e73e9; }
+        .kh-btn-primary:hover { background:#255ecd; color:#fff; }
+
+        /* Inputs */
+        input[type="text"], input[type="search"], input[type="number"], input[type="color"], textarea {
+            border:1px solid var(--kh-input-border);
+            border-radius:4px; background:var(--kh-input-bg); box-shadow:var(--kh-input-shadow);
+        }
+        input[type="text"]:focus, input[type="search"]:focus, input[type="number"]:focus, textarea:focus {
+            outline:none; border-color:#89b5ff !important; box-shadow:0 0 0 2px rgba(46,115,233,.15) !important;
+        }
 
         .kh-popup-setting{ margin-bottom:.8rem; }
         label     { user-select:none; }
@@ -32,29 +58,54 @@
         #kh-pagination button[disabled]{ opacity:.4;cursor:default; }
 
         /* inner settings tabs */
-        #kh-settings-tabs{ display:flex;border-bottom:1px solid #ddd;margin:-.2rem 0 .6rem; }
-        #kh-settings-tabs button{ flex:1;padding:.4rem 0;border:0;background:#f8f8f8;font-weight:600;cursor:pointer; }
-        #kh-settings-tabs button.active{ background:#fff;border-bottom:2px solid dodgerblue; }
+        #kh-settings-tabs{ display:flex;border-bottom:1px solid #ddd;margin:-.2rem 0 .6rem; gap:6px; }
+        #kh-settings-tabs button{ flex:1; }
         #kh-settings-panels .settings-subsection{ display:none; }
         #kh-settings-panels .settings-subsection.active{ display:block; }
+
+        /* Notes textarea layout fix */
+        #kh-popup-ticket-notes{ box-sizing:border-box; width:100%; display:block; max-width:100%; }
+
+        /* Date range picker */
+        #kh-date-range-picker{ position:absolute; background:#fff; border:1px solid #ddd; box-shadow:0 2px 10px rgba(0,0,0,.1); padding:.5rem; z-index:10; }
+        .kh-date-header{ display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem; }
+        .kh-date-grid{ display:grid;grid-template-columns:repeat(7,1fr);gap:.2rem; }
+        .kh-date-cell{ text-align:center;padding:.25rem 0;cursor:pointer;border-radius:4px; }
+        .kh-date-cell:hover{ background:#f0f7ff; }
+        .kh-date-cell.kh-in-range{ background:#e6f0ff; }
+        .kh-date-cell.kh-selected{ background:#cfe3ff; font-weight:600; }
+        .kh-date-weekday{ font-size:.75rem;color:#666; text-align:center; }
+        .kh-date-actions{ display:flex;gap:.4rem;justify-content:flex-end;margin-top:.4rem; }
     </style>
 </head>
 <body>
 
 <!-- top-level tabs -->
 <nav>
-    <button class="tab active" data-tab="main">Main</button>
-    <button class="tab"        data-tab="settings">Settings</button>
+    <button class="tab kh-bar-btn active" data-tab="main">Main</button>
+    <button class="tab kh-bar-btn"        data-tab="settings">Settings</button>
 </nav>
+
+<!-- Global: Copy open Kayako ticket URLs/IDs (outside of tabs) -->
+<div style="padding: 0 10px;">
+    <button id="kh-copy-open-tabs-btn" class="kh-btn"
+            title="Left click: copy URLs. Right-click: copy IDs. Ctrl+Click: CSV"
+            style="margin:.6rem 0 .4rem .5rem;">
+        Copy all ticket URLs in this tab
+    </button>
+    
+    <!-- Optional helper text -->
+    <div style="font-size:.8rem;color:#666;margin:.1rem .5rem .2rem;">
+        Tip: Right-click to copy IDs; Ctrl+Click for CSV
+    </div>
+    
+    <hr style="margin:.3rem .5rem;" />
+    
+    <!-- Date range display mirrors list filter; remains in Main tab UI -->
+</div>
 
 <!-- MAIN -->
 <section id="tab-main" class="active">
-    <button id="kh-copy-open-tabs-btn"
-            title="Left click: copy URLs. Right-click: copy IDs. Ctrl+Click: CSV"
-            style="margin:.6rem 0 .4rem .5rem;padding:.4rem .6rem;border:1px solid #ccc;background:#f8f8f8;font-weight:600;cursor:pointer">
-        Copy all ticket URLs in this tab
-    </button>
-
     <h4>This ticket</h4>
     <div id="kh-ticket-info">
         <div class="kh-ticket-info-label">ID:</div>              <div><span id="kh-popup-ticket-info-id">-</span></div>
@@ -62,6 +113,8 @@
         <div class="kh-ticket-info-label">Requester:</div>       <div><span id="kh-popup-ticket-info-requester-name">-</span></div>
         <div class="kh-ticket-info-label">Requester Email:</div> <div><span id="kh-popup-ticket-info-requester-email">-</span></div>
         <div class="kh-ticket-info-label">Your Replies:</div>    <div><span id="kh-popup-ticket-info-reply-count">0</span></div>
+        <div class="kh-ticket-info-label">Product:</div>         <div><span id="kh-popup-ticket-info-product">-</span></div>
+        <div class="kh-ticket-info-label">Last Access:</div>     <div><span id="kh-popup-ticket-info-last">-</span></div>
     </div>
 
     <!-- Notes -->
@@ -77,6 +130,27 @@
         <button class="list-tab"        data-list="visited">Visited</button>
     </div>
 
+    <!-- Date range filter (single calendar with two selections) -->
+    <div id="kh-date-filter" style="position:relative;margin:.25rem 0 .4rem 0;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <button id="kh-date-range-trigger" style="padding:.2rem .5rem;border:1px solid #ccc;background:#f8f8f8;cursor:pointer">Date range</button>
+        <span id="kh-date-range-display" style="font-size:.85rem;color:#555">All dates</span>
+
+        <div id="kh-date-range-picker" style="display:none;top:2.0rem;left:0">
+            <div class="kh-date-header">
+                <button id="kh-date-prev" title="Prev" style="border:1px solid #ccc;background:#f8f8f8;cursor:pointer">◀</button>
+                <div id="kh-date-month" style="font-weight:600"></div>
+                <button id="kh-date-next" title="Next" style="border:1px solid #ccc;background:#f8f8f8;cursor:pointer">▶</button>
+            </div>
+            <div class="kh-date-grid" id="kh-date-grid">
+                <!-- weekdays header -->
+            </div>
+            <div class="kh-date-actions">
+                <button class="kh-date-clear" id="kh-date-clear" style="border:1px solid #ccc;background:#f8f8f8;cursor:pointer">Clear</button>
+                <button class="kh-date-apply" id="kh-date-apply" style="border:1px solid #ccc;background:dodgerblue;color:#fff;cursor:pointer">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <input type="search" id="kh-search-tickets"
            placeholder="Filter by ID, subject, requester, notes…"
            style="width:100%;padding:.3rem;margin-bottom:.5rem" />
@@ -89,8 +163,8 @@
 <section id="tab-settings">
     <!-- inner settings tabs -->
     <div id="kh-settings-tabs">
-        <button class="setting-tab active" data-settings="general">General</button>
-        <button class="setting-tab"        data-settings="ui">UI</button>
+        <button class="setting-tab kh-bar-btn active" data-settings="general">General</button>
+        <button class="setting-tab kh-bar-btn"        data-settings="ui">UI</button>
     </div>
 
     <div id="kh-settings-panels">

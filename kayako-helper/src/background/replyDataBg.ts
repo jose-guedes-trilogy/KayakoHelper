@@ -8,6 +8,7 @@ export interface TicketData {
     email  : string;
     subject: string;
     notes ?: string;
+    product?: string;
     lastAccess: number;
 }
 
@@ -43,12 +44,13 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
 
         /* metadata */
         case 'saveMetadata': {
-            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', lastAccess: Date.now() };
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', product: '', lastAccess: Date.now() };
             tickets[msg.ticketId] = {
                 ...t,
                 name:    msg.name    || t.name,
                 email:   msg.email   || t.email,
                 subject: msg.subject || t.subject,
+                product: msg.product ?? t.product,
             };
             save(tickets);
             break;
@@ -72,7 +74,7 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
 
         /* stats for one */
         case 'getStats': {
-            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '' };
+            const t = tickets[msg.ticketId] ?? { count: 0, name: '', email: '', subject: '', notes: '', product: '', lastAccess: 0 };
             chrome.runtime.sendMessage<FromBackground>({
                 action : 'stats',
                 ticketId: msg.ticketId,
@@ -81,6 +83,8 @@ chrome.runtime.onMessage.addListener((msg: ToBackground) => {
                 email : t.email,
                 subject: t.subject,
                 notes : t.notes ?? '',
+                product: t.product,
+                lastAccess: t.lastAccess,
             });
             break;
         }

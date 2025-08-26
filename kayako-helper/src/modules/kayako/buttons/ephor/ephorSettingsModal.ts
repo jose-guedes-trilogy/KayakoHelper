@@ -143,7 +143,7 @@ export async function openEphorSettingsModal(
         store.preferredMode = newVal.preferredMode;
         store.customInstructionsByStage = newVal.customInstructionsByStage ?? store.customInstructionsByStage;
         store.customInstructionsByContext = newVal.customInstructionsByContext ?? store.customInstructionsByContext;
-        store.instructionsScopeForWorkflow = newVal.instructionsScopeForWorkflow ?? store.instructionsScopeForWorkflow;
+        store.instructionsScopeForWorkflow = newVal.instructionsScopeForWorkflow ?? store.instructionsScopeForWorkflow ?? "ticket";
 
         // reflect in the UI (radio buttons + channel list)
         refs.modeMultiplexer.checked = newVal.preferredMode === "multiplexer";
@@ -279,6 +279,7 @@ export async function openEphorSettingsModal(
             /* tab button */
             const btn = document.createElement("button");
             btn.textContent = saved?.byModel?.[label] ? `✓ ${label}` : label;
+            btn.className = "kh-bar-btn";
             tabBar.appendChild(btn);
             tabs.push(btn);
 
@@ -832,6 +833,90 @@ export async function openEphorSettingsModal(
      * Toolbar buttons                                                    *
      * ------------------------------------------------------------------ */
     refs.refreshBtn.addEventListener("click", () => void refreshProjects(state, refs, log));
+
+    // Browse projects modal – lists defaults from JSON and allows joining
+    (modal.querySelector<HTMLButtonElement>("#kh-ephor-browse-projects") as HTMLButtonElement | null)?.addEventListener("click", async () => {
+        try { log("UI", "Open Browse Projects"); } catch {}
+        if (document.getElementById("kh-browse-projects-modal")) return;
+        const overlay = document.createElement("div"); overlay.className = "kh-dialog-overlay";
+        const dlg = document.createElement("div"); dlg.className = "kh-dialog"; dlg.id = "kh-browse-projects-modal";
+        dlg.style.minWidth = "720px";
+        dlg.innerHTML = `
+          <header>Browse Projects</header>
+          <main style="display:grid;grid-template-columns:260px 1fr;gap:12px;min-height:340px;">
+            <div style="border:1px solid #adc1e3;border-radius:6px;padding:6px;overflow:auto;min-height:240px;">
+              <div id="kh-browse-proj-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div style="border:1px solid #adc1e3;border-radius:6px;padding:8px;">
+              <p style="margin:0 0 6px;color:#445">Select a project on the left to see details.</p>
+              <div id="kh-browse-proj-details" style="font-family:monospace;color:#334"></div>
+            </div>
+          </main>
+          <footer>
+            <button class="kh-btn" data-act="close">Close</button>
+          </footer>`;
+
+        const close = () => overlay.remove();
+        dlg.querySelector<HTMLButtonElement>("[data-act=close]")!.addEventListener("click", close);
+        overlay.appendChild(dlg);
+        modal.appendChild(overlay);
+
+        type DefaultProj = { project_id: string; invite_link_id: string };
+        const defaults = await import("../export-chat/defaultEphorProjects.json");
+        const entries: Array<[string, DefaultProj]> = Object.entries(defaults.default || defaults as any);
+
+        // fetch joined projects via cookie
+        let joinedIds = new Set<string>();
+        try {
+            const remote = await state.client.listProjects();
+            const items: any[] = Array.isArray(remote) ? remote : (remote?.items ?? remote?.data ?? []);
+            joinedIds = new Set(items.map((p: any) => String(p.project_id ?? p.id ?? p.uuid)));
+            try { log("RESPONSE (projects cookie)", `${items.length} items`); } catch {}
+        } catch {}
+
+        const listDiv = dlg.querySelector<HTMLDivElement>("#kh-browse-proj-list")!;
+        const details = dlg.querySelector<HTMLDivElement>("#kh-browse-proj-details")!;
+
+        const render = () => {
+            listDiv.textContent = "";
+            for (const [name, rec] of entries.sort((a,b)=>a[0].localeCompare(b[0]))) {
+                const has = joinedIds.has(rec.project_id);
+                const row = document.createElement("div");
+                row.style.cssText = "display:flex;align-items:center;gap:8px;padding:4px;border:1px solid #ddd;border-radius:6px";
+                if (!has) row.style.opacity = ".5";
+                const lab = document.createElement("span"); lab.textContent = name; lab.style.flex = "1";
+                const btn = document.createElement("button"); btn.className = "kh-btn";
+                btn.textContent = has ? "Joined" : "Join";
+                btn.disabled = has;
+                if (!has) btn.classList.add("kh-btn-primary");
+                btn.addEventListener("click", async (ev) => {
+                    ev.stopPropagation();
+                    btn.disabled = true; btn.textContent = "Joining…";
+                    try { log("REQUEST", `Join by invite ${rec.invite_link_id} → ${rec.project_id}`); } catch {}
+                    const resp = await new Promise<{ ok: boolean; joined?: boolean; error?: any }>(r =>
+                        chrome.runtime.sendMessage({ action: 'ephor.joinByInvite', inviteId: rec.invite_link_id, projectId: rec.project_id }, r));
+                    if (resp?.ok && resp.joined) {
+                        joinedIds.add(rec.project_id);
+                        btn.textContent = "Joined"; btn.classList.remove("kh-btn-primary"); btn.disabled = false;
+                        // refresh projects list in main modal so Project list updates
+                        void refreshProjects(state, refs, log);
+                        try { log("RESPONSE (join)", `Joined ${rec.project_id}`); } catch {}
+                    } else {
+                        btn.textContent = "Join"; btn.disabled = false;
+                        alert("Could not join project – sign in to ephor.ai and try again.");
+                        try { log("ERROR join", String(resp?.error || "unknown")); } catch {}
+                    }
+                });
+                row.appendChild(lab);
+                row.appendChild(btn);
+                row.addEventListener("click", () => {
+                    details.innerHTML = `<div>Name: ${name}</div><div>Project: ${rec.project_id}</div><div>Invite: ${rec.invite_link_id}</div>`;
+                });
+                listDiv.appendChild(row);
+            }
+        };
+        render();
+    });
 
     refs.newChatBtn.addEventListener("click", async () => {
         if (!store.selectedProjectId) { openMessageDialog("New Chat", "Select a project first."); return; }
@@ -1420,7 +1505,10 @@ export async function openEphorSettingsModal(
             const idx = (store.savedInstructions ?? []).findIndex(x => x.id === currentId);
             if (idx === -1) return;
             store.savedInstructions![idx].name = nameInp.value.trim();
-            void saveEphorStore(store).then(() => rebuildList());
+            void saveEphorStore(store).then(() => {
+                rebuildList();
+                try { document.dispatchEvent(new CustomEvent("savedInstructionsChanged")); } catch {}
+            });
         });
 
         bodyTa.addEventListener("input", () => {
@@ -1448,6 +1536,9 @@ export async function openEphorSettingsModal(
     }
 
     refs.instrGearBtn?.addEventListener("click", () => openSavedInstructionsModal());
+    // Live updates when instruction names/bodies change
+    const onSavedInstrChanged = () => rebuildSavedInstructionButtons();
+    document.addEventListener("savedInstructionsChanged", onSavedInstrChanged);
     rebuildSavedInstructionButtons();
 
     /* ------------------------------------------------------------------ *
@@ -1474,7 +1565,7 @@ export async function openEphorSettingsModal(
     /* ------------------------------------------------------------------ *
      * AI Selections (presets)                                            *
      * ------------------------------------------------------------------ */
-    function applyAiSelection(models: string[]): void {
+    function applyAiSelection(models: string[], selName?: string): void {
         const avail = new Set(state.availableModels.map(x => x.toLowerCase()));
         const sanitized = (models || []).filter(m => avail.has(String(m).toLowerCase()));
         if (useWorkflow) {
@@ -1490,7 +1581,7 @@ export async function openEphorSettingsModal(
         try {
             const note = (document.getElementById("kh-model-saved-note") as HTMLSpanElement | null);
             if (note && sanitized.length) {
-                note.textContent = sanitized.join(", ");
+                note.textContent = selName ? `Loaded ${selName}` : "Loaded selection";
                 note.style.color = "hsl(217.86deg 45% 56%)";
                 note.style.display = "inline";
                 note.style.transition = "opacity .4s ease";
@@ -1498,7 +1589,7 @@ export async function openEphorSettingsModal(
                 window.setTimeout(() => { note.style.opacity = "0"; }, 2400);
                 window.setTimeout(() => { note.style.display = "none"; note.textContent = ""; note.style.opacity = "1"; }, 3000);
             }
-            log("UI", `Applied AI selection (${sanitized.length} models)`);
+            log("UI", `Applied AI selection${selName ? ` '${selName}'` : ""} (${sanitized.length} models)`);
         } catch {}
     }
 
@@ -1511,7 +1602,7 @@ export async function openEphorSettingsModal(
             btn.className = "kh-ph-btn";
             btn.textContent = sel.name || "Selection";
             btn.title = `${sel.name || "Selection"} — ${sel.models.length} models`;
-            btn.addEventListener("click", () => applyAiSelection(sel.models));
+            btn.addEventListener("click", () => applyAiSelection(sel.models, sel.name));
             refs.aiSelRow.appendChild(btn);
         }
         // Always keep gear enabled
