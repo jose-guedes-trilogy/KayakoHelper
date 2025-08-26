@@ -5,12 +5,50 @@ import {
 import { currentConvId } from '@/utils/location.js';
 import { DEFAULT_PROVIDERS, EPHOR_DEFAULT_URLS } from './defaultProviders.ts';
 import { PH } from './constants.ts';
+import { loadEphorStore } from '@/modules/kayako/buttons/ephor/ephorStore.ts';
 
 /** Placeholder replacement */
 export const fillPrompt = (tpl: string, transcript: string): string =>
     tpl.replaceAll(PH.TRANSCRIPT, transcript)
         .replaceAll(PH.URL, location.href)
         .replaceAll(PH.ID,  currentConvId() ?? '');
+
+/** Shared placeholder replacement (URL/ID + Ephor system + canned). */
+export async function fillPromptShared(tpl: string, transcript: string): Promise<string> {
+    try {
+        const base = fillPrompt(tpl, transcript)
+            // also accept Ephor-style marker for transcript
+            .replace(/@#\s*TRANSCRIPT\s*#@/gi, transcript)
+            .replace(/{{\s*TRANSCRIPT\s*}}/gi, transcript)
+            .replace(/@#\s*URL\s*#@/gi, location.href)
+            .replace(/@#\s*ID\s*#@/gi, currentConvId() ?? '');
+
+        const ephor = await loadEphorStore();
+        let out = base;
+
+        // System placeholder bodies
+        const sys = ephor.systemPromptBodies || { fileAnalysis: '', pastTickets: '', styleGuide: '' };
+        out = out
+            .replace(/@#\s*FILE_ANALYSIS\s*#@/gi, sys.fileAnalysis || '')
+            .replace(/@#\s*PAST_TICKETS\s*#@/gi, sys.pastTickets  || '')
+            .replace(/@#\s*STYLE_GUIDE\s*#@/gi, sys.styleGuide   || '');
+
+        // User-defined canned placeholders
+        const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        for (const cp of ephor.cannedPrompts || []) {
+            if (!cp?.placeholder) continue;
+            try {
+                const re = new RegExp(esc(cp.placeholder), 'g');
+                out = out.replace(re, cp.body ?? '');
+            } catch {/* ignore malformed */}
+        }
+
+        return out;
+    } catch (err) {
+        console.warn('[exportChat] fillPromptShared fell back to basic replacement', err);
+        return fillPrompt(tpl, transcript);
+    }
+}
 
 /** First-run bootstrap */
 export async function ensureDefaultProviders(store: Store): Promise<void> {

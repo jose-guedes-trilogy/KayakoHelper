@@ -35,6 +35,26 @@
         .kh-btn-primary { background:#2e73e9; color:#fff; border-color:#2e73e9; }
         .kh-btn-primary:hover { background:#255ecd; color:#fff; }
 
+        /* Checkboxes (subtle 3D) */
+        input[type="checkbox"]{
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width:14px; height:14px; vertical-align:middle;
+            border:1px solid var(--kh-input-border);
+            border-radius:3px; background:#fff;
+            box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04);
+            position: relative; cursor: pointer;
+        }
+        input[type="checkbox"]:hover{ background:#f9fbff; border-color:#adc1e3; }
+        input[type="checkbox"]:active{ box-shadow: 0 1px 1px rgba(0,0,0,.03); }
+        input[type="checkbox"]:focus-visible{ outline:none; box-shadow:0 0 0 2px rgba(46,115,233,.25); }
+        input[type="checkbox"]:checked{ border-color: hsl(217.86deg 73.66% 70.67%); background: linear-gradient(180deg, #e9f1ff, #dfeaff); }
+        input[type="checkbox"]:checked::after{
+            content:""; position:absolute; left:3px; top:1px; width:6px; height:9px;
+            border-right:2px solid #2e73e9; border-bottom:2px solid #2e73e9; transform: rotate(45deg);border-color: hsl(217.86deg 66% 54.71%);
+        }
+
         /* Inputs */
         input[type="text"], input[type="search"], input[type="number"], input[type="color"], textarea {
             border:1px solid var(--kh-input-border);

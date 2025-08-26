@@ -8,6 +8,8 @@ import {
     EPHOR_PROJECT_INVITES,
 } from './defaultProviders.ts';
 import {saveStore, Store, UrlEntry} from "@/utils/providerStore.ts";
+import { openCannedPromptModal } from "@/modules/kayako/buttons/ephor/ephorCannedPromptModal.ts";
+import { loadEphorStore } from "@/modules/kayako/buttons/ephor/ephorStore.ts";
 
 // ── Inline Add URL row selectors (module scope) ───────────────────────────
 const NEW_LABEL_SEL = '.kh-exp-new-label';
@@ -56,8 +58,11 @@ export function openSettingsModal(store: Store): void {
           .kh-btn{padding:4px 12px;border:1px solid #c9ced6;border-radius:4px;background:#fff;
                   cursor:pointer;font:inherit;display:inline-flex;align-items:center;gap:4px;box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04);}
           .kh-btn:hover{background:#f5f7ff;border-color:#8aa4e6;}
+          .kh-btn:active{transform:translateY(1px); box-shadow:0 1px 1px rgba(0,0,0,.03);}  
+          .kh-btn[disabled]{opacity:.5; pointer-events:none;}
           .kh-btn-primary{background:#2e73e9;color:#fff;border:none;border-radius:4px;box-shadow: 0 1px 1px rgba(0,0,0,.06), 0 2px 3px rgba(0,0,0,.05);}
           .kh-btn-primary:hover{background:#255ecd;color:#fff;}
+          .kh-btn-primary:active{transform:translateY(1px); box-shadow:0 1px 1px rgba(0,0,0,.04);}  
 
           /* ---------- inputs ---------- */
           .kh-exp-input{border:1px solid #c9ced6;border-radius:4px;padding:6px 8px;font:inherit;background:#fff;}
@@ -66,7 +71,11 @@ export function openSettingsModal(store: Store): void {
           .kh-exp-provider-head{display:flex;align-items:center;gap:8px;}
 
           /* Outermost provider wrapper with rounder borders (desaturated bg) */
-          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{border:1px solid #e5e7f2;border-radius:12px;padding:10px;margin:10px 0;background:#fafafa;}
+          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{border:1px solid #e5e7f2;border-radius:12px;padding:10px;margin:10px 0;background:#fafafa; transition:background .12s ease, border-color .12s ease, box-shadow .12s ease;}
+          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}:hover{background:#f5f7ff; border-color:#adc1e3; box-shadow:0 1px 2px rgba(0,0,0,.04);}  
+          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}.kh-dragging{opacity:.85; background:#eef4ff; border-color:#88a5da;}
+          .kh-exp-provider-head{cursor:grab;}
+          .kh-exp-provider-head:active{cursor:grabbing;}
 
           /* Grouped URL fields */
           .kh-exp-group{background:hsl(210 8% 99% / 1);border:1px solid #e8ebf2;border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;}
@@ -75,7 +84,10 @@ export function openSettingsModal(store: Store): void {
 
           /* Radio group layout */
           .${EXTENSION_SELECTORS.exportUrlMode.slice(1)}{display:flex;align-items:center;gap:8px;font-size:11px;}
-          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label{display:flex;align-items:center;gap:4px;}
+          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label{display:flex;align-items:center;gap:4px; padding:2px 6px; border-radius:4px; cursor:pointer; transition:background .12s ease, border-color .12s ease;}
+          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label:hover{background:#f5f7ff;}
+          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label:has(input:checked){background:hsl(216 20% 98% / 1); border:1px solid #adc1e3;}
+          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} input{position:relative; top:2px; margin-right:2px;}
 
           /* Content container spacing */
           ${EXTENSION_SELECTORS.exportSettingsContent}{margin-top:8px;}
@@ -91,6 +103,23 @@ export function openSettingsModal(store: Store): void {
           /* Search */
           .kh-exp-search { display:flex; gap:6px; align-items:center; margin:8px 0; }
           .kh-exp-search input { flex:1 1 auto; min-width:200px; }
+
+          /* Modal base typography to match Ephor */
+          ${EXTENSION_SELECTORS.exportSettingsModal}{ font-family: system-ui; font-size: 13px; contain:inline-size; }
+
+          /* URL list styling – match Ephor lists */
+          ${EXTENSION_SELECTORS.exportUrlList}{ border:1px solid #ddd; border-radius:4px; padding:4px; background:#fff; overflow-y:auto; }
+          ${EXTENSION_SELECTORS.exportUrlList} > * { border:1px solid transparent; border-radius:6px; }
+          ${EXTENSION_SELECTORS.exportUrlList} > *:nth-child(odd){ background: hsl(213 66% 98% / 1); }
+          ${EXTENSION_SELECTORS.exportUrlList} > *:nth-child(even){ background: hsl(213 54% 94% / 1); }
+          ${EXTENSION_SELECTORS.exportUrlList} ${EXTENSION_SELECTORS.exportLinkItem}:hover{ background:#f5f7ff; border-color:#adc1e3; }
+          ${EXTENSION_SELECTORS.exportLinkItemActive}, ${EXTENSION_SELECTORS.exportLinkItem}.active{ background:hsl(216 20% 98% / 1) !important; color:#454545; border-color:hsl(216 69% 77% / 1) !important; box-shadow:0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04); }
+          ${EXTENSION_SELECTORS.exportLinkItem}{ transition: background .12s ease, border-color .12s ease, box-shadow .12s ease; }
+
+          /* Deletion links and minor actions */
+          ${EXTENSION_SELECTORS.exportDelUrlBtn}{ color:#b11; cursor:pointer; }
+          ${EXTENSION_SELECTORS.exportDelUrlBtn}:hover{ color:#900; text-decoration:underline; }
+          ${EXTENSION_SELECTORS.exportDelUrlBtn}:active{ color:#700; }
         </style>
         <div class="kh-exp-header" style="display:flex;align-items:center;gap:12px;">
           <h2 style="margin:0;font-size:16px;">Export chat – settings</h2>
@@ -111,7 +140,9 @@ export function openSettingsModal(store: Store): void {
 
         <div id="${EXTENSION_SELECTORS.exportSettingsContent.slice(1)}" style="flex:1 1 auto; min-height:0; overflow:auto;"></div>
 
-        <div class="kh-exp-footer" style="margin-top:16px;text-align:right;">
+        <div class="kh-exp-footer" style="margin-top:16px;display:flex;align-items:center;gap:8px;">
+          <button class="kh-btn ${EXTENSION_SELECTORS.exportCannedBtn.replace(/^\./,'')}" title="Manage placeholders">📑 Placeholders</button>
+          <span style="margin-left:auto"></span>
           <button id="${EXTENSION_SELECTORS.exportAddProviderBtn.slice(1)}" class="kh-btn">➕ Add provider</button>
         </div>
     `;
@@ -239,6 +270,17 @@ export function openSettingsModal(store: Store): void {
             if (!res?.active)
                 modal.querySelector(EXTENSION_SELECTORS.noActiveTabNotice)!.setAttribute('style','');
         });
+
+    /* Placeholders button → open shared manager */
+    modal.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportCannedBtn)?.addEventListener('click', async () => {
+        try {
+            const ephor = await loadEphorStore();
+            openCannedPromptModal(ephor);
+        } catch (e) {
+            console.error('[exportSettings] failed to open Placeholders', e);
+            alert('Could not open Placeholders.');
+        }
+    });
 
     /* expand/collapse controls removed */
 }

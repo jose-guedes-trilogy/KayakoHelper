@@ -161,7 +161,7 @@ export async function openEphorSettingsModal(
     let logCollapsed = true;
     refs.logToggle.addEventListener("click", () => {
         logCollapsed = !logCollapsed;
-        refs.logContainer.style.display = logCollapsed ? "none" : "";
+        refs.logContainer.style.display = logCollapsed ? "none" : "block";
     });
 
     /* ------------------------------------------------------------------ *

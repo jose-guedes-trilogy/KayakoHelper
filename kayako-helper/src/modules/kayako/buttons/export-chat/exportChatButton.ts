@@ -9,7 +9,7 @@ import {
     DEFAULT_INSERTER_PROVIDERS,
 } from './defaultProviders.ts';
 import {
-    fillPrompt, ensureDefaultProviders,
+    fillPromptShared as fillPrompt, ensureDefaultProviders,
     mainDefaultUrl, providerSignature,
     augmentMissingDefaultProviders,
 } from './promptUtils.ts';
@@ -137,7 +137,7 @@ async function performExport(urlEntry: UrlEntry): Promise<void> {
 
     try {
         const transcript = await fetchTranscript(1_000);
-        const prompt     = fillPrompt(urlEntry.prompt || BLANK_PROMPT, transcript);
+        const prompt     = await fillPrompt(urlEntry.prompt || BLANK_PROMPT, transcript);
         const mode       = urlEntry.mode ?? 'new-tab';
 
         if (urlEntry.supportsInsertion) {
