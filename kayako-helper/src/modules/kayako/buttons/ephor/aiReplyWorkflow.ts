@@ -10,6 +10,7 @@ import { EphorClient } from "@/background/ephorClient.ts";
 import { EphorStore, saveEphorStore, CannedPrompt } from "./ephorStore.ts";
 import { Logger } from "@/background/ephor-client/logger.ts";
 import { currentKayakoTicketId } from "@/utils/kayakoIds.ts";
+import { fetchTranscript } from "@/utils/api.js";
 
 /* ---------- timing / retry ---------- */
 const TIMEOUT_MS = 180_000; // 3 minutes
@@ -301,6 +302,21 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
     const tell = (m: string) => opts.onStatus?.(m);
     await client.ready();
 
+    // Expand placeholders for single-shot sends as well (TRANSCRIPT, PRV_RD_OUTPUT, canned, RD_n_*)
+    // Use last saved outputs for the current pseudo-stage as "previous round" context.
+    try {
+        const pseudoStageId = opts.persistStageId || "__single__";
+        const prev = store.lastOutputs?.[pseudoStageId];
+        const rounds = prev ? [prev] : [];
+        const transcript = await fetchTranscript(1000).catch(() => "");
+        const expanded = applyPlaceholders(prompt, transcript || "", rounds, store.cannedPrompts ?? []);
+        if (expanded !== prompt) tell("Expanded placeholders in prompt");
+        // overwrite prompt for remainder of function
+        (opts as any).prompt = expanded;
+    } catch {
+        // non-fatal; fall back to original prompt
+    }
+
     /* ── NEW: prepend per-ticket **per-stage** custom instructions.
      * Primary key: `${projectId}::${ticketId}::${stageId}`
      * Fallback (back-compat): `${projectId}::${ticketId}`
@@ -314,7 +330,7 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
         ? (store.customInstructionsByContext?.[ticketKey] ?? (stageKey && store.customInstructionsByStage?.[stageKey]) ?? "")
         : ((stageKey && store.customInstructionsByStage?.[stageKey]) ?? (store.customInstructionsByContext?.[ticketKey]) ?? "");
     const trimmed = prepend.trim();
-    const finalPrompt = trimmed ? `${trimmed}\n\n${prompt}` : prompt;
+    const finalPrompt = trimmed ? `${trimmed}\n\n${opts.prompt}` : opts.prompt;
     // NOTE: We also pass `custom_instructions` in Stream payload for servers that support it.
     const customInstructions = trimmed;
 

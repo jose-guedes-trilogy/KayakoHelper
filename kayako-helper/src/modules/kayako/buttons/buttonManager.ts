@@ -388,11 +388,23 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
             if (!right) {
                 right = createHeaderBtn(RIGHT_ID, sCfg.rightLabel, header);
                 right.classList.add(EXTENSION_SELECTORS.twoPartBtnRightHalf.slice(1));
+                // Anchor dropdown to the right-half, and render a chevron similar to Export Chat
+                right.style.position = 'relative';
+                right.innerHTML = `<div class="${EXTENSION_SELECTORS.twoPartBtnChevron.replace(/^./,'')}">${sCfg.rightLabel}</div>`;
                 wrap.appendChild(right);
 
                 const menu = document.createElement('div');
-                menu.className = EXTENSION_SELECTORS.twoPartBtnDropdownSub.slice(1);
+                menu.className = EXTENSION_SELECTORS.twoPartBtnDropdown.slice(1);
                 menu.style.display = 'none';
+                // Position so that dropdown opens upwards, and its left edge aligns
+                // with the right edge of the right-half button
+                Object.assign(menu.style, {
+                    position: 'absolute',
+                    left: '100%',
+                    bottom: '100%',
+                    top: 'auto',
+                    right: 'auto',
+                } as Partial<CSSStyleDeclaration>);
                 right.appendChild(menu);
 
                 let hideTo: number|null = null;
@@ -402,7 +414,9 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                 const toggle = () => {
                     if (hideTo) { clearTimeout(hideTo); hideTo = null; }
                     const visible = menu.style.display !== 'none';
-                    menu.style.display = visible ? 'none' : 'flex';
+                    const next = visible ? 'none' : 'flex';
+                    console.info('[KH][HeaderSplit] right-half toggle', { visible: !visible });
+                    menu.style.display = next;
                 };
 
                 right.addEventListener('mouseenter',show);
@@ -414,7 +428,7 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
 
             /* rebuild dropdown every cycle */
             const menuDiv = right!.querySelector<HTMLElement>(
-                `.${EXTENSION_SELECTORS.twoPartBtnDropdownSub.replace(/^./,'')}`
+                `.${EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./,'')}`
             )!;
             sCfg.buildMenu(menuDiv);
         });

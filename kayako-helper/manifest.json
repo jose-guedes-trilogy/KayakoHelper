@@ -1,7 +1,7 @@
 {
   "name": "OmniHelper",
   "description": "Every Central Support agent's best friend.",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "manifest_version": 3,
 
   "icons": {

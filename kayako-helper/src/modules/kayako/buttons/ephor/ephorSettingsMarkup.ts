@@ -135,6 +135,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
           <div id="kh-ai-sel-toolbar" class="kh-ai-sel-toolbar">
             <div id="kh-ai-sel-row" class="kh-ai-sel-row"></div>
             <span class="kh-flex-spacer"></span>
+            <button id="kh-ai-sel-clear" class="kh-btn" title="Clear selection">🧹 Clear</button>
             <button id="kh-ai-sel-gear" class="kh-btn" title="AI Selections">⚙️</button>
           </div>
         </div>

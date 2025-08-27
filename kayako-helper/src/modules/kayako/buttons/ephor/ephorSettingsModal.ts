@@ -1641,6 +1641,12 @@ export async function openEphorSettingsModal(
             isCollapsed = !isCollapsed; update();
             try { log("UI", `${titleSel} collapsed → ${isCollapsed}`); } catch {}
         });
+        collapsed.addEventListener("click", () => {
+            if (isCollapsed) {
+                isCollapsed = false; update();
+                try { log("UI", `${titleSel} expanded via collapsed note`); } catch {}
+            }
+        });
         update();
     }
     wireSingleCollapse("#kh-title-instr", "#kh-instr-body", "#kh-instr-collapsed");
@@ -1656,7 +1662,9 @@ export async function openEphorSettingsModal(
         const apply = () => {
             const on = cbx.checked;
             section.style.display = on ? "" : "none";
-            leftToolbar.style.display = on ? "" : "none";
+            // Keep Send controls aligned left; only hide left toolbar content
+            leftToolbar.style.visibility = on ? "visible" : "hidden";
+            leftToolbar.style.display = ""; // keep node in flow
             // Hide the collapsed-note when excluded entirely; otherwise preserve its state
             if (!on) collapsedNote.style.display = "none";
             try { log("UI", `Include Default Instructions → ${on}`); } catch {}
@@ -1710,6 +1718,27 @@ export async function openEphorSettingsModal(
         }
         // Always keep gear enabled
         if (refs.aiSelGearBtn) refs.aiSelGearBtn.disabled = false;
+
+        // Wire Clear selection button
+        try {
+            const btn = (modal.querySelector("#kh-ai-sel-clear") as HTMLButtonElement | null) || null;
+            if (btn) {
+                btn.onclick = null as any;
+                btn.addEventListener("click", () => {
+                    if (useWorkflow) {
+                        const stg = store.workflowStages.find(x => x.id === currentStageId);
+                        if (stg) stg.selectedModels = [];
+                    } else {
+                        store.selectedModels = [];
+                    }
+                    void saveEphorStore(store);
+                    rebuildModelList(state, refs, refs.modelSearchInp.value, useWorkflow ? store.workflowStages.find(x => x.id === currentStageId)! : null);
+                    rebuildOutputTabs();
+                    updateWorkflowDirtyIndicator();
+                    try { log("UI", "AI selection cleared"); } catch {}
+                });
+            }
+        } catch {}
 
         // Do not persist the selection note; leave it ephemeral only on click
         try {

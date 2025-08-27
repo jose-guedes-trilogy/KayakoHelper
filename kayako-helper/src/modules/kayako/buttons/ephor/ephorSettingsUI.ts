@@ -44,6 +44,7 @@ export interface ModalRefs {
     /* NEW ▸ AI selections toolbar */
     aiSelRow: HTMLDivElement;
     aiSelGearBtn: HTMLButtonElement;
+    aiSelClearBtn?: HTMLButtonElement;
 
     /* NEW ▸ workflows row */
     wfSelect: HTMLSelectElement;
@@ -151,6 +152,14 @@ export function createSettingsModal() {
         // left stays as-is (free to cross viewport)
     });
 
+    // Convert center position to fixed-top on mount to avoid tab height reflow jumps
+    try {
+        const rect = modal.getBoundingClientRect();
+        modal.style.transform = "none";
+        modal.style.left = `${rect.left}px`;
+        modal.style.top = `${Math.max(8, rect.top)}px`;
+    } catch {}
+
     const $ = <T extends HTMLElement>(q: string) => modal.querySelector<T>(q)!;
 
     /* ---------- refs ---------- */
@@ -196,6 +205,7 @@ export function createSettingsModal() {
         /* NEW ▸ AI selections toolbar */
         aiSelRow: $("#kh-ai-sel-row"),
         aiSelGearBtn: $("#kh-ai-sel-gear") as HTMLButtonElement,
+        aiSelClearBtn: $("#kh-ai-sel-clear") as HTMLButtonElement,
 
         /* NEW ▸ workflows row */
         wfSelect: $("#kh-workflow-select") as HTMLSelectElement,

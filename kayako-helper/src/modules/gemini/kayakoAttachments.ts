@@ -23,6 +23,11 @@ export function bootKayakoAttachments(): void {
     // …and watch for new blocks (lazy-load via scroll)
     const observer = new MutationObserver(throttle(enhanceAll, 300));
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Cleanup on navigation/unload to avoid observers firing post-dispose
+    const teardown = () => { try { observer.disconnect(); } catch {} };
+    window.addEventListener('pagehide', teardown, { once: true });
+    window.addEventListener('beforeunload', teardown, { once: true });
 }
 
 /** Scan the DOM and insert a helper link next to each “Download all” */
@@ -55,6 +60,8 @@ function insertHelper(downloadAnchor: HTMLAnchorElement): void {
     downloadAnchor.parentElement!.appendChild(helper);
 }
 
+import { requestMessageSafe } from '@/utils/sendMessageSafe';
+
 /** When clicked, only update the helper’s text—not the Download all link */
 async function handleClick(
     helper: HTMLAnchorElement,
@@ -68,15 +75,13 @@ async function handleClick(
 
     helper.textContent = 'Working…';
     try {
-        const resp = await chrome.runtime.sendMessage({
-            action:   'attachments.fetchZip',
-            url:      zipUrl,
-            ticketId,
-        });
-        if (resp.ok) {
-            helper.textContent = `Sent ✔ (${resp.fileCount})`;
+        const resp = await requestMessageSafe<{ action:string; url:string; ticketId:string }, { ok:boolean; fileCount:number; error?:string }>(
+            { action: 'attachments.fetchZip', url: zipUrl, ticketId }, 'kayakoAttachments.fetchZip', { timeoutMs: 15000 },
+        );
+        if (resp && (resp as any).ok) {
+            helper.textContent = `Sent ✔ (${(resp as any).fileCount})`;
         } else {
-            throw new Error(resp.error);
+            throw new Error((resp as any)?.error || 'background error');
         }
     } catch (err) {
         console.error(err);

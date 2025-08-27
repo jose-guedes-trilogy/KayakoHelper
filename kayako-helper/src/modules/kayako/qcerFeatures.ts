@@ -67,14 +67,17 @@ function addQcButton(post: HTMLElement): void {
         qcBtn.className = `${nativeClass} ${CL_QC_BTN}`.trim();
         qcBtn.setAttribute('role', 'button');
         qcBtn.setAttribute('aria-label', 'Extract PR to reply');
-        qcBtn.innerHTML = '<strong>QC</strong>';
+        qcBtn.setAttribute('title', 'Extract PR to reply');
+        qcBtn.innerHTML = '<strong>✔️</strong>';
+        qcBtn.style.opacity = '0.65';
         qcBtn.addEventListener('click', async e => {
             e.stopPropagation();
             await onQcClick(post);
         });
 
-        // Place as first item (far left)
+        // Place in menu but hide; PR-local toolbar will proxy its click
         feedMenu.insertBefore(qcBtn, feedMenu.firstElementChild);
+        qcBtn.style.display = 'none';
 
         // Mark this post as processed for QC button
         post.dataset[FLAG] = 'yes';
@@ -209,8 +212,8 @@ function extractProposedResponse(text: string): string | null {
     }
 
     // Trim leading/trailing empty lines from collected
-    while (collected.length && collected[0].trim() === '') collected.shift();
-    while (collected.length && collected[collected.length - 1].trim() === '') collected.pop();
+    while (collected.length > 0 && (collected[0] || '').trim() === '') collected.shift();
+    while (collected.length > 0 && (collected[collected.length - 1] || '').trim() === '') collected.pop();
 
     const result = collected.join('\n').trim();
     return result.length ? result : null;

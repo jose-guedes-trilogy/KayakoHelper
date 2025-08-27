@@ -10,6 +10,7 @@ import {
 import {saveStore, Store, UrlEntry} from "@/utils/providerStore.ts";
 import { openCannedPromptModal } from "@/modules/kayako/buttons/ephor/ephorCannedPromptModal.ts";
 import { loadEphorStore } from "@/modules/kayako/buttons/ephor/ephorStore.ts";
+import { requestMessageSafe } from '@/utils/sendMessageSafe';
 
 // ── Inline Add URL row selectors (module scope) ───────────────────────────
 const NEW_LABEL_SEL = '.kh-exp-new-label';
@@ -41,7 +42,7 @@ export function openSettingsModal(store: Store): void {
     modal.style.boxShadow = '0 6px 24px rgba(17,24,39,.12)';
     modal.style.display = 'flex';
     modal.style.flexDirection = 'column';
-    modal.style.zIndex = '2147483647';
+    modal.style.zIndex = '10002';
     modal.style.visibility = 'hidden';
     // Fixed selectors for the inline Add URL row (do not depend on generated types)
     // const NEW_LABEL_SEL = '.kh-exp-new-label';
@@ -54,25 +55,33 @@ export function openSettingsModal(store: Store): void {
 
     modal.innerHTML = /* html */`
         <style>
+          /* ---------- variables (match Ephor) ---------- */
+          ${EXTENSION_SELECTORS.exportSettingsModal}{
+            --kh-input-border: hsl(213deg 15% 84%);
+            --kh-input-shadow: inset 0 0 4px 0 hsla(0,0%,0%,0.0325), inset 0 0 2px 0 hsla(0,0%,0%,0.0805), inset 0 0 1px 0 hsla(0,0%,0%,0.089);
+            --kh-input-bg: #fff;
+          }
           /* ---------- buttons (Ephor-like) ---------- */
           .kh-btn{padding:4px 12px;border:1px solid #c9ced6;border-radius:4px;background:#fff;
                   cursor:pointer;font:inherit;display:inline-flex;align-items:center;gap:4px;box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04);}
           .kh-btn:hover{background:#f5f7ff;border-color:#8aa4e6;}
           .kh-btn:active{transform:translateY(1px); box-shadow:0 1px 1px rgba(0,0,0,.03);}  
           .kh-btn[disabled]{opacity:.5; pointer-events:none;}
-          .kh-btn-primary{background:#2e73e9;color:#fff;border:none;border-radius:4px;box-shadow: 0 1px 1px rgba(0,0,0,.06), 0 2px 3px rgba(0,0,0,.05);}
-          .kh-btn-primary:hover{background:#255ecd;color:#fff;}
-          .kh-btn-primary:active{transform:translateY(1px); box-shadow:0 1px 1px rgba(0,0,0,.04);}  
+          .kh-btn-primary{background: linear-gradient(180deg, #3d82f2, #2e73e9); color:#fff; border:none; border-radius:4px; box-shadow: 0 2px 4px rgba(0,0,0,.12), 0 1px 0 rgba(255,255,255,.25) inset, 0 0 0 1px rgba(0,0,0,.02);}  
+          .kh-btn-primary:hover{background: linear-gradient(180deg, #3576e4, #255ecd); color:#fff;}
+          .kh-btn-primary:active{transform:translateY(1px); box-shadow:0 1px 2px rgba(0,0,0,.10), 0 1px 0 rgba(255,255,255,.2) inset;}  
+
+          /* Close button look (match Ephor) */
+          .kh-exp-close-btn{ padding:4px 8px; font-weight:600; color:#555; }
 
           /* ---------- inputs ---------- */
-          .kh-exp-input{border:1px solid #c9ced6;border-radius:4px;padding:6px 8px;font:inherit;background:#fff;}
+          .kh-exp-input{border:1px solid var(--kh-input-border);border-radius:4px;padding:6px 8px;font:inherit;background:var(--kh-input-bg); box-shadow: var(--kh-input-shadow);}
           .kh-exp-input:focus{outline:none;border-color:#8aa4e6;box-shadow:0 0 0 2px rgba(46,115,233,.15)}
           .kh-exp-url-row{background:hsl(210 10% 98% / 1);padding:6px 8px;border:1px solid #e5e7f2;border-radius:8px;}
           .kh-exp-provider-head{display:flex;align-items:center;gap:8px;}
 
           /* Outermost provider wrapper with rounder borders (desaturated bg) */
-          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{border:1px solid #e5e7f2;border-radius:12px;padding:10px;margin:10px 0;background:#fafafa; transition:background .12s ease, border-color .12s ease, box-shadow .12s ease;}
-          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}:hover{background:#f5f7ff; border-color:#adc1e3; box-shadow:0 1px 2px rgba(0,0,0,.04);}  
+          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{border:1px solid #e5e7f2;border-radius:12px;padding:10px;margin:10px 0;background:#fafafa;}
           .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}.kh-dragging{opacity:.85; background:#eef4ff; border-color:#88a5da;}
           .kh-exp-provider-head{cursor:grab;}
           .kh-exp-provider-head:active{cursor:grabbing;}
@@ -84,13 +93,16 @@ export function openSettingsModal(store: Store): void {
 
           /* Radio group layout */
           .${EXTENSION_SELECTORS.exportUrlMode.slice(1)}{display:flex;align-items:center;gap:8px;font-size:11px;}
-          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label{display:flex;align-items:center;gap:4px; padding:2px 6px; border-radius:4px; cursor:pointer; transition:background .12s ease, border-color .12s ease;}
+          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label{display:flex;align-items:center;gap:6px; padding:2px 8px; border-radius:4px; cursor:pointer; transition:background .12s ease, border-color .12s ease;}
           .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label:hover{background:#f5f7ff;}
           .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} > label:has(input:checked){background:hsl(216 20% 98% / 1); border:1px solid #adc1e3;}
-          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} input{position:relative; top:2px; margin-right:2px;}
+          .${EXTENSION_SELECTORS.exportUrlMode.slice(1)} input{margin:0 2px 0 0;}
 
           /* Content container spacing */
           ${EXTENSION_SELECTORS.exportSettingsContent}{margin-top:8px;}
+          /* Snap scrolling to one provider at a time */
+          ${EXTENSION_SELECTORS.exportSettingsContent}{ scroll-snap-type: y mandatory; }
+          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{ scroll-snap-align: start; scroll-snap-stop: always; }
           /* Accordion */
           .kh-accordion { border-top:1px solid #e5e7f2; margin-top:8px; }
           .kh-acc-item { border-bottom:1px solid #e5e7f2; }
@@ -107,6 +119,18 @@ export function openSettingsModal(store: Store): void {
           /* Modal base typography to match Ephor */
           ${EXTENSION_SELECTORS.exportSettingsModal}{ font-family: system-ui; font-size: 13px; contain:inline-size; }
 
+          /* Checkboxes (subtle 3D like Ephor) */
+          ${EXTENSION_SELECTORS.exportSettingsModal} input[type="checkbox"]{
+            -webkit-appearance: none; -moz-appearance: none; appearance: none; width:14px; height:14px; vertical-align:middle;
+            border:1px solid var(--kh-input-border); border-radius:3px; background:#fff;
+            box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04); position: relative; cursor: pointer;
+          }
+          ${EXTENSION_SELECTORS.exportSettingsModal} input[type="checkbox"]:hover{ background:#f9fbff; border-color:#adc1e3; }
+          ${EXTENSION_SELECTORS.exportSettingsModal} input[type="checkbox"]:active{ box-shadow: 0 1px 1px rgba(0,0,0,.03); }
+          ${EXTENSION_SELECTORS.exportSettingsModal} input[type="checkbox"]:focus-visible{ outline:none; box-shadow:0 0 0 2px rgba(46,115,233,.25); }
+          ${EXTENSION_SELECTORS.exportSettingsModal} input[type="checkbox"]:checked{ border-color:#2e73e9; background: linear-gradient(180deg, #e9f1ff, #dfeaff); }
+          ${EXTENSION_SELECTORS.exportSettingsModal} input[type="checkbox"]:checked::after{ content:""; position:absolute; left:3px; top:1px; width:6px; height:9px; border-right:2px solid #2e73e9; border-bottom:2px solid #2e73e9; transform: rotate(45deg); }
+
           /* URL list styling – match Ephor lists */
           ${EXTENSION_SELECTORS.exportUrlList}{ border:1px solid #ddd; border-radius:4px; padding:4px; background:#fff; overflow-y:auto; }
           ${EXTENSION_SELECTORS.exportUrlList} > * { border:1px solid transparent; border-radius:6px; }
@@ -120,6 +144,11 @@ export function openSettingsModal(store: Store): void {
           ${EXTENSION_SELECTORS.exportDelUrlBtn}{ color:#b11; cursor:pointer; }
           ${EXTENSION_SELECTORS.exportDelUrlBtn}:hover{ color:#900; text-decoration:underline; }
           ${EXTENSION_SELECTORS.exportDelUrlBtn}:active{ color:#700; }
+          
+          /* Scrollbars (match Ephor) */
+          ${EXTENSION_SELECTORS.exportSettingsContent}::-webkit-scrollbar { width: 14px; height: 14px; }
+          ${EXTENSION_SELECTORS.exportSettingsContent}::-webkit-scrollbar-thumb { background:#c7cedb; border-radius:10px; border:3px solid #fff; }
+          ${EXTENSION_SELECTORS.exportSettingsContent}::-webkit-scrollbar-track { background:transparent; border-radius:10px; }
         </style>
         <div class="kh-exp-header" style="display:flex;align-items:center;gap:12px;">
           <h2 style="margin:0;font-size:16px;">Export chat – settings</h2>
@@ -205,6 +234,62 @@ export function openSettingsModal(store: Store): void {
     console.info('[exportSettings] opening settings modal – building UI');
     rebuildSettingsUi(modal.querySelector(EXTENSION_SELECTORS.exportSettingsContent)! as HTMLElement, store);
 
+    /* Snap-sizing: fit exactly one provider and discrete scroll between them */
+    (function applySnapSizing(){
+        const content = modal.querySelector<HTMLElement>(EXTENSION_SELECTORS.exportSettingsContent);
+        if (!content) return;
+        const contentEl = content as HTMLElement;
+
+        const getWrappers = (): HTMLElement[] => Array.from(contentEl.querySelectorAll<HTMLElement>(EXTENSION_SELECTORS.exportProviderWrapper));
+
+        const sizeToOne = () => {
+            try {
+                const first = getWrappers()[0];
+                if (!first) return;
+                const rect = first.getBoundingClientRect();
+                const targetHeight = Math.ceil(rect.height);
+                contentEl.style.height = targetHeight + 'px';
+            } catch {}
+        };
+
+        let scrollLock = false;
+        const scrollToIndex = (idx: number) => {
+            const list = getWrappers();
+            if (!list.length) return;
+            const clamped = Math.max(0, Math.min(list.length - 1, idx));
+            const top = list[clamped]!.offsetTop;
+            contentEl.scrollTo({ top, behavior: 'smooth' });
+        };
+        const currentIndex = (): number => {
+            const list = getWrappers();
+            if (!list.length) return 0;
+            let best = 0; let bestDist = Number.POSITIVE_INFINITY;
+            const st = contentEl.scrollTop;
+            for (let i = 0; i < list.length; i++) {
+                const d = Math.abs(list[i]!.offsetTop - st);
+                if (d < bestDist) { bestDist = d; best = i; }
+            }
+            return best;
+        };
+        const onWheel = (e: WheelEvent) => {
+            if (e.ctrlKey) return; // allow zooming
+            e.preventDefault();
+            if (scrollLock) return;
+            scrollLock = true;
+            const dir = e.deltaY > 0 ? 1 : -1;
+            const next = currentIndex() + dir;
+            scrollToIndex(next);
+            setTimeout(() => { scrollLock = false; }, 280);
+        };
+
+        sizeToOne();
+        contentEl.addEventListener('wheel', onWheel, { passive: false });
+        window.addEventListener('resize', sizeToOne);
+        // Recalculate when providers render/update
+        const mo = new MutationObserver(() => requestAnimationFrame(sizeToOne));
+        mo.observe(contentEl, { childList: true, subtree: true });
+    })();
+
     /* add-provider */
     modal.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportAddProviderBtn)!
         .addEventListener('click', () => {
@@ -265,11 +350,15 @@ export function openSettingsModal(store: Store): void {
     window.addEventListener('resize', onWinResize);
 
     /* ask background if an active tab exists → update tiny notice */
-    chrome.runtime.sendMessage({ action: 'exportChat.getStatus' },
-        (res: {active:boolean}) => {
+    (async () => {
+        try {
+            const res = await requestMessageSafe<{action:string}, {active:boolean}>(
+                { action: 'exportChat.getStatus' }, 'exportSettings.getStatus', { timeoutMs: 5000 },
+            );
             if (!res?.active)
                 modal.querySelector(EXTENSION_SELECTORS.noActiveTabNotice)!.setAttribute('style','');
-        });
+        } catch {}
+    })();
 
     /* Placeholders button → open shared manager */
     modal.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportCannedBtn)?.addEventListener('click', async () => {

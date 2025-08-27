@@ -26,6 +26,7 @@ import {
     SplitButtonConfig,
 } from '@/modules/kayako/buttons/buttonManager.ts';
 import { openSettingsModal } from './settingsModal.ts';
+import { requestMessageSafe } from '@/utils/sendMessageSafe';
 
 /* ───────────────────────── state ───────────────────────── */
 let uiState: UiState = 'idle';
@@ -157,6 +158,8 @@ async function performExport(urlEntry: UrlEntry): Promise<void> {
 }
 
 const openViaBg = async (url: string, prompt: string, mode: ExportMode): Promise<void> => {
-    const res = await chrome.runtime.sendMessage({ action:'exportChat.export', url, prompt, mode });
+    const res = await requestMessageSafe<{ action:string; url:string; prompt:string; mode:ExportMode }, string | { ok?: boolean; error?: string }>(
+        { action: 'exportChat.export', url, prompt, mode }, 'exportChat.openViaBg', { timeoutMs: 15000 },
+    );
     if (res !== 'ok') throw new Error(typeof res === 'string' ? res : 'background error');
 };

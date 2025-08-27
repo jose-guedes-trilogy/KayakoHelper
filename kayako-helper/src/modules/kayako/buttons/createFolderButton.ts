@@ -8,6 +8,7 @@ import {
 
 import { currentConvId }       from '@/utils/location.ts';
 import { registerButton }   from '@/modules/kayako/buttons/buttonManager.ts';
+import { sendMessageSafe } from '@/utils/sendMessageSafe';
 
 export function bootCreateFolderButton(): void {
     registerButton({
@@ -21,11 +22,11 @@ export function bootCreateFolderButton(): void {
             const requester = document
                 .querySelector(KAYAKO_SELECTORS.requesterEmail)
                 ?.textContent?.trim();
-            chrome.runtime.sendMessage({
+            sendMessageSafe({
                 action: 'createFolder',
                 ticketId: `${requester} - ${ticketId}`,
                 location: 'V',
-            });
+            }, 'createFolderButton.V');
         },
 
         onContextMenu() {
@@ -34,11 +35,11 @@ export function bootCreateFolderButton(): void {
             const requester = document
                 .querySelector(KAYAKO_SELECTORS.requesterEmail)
                 ?.textContent?.trim();
-            chrome.runtime.sendMessage({
+            sendMessageSafe({
                 action: 'createFolder',
                 ticketId: `${requester} - ${ticketId}`,
                 location: 'DOWNLOADS',
-            });
+            }, 'createFolderButton.DOWNLOADS');
         },
 
         groupId   : EXTENSION_SELECTORS.tabStripCustomButtonAreaGroup1,
