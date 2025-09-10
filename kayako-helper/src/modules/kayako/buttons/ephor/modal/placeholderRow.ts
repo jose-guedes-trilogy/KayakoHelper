@@ -3,6 +3,9 @@
 
 import { EphorStore, saveEphorStore } from "../ephorStore.ts";
 import type { ModalRefs } from "../ephorSettingsUI.ts";
+import { waitForRequesterId, waitForOrganization } from "@/modules/kayako/utils/caseContext.ts";
+import { searchConversationIds, fetchTranscriptByCase, quoteForSearch } from "@/modules/kayako/utils/search.ts";
+import { choiceDialog } from "@/utils/dialog.ts";
 
 /* ------------------------------------------------------------------ */
 /* Public API                                                         */
@@ -12,8 +15,13 @@ import type { ModalRefs } from "../ephorSettingsUI.ts";
 export function attachPlaceholderRowHandler(refs: ModalRefs): void {
     refs.placeholderRow.addEventListener("click", ev => {
         const el = (ev.target as HTMLElement).closest<HTMLElement>("[data-ph]");
-        if (!el?.dataset.ph) return;
-        insertPlaceholder(refs, el.dataset.ph);
+        if (!el) return;
+        const act = (el as HTMLElement).dataset.act || "";
+        if (act === "recentTickets") {
+            void insertRecentTickets(refs);
+            return;
+        }
+        if (el.dataset.ph) insertPlaceholder(refs, el.dataset.ph);
     });
 }
 
@@ -168,4 +176,147 @@ function appendSystemPlaceholders(parent: HTMLElement, store: EphorStore): void 
         createPlainBtn("Past Tickets", "@#PAST_TICKETS#@", parent);
         createPlainBtn("Style Guide", "@#STYLE_GUIDE#@", parent);
     } catch {}
+}
+
+/* ------------------------------------------------------------------ */
+/* Async helper: fetch last 10 by requester and org, insert into TA    */
+/* ------------------------------------------------------------------ */
+async function insertRecentTickets(refs: ModalRefs): Promise<void> {
+    const ta = refs.promptInput;
+    const LIMIT = 10;
+    const POSTS_PER_CASE = 100;
+    let attempts = 0;
+
+    while (true) {
+        attempts++;
+        try {
+            try { console.debug('[KH][RecentTickets] start fetch attempt', { attempts }); } catch {}
+
+            const requesterId = await waitForRequesterId(2000);
+            const org = await waitForOrganization(2000);
+            const orgName = (org?.name || '').trim();
+
+            const results: string[] = [];
+            const notes: string[] = [];
+
+            // Requester branch
+            let requesterOk = false;
+            try {
+                if (!requesterId) throw new Error('Requester ID not available');
+                const q = `requester:${quoteForSearch(String(requesterId))}`;
+                const ids = await searchConversationIds(q, LIMIT, 0);
+                try { console.debug('[KH][RecentTickets] requester ids', ids); } catch {}
+                if (!ids.length) throw new Error('No requester conversations found');
+                const texts = await Promise.all(ids.map(async id => {
+                    const raw = await fetchTranscriptByCase(id, POSTS_PER_CASE);
+                    return raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                }));
+                const section = [
+                    '===== Recent Requester Tickets =====',
+                    ...texts.map((t, i) => `--- [Requester ${i+1}] ---\n${t}`),
+                ].join('\n\n');
+                results.push(section);
+                requesterOk = true;
+            } catch (err: any) {
+                notes.push(`Requester: ${err?.message ?? String(err)}`);
+            }
+
+            // Organization branch
+            let orgOk = false;
+            try {
+                const q = `organization:${quoteForSearch(orgName)}`;
+                const ids = await searchConversationIds(q, LIMIT, 0);
+                try { console.debug('[KH][RecentTickets] org ids', ids); } catch {}
+                if (!ids.length) throw new Error('No organization conversations found');
+                const texts = await Promise.all(ids.map(async id => {
+                    const raw = await fetchTranscriptByCase(id, POSTS_PER_CASE);
+                    return raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                }));
+                const section = [
+                    '===== Recent Organization Tickets =====',
+                    ...texts.map((t, i) => `--- [Org ${i+1}] ---\n${t}`),
+                ].join('\n\n');
+                results.push(section);
+                orgOk = true;
+            } catch (err: any) {
+                notes.push(`Organization: ${err?.message ?? String(err)}`);
+            }
+
+            if (!requesterOk || !orgOk) {
+                const msg = document.createElement('div');
+                msg.style.maxWidth = '560px';
+                msg.innerHTML = `
+                  <p>Fetching recent tickets completed with issues:</p>
+                  <ul style="margin:6px 0 0 18px;">${notes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+                  <p style="margin-top:10px">What would you like to do?</p>`;
+                const choice = await choiceDialog({
+                    title: 'Recent Tickets – Partial Failure',
+                    message: msg,
+                    options: [
+                        { id: 'retry', label: 'Retry' },
+                        { id: 'skip', label: 'Skip stage and continue workflow' },
+                        { id: 'proceed', label: 'Proceed with available data', primary: true },
+                    ],
+                });
+                if (choice === 'retry') { try { console.debug('[KH][RecentTickets] retry chosen'); } catch {}; continue; }
+                if (choice === 'skip') { try { console.warn('[KH][RecentTickets] skip chosen; nothing inserted'); } catch {}; return; }
+                // proceed: fall through to insert whatever we have (may be empty)
+            }
+
+            const text = results.join('\n\n[=========== Next Conversation ===========]\n\n');
+            try {
+                document.dispatchEvent(new CustomEvent('ephorSetPerTicketSystemBody', { detail: { field: 'pastTickets', body: text } }));
+                console.debug('[KH][RecentTickets] saved to per-ticket placeholder', { field: 'pastTickets', length: text.length });
+            } catch {}
+            return;
+        } catch (err: any) {
+            try { console.error('[KH][RecentTickets] fetch failed', err); } catch {}
+            const msg = document.createElement('div');
+            msg.style.maxWidth = '560px';
+            msg.innerHTML = `
+              <p>Fetching recent tickets failed.</p>
+              <p style="white-space:pre-wrap">${escapeHtml(err?.message ?? String(err))}</p>
+              <p>What would you like to do?</p>`;
+            const choice = await choiceDialog({
+                title: 'Recent Tickets – Error',
+                message: msg,
+                options: [
+                    { id: 'retry', label: 'Retry' },
+                    { id: 'skip', label: 'Skip stage and continue workflow' },
+                    { id: 'proceed', label: 'Proceed with the workflow anyway', primary: true },
+                ],
+            });
+            if (choice === 'retry') { continue; }
+            if (choice === 'skip') { try { document.dispatchEvent(new CustomEvent('ephorSkipCurrentStage')); } catch {} return; }
+            // proceed: insert nothing and continue
+            return;
+        }
+    }
+}
+
+function insertLargeText(ta: HTMLTextAreaElement, text: string): void {
+    ta.focus();
+    try {
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        (ta as any).setRangeText ? ta.setRangeText(text, start, end, 'end') : (ta.value = ta.value.slice(0, start) + text + ta.value.slice(end));
+    } catch {
+        try {
+            ta.setSelectionRange(ta.selectionStart, ta.selectionEnd);
+            // eslint-disable-next-line deprecation/deprecation
+            document.execCommand('insertText', false, text);
+        } catch {
+            ta.value += (ta.value ? '\n' : '') + text;
+        }
+    }
+    const pos = ta.value.length;
+    try { ta.setSelectionRange(pos, pos); } catch {}
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function escapeHtml(s: string): string {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }

@@ -1,0 +1,8 @@
+@use '@/generated/_selectors.scss' as sel;
+
+/* When enabled via settings, allow internal notes to expand by unsetting max-width */
+#{sel.$timelineItemNote} {
+  max-width: unset !important;
+}
+
+

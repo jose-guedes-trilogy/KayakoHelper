@@ -6,8 +6,8 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
   <div class="kh-ephor-header">
     <h2>Ephor – Settings & Manual Send</h2>
     <span class="kh-header-actions">
-      <button id="kh-ephor-gear" class="kh-btn" title="Settings">⚙️</button>
-      <button id="kh-ephor-close" class="kh-btn kh-close-button">✕</button>
+      <button id="kh-ephor-gear" class="kh-btn" title="Settings"><span style="font-size:10px">⚙️</span></button>
+      <button id="kh-ephor-close" class="kh-btn kh-close-button"><span style="font-size:10px">✕</span></button>
     </span>
   </div>
 
@@ -54,12 +54,12 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
         <input id="kh-workflow-name" type="text" placeholder="Name…"
         >
         <button id="kh-workflow-name-clear" class="kh-btn" title="Clear name"
-        >×</button>
+        ><span style="font-size:10px">×</span></button>
       </span>
       <span class="kh-wf-actions">
-        <button id="kh-workflow-save" class="kh-btn">💾 Save</button>
-        <button id="kh-workflow-load" class="kh-btn">📥 Load</button>
-        <button id="kh-workflow-delete" class="kh-btn">🗑 Delete</button>
+        <button id="kh-workflow-save" class="kh-btn"><span style="font-size:10px">💾</span> Save</button>
+        <button id="kh-workflow-load" class="kh-btn"><span style="font-size:10px">📥</span> Load</button>
+        <button id="kh-workflow-delete" class="kh-btn"><span style="font-size:10px">🗑</span> Delete</button>
       </span>
     </div>
   </div>
@@ -83,8 +83,8 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
           <input id="kh-ephor-project-search" type="search" placeholder="Search projects…">
           <div id="kh-ephor-project-list"></div>
           <div class="kh-proj-actions">
-            <button id="kh-ephor-browse-projects" class="kh-btn" title="Browse available projects">📚 Browse</button>
-            <button id="kh-ephor-refresh-projects" class="kh-btn">🔄 Refresh Projects</button>
+            <button id="kh-ephor-browse-projects" class="kh-btn" title="Browse available projects"><span style="font-size:10px">📚</span> Browse</button>
+            <button id="kh-ephor-refresh-projects" class="kh-btn"><span style="font-size:10px">🔄</span> Refresh Projects</button>
           </div>
         </div>
         <div id="kh-proj-collapsed" class="kh-collapsed-note">Click to expand</div>
@@ -117,7 +117,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
           <input id="kh-ephor-channel-search" type="search" placeholder="Search chats…">
           <div id="kh-ephor-channel-list"></div>
           <div class="kh-chat-actions">
-            <button id="kh-ephor-new-chat" class="kh-btn">➕ New Chat</button>
+            <button id="kh-ephor-new-chat" class="kh-btn"><span style="font-size:10px">➕</span> New Chat</button>
           </div>
         </div>
         <div id="kh-chat-collapsed" class="kh-collapsed-note">Click to expand</div>
@@ -135,8 +135,8 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
           <div id="kh-ai-sel-toolbar" class="kh-ai-sel-toolbar">
             <div id="kh-ai-sel-row" class="kh-ai-sel-row"></div>
             <span class="kh-flex-spacer"></span>
-            <button id="kh-ai-sel-clear" class="kh-btn" title="Clear selection">🧹 Clear</button>
-            <button id="kh-ai-sel-gear" class="kh-btn" title="AI Selections">⚙️</button>
+            <button id="kh-ai-sel-clear" class="kh-btn" title="Clear selection"><span style="font-size:10px">🧹</span> Clear</button>
+            <button id="kh-ai-sel-gear" class="kh-btn" title="AI Selections"><span style="font-size:10px">⚙️</span></button>
           </div>
         </div>
         <div id="kh-model-collapsed" class="kh-collapsed-note">Click to expand</div>
@@ -166,7 +166,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
       <p id="kh-title-default" class="kh-title kh-title-row">
         <span>5. Default Instructions</span>
         <label class="kh-include-default">
-          <input type="checkbox" id="kh-include-default" checked> Include Default Instructions
+          <input type="checkbox" id="kh-include-default" checked> Include default instructions
         </label>
       </p>
 
@@ -176,10 +176,10 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
           <div class="kh-seg-label"><strong>Insert</strong></div>
           <div class="kh-seg kh-insert-seg">
             <div id="kh-placeholder-row" class="kh-placeholder-row"></div>
-            <button id="kh-add-placeholder" class="kh-btn" title="Add placeholder">➕</button>
+            <button id="kh-add-placeholder" class="kh-btn" title="Add placeholder"><span style="font-size:10px">➕</span></button>
           </div>
           <div class="kh-canned-wrap">
-            <button id="kh-ephor-canned-btn" class="kh-btn">📑 Placeholders</button>
+            <button id="kh-ephor-canned-btn" class="kh-btn"><span style="font-size:10px">📑</span> Placeholders</button>
           </div>
         </div>
 
@@ -193,7 +193,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
       <!-- toolbar (split: left part hidden with default-section; right part always visible) -->
       <div id="kh-ephor-bottom-toolbar" class="kh-bottom-toolbar">
         <div id="kh-default-toolbar-left">
-            <button id="kh-instr-gear" class="kh-btn" title="Saved Instructions">📝 Instructions</button>
+            <button id="kh-instr-gear" class="kh-btn" title="Saved Instructions"><span style="font-size:10px">📝</span> Instructions</button>
             <div id="kh-saved-instr" class="kh-saved-instr"></div>
         </div>
         <span class="kh-send-controls">
@@ -220,8 +220,8 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
       <p id="kh-ephor-log-toggle" class="kh-log-toggle">API Log</p>
       <div class="kh-log-actions">
         <label><input type="checkbox" id="kh-ephor-log-verbose"> Verbose</label>
-        <button id="kh-ephor-copy-log"  class="kh-btn">📋 Copy</button>
-        <button id="kh-ephor-clear-log" class="kh-btn">🗑 Clear</button>
+        <button id="kh-ephor-copy-log"  class="kh-btn"><span style="font-size:10px">📋</span> Copy</button>
+        <button id="kh-ephor-clear-log" class="kh-btn"><span style="font-size:10px">🗑</span> Clear</button>
       </div>
     </div>
     <!-- ⬇ start collapsed (display:none). Keep width stable: allow wrapping + isolate inline-size -->

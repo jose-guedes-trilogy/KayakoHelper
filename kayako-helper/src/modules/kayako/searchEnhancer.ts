@@ -407,6 +407,12 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
 			else if (selP.length > 1) parts.push(`priority:(${selP.join(' OR ')})`);
 		}
         if (refsLocal.channel) { const sel = Array.from((refsLocal.channel as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(cb => cb.value); if (sel.length === 1) parts.push(`channel:${sel[0]}`); else if (sel.length > 1) parts.push('(' + sel.map(v => `channel:${v}`).join(' OR ') + ')'); }
+        if ((refsLocal as any).status) {
+			const selS = Array.from(((refsLocal as any).status as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(cb => cb.value);
+			console.debug('[KH Search] syncToOriginalLocal: status[] =', selS);
+			if (selS.length === 1) parts.push(`status:${selS[0]}`);
+			else if (selS.length > 1) parts.push(`status:(${selS.join(' OR ')})`);
+		}
         const cfKey = (refsLocal.custom_key as HTMLInputElement)?.value?.trim() ?? ''; const cfVal = (refsLocal.custom_val as HTMLInputElement)?.value?.trim() ?? ''; if (cfKey && cfVal) parts.push(`${cfKey}:"${cfVal}"`);
         (['created','updated'] as const).forEach(k => { const w = (refsLocal as any)[k] as HTMLElement | undefined; if (!w) return; const sel = w.querySelector('select') as HTMLSelectElement; const d = w.querySelector('input[type="date"]') as HTMLInputElement; const op = sel?.value ?? ':'; const dv = d?.value ?? ''; if (dv) parts.push(`${k}${op}${dv}`); });
         const finalQuery = parts.join(' ').trim();
@@ -427,7 +433,10 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
         const parsed: any = {} as ParsedQuery;
         parsed.in = [...raw.matchAll(/\bin:([^\s()]+)/gi)].map(m => m[1]!).filter(Boolean);
         parsed.channel = [...raw.matchAll(/\bchannel:([^\s()]+)/gi)].map(m => m[1]!).filter(Boolean);
-        (['assignee','team','tag','subject','body','product','brand','name','creator','organization'] as const).forEach(k => { const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|(null))`, 'i')); if (m) parsed[k] = (m[1] ?? m[2])!; });
+        (['assignee','team','tag','subject','body','product','brand','name','creator','organization'] as const).forEach(k => {
+            const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|'([^']*)'|(null))`, 'i'));
+            if (m) parsed[k] = (m[1] ?? m[2] ?? m[3])!;
+        });
         // priority (multi)
         const prioritySet = new Set<string>();
         for (const m of raw.matchAll(/\bpriority:\(([^)]+)\)/gi)) {
@@ -460,18 +469,21 @@ async function ensureInstance(host: HTMLElement, originalInputEl: HTMLInputEleme
                 cb.checked = statuses.includes(cb.value);
             });
         }
-        (['custom_key'] as const).forEach(k => { const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|(null))`, 'i')); if (m) parsed[k] = (m[1] ?? m[2])!; });
+        (['custom_key'] as const).forEach(k => {
+            const m = raw.match(new RegExp(`\\b${k}:(?:"([^"]*)"|'([^']*)'|(null))`, 'i'));
+            if (m) parsed[k] = (m[1] ?? m[2] ?? m[3])!;
+        });
         [...raw.matchAll(/\b(created|updated)([:<>])(\d{4}-\d{2}-\d{2})/gi)].forEach(m => (parsed as any)[m[1] as 'created' | 'updated'] = `${m[2]}${m[3]}`);
         let kw = raw
             .replace(/\bin:[^\s()]+/gi, '')
             .replace(/\bchannel:[^\s()]+/gi, '')
-            .replace(/\b(?:assignee|team|tag|subject|body|product|brand|name|creator|organization):(?:\"[^\"]*\"|null)/gi, '')
+            .replace(/\b(?:assignee|team|tag|subject|body|product|brand|name|creator|organization):(?:"[^"]*"|'[^']*'|null)/gi, '')
             .replace(/\bstatus:\([^)]*\)/gi, '')
             .replace(/\bstatus:[^\s()]+/gi, '')
             .replace(/\bpriority:\([^)]*\)/gi, '')
             .replace(/\bpriority:[^\s()]+/gi, '')
             .replace(/\b(?:created|updated)(?:[:<>])\d{4}-\d{2}-\d{2}/gi, '');
-        if (parsed.custom_key) { const esc = parsed.custom_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); kw = kw.replace(new RegExp(`\\b${esc}:"[^"]*"`, 'gi'), ''); }
+        if (parsed.custom_key) { const esc = parsed.custom_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); kw = kw.replace(new RegExp(`\\b${esc}:(?:"[^"]*"|'[^']*')`, 'gi'), ''); }
         kw = kw.replace(/\s+OR\s+/gi, ' ').replace(/[()]/g, ' ').replace(/\s{2,}/g, ' ').trim(); if (/^(?:OR\s*)+$/i.test(kw)) kw = '';
         refsLocal.qbox!.value = kw;
         (refsLocal.in as HTMLElement)!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(cb => { cb.checked = parsed.in?.includes(cb.value) ?? false; });
@@ -831,9 +843,9 @@ function syncFromOriginal(ev?: Event): void {
     });
 
     /* custom field – pick the first key:"value" pair that is NOT a built-in key */
-    for (const m of raw.matchAll(/(\w+):"([^"]+)"/g)) {
+    for (const m of raw.matchAll(/(\w+):(?:"([^"]+)"|'([^']+)')/g)) {
         const key = m[1];
-        const val = m[2];
+        const val = (m[2] ?? m[3]);
         if (key && !(['assignee','team','tag','subject','body','name','creator','organization','priority'] as readonly string[]).includes(key)) {
             parsed.custom_key = key as string;
             parsed.custom_val = val as string;
@@ -850,7 +862,7 @@ function syncFromOriginal(ev?: Event): void {
     let kw = raw
         .replace(/\bin:[^\s()]+/gi, '')
         .replace(/\bchannel:[^\s()]+/gi, '')
-        .replace(/\b(?:assignee|team|tag|subject|body|product|brand|name|creator|organization):(?:\"[^\"]*\"|null)/gi, '')
+        .replace(/\b(?:assignee|team|tag|subject|body|product|brand|name|creator|organization):(?:"[^"]*"|'[^']*'|null)/gi, '')
         .replace(/\bstatus:\([^)]*\)/gi, '')
         .replace(/\bstatus:[^\s()]+/gi, '')
         .replace(/\bpriority:\([^)]*\)/gi, '')
@@ -860,7 +872,7 @@ function syncFromOriginal(ev?: Event): void {
     /* --------- strip current custom-field pair from kw -------------------- */
     if (parsed.custom_key) {
         const esc = parsed.custom_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        kw = kw.replace(new RegExp(`\\b${esc}:"[^"]*"`, 'gi'), '');
+        kw = kw.replace(new RegExp(`\\b${esc}:(?:"[^"]*"|'[^']*')`, 'gi'), '');
     }
     /* ---------------------------------------------------------------------- */
 

@@ -309,9 +309,91 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
         const prev = store.lastOutputs?.[pseudoStageId];
         const rounds = prev ? [prev] : [];
         const transcript = await fetchTranscript(1000).catch(() => "");
-        const expanded = applyPlaceholders(prompt, transcript || "", rounds, store.cannedPrompts ?? []);
+        let expanded = applyPlaceholders(prompt, transcript || "", rounds, store.cannedPrompts ?? []);
+        // Auto-fetch recent/past tickets at send time if needed
+        try {
+            if (/@#\s*PAST_TICKETS\s*#@/i.test(expanded)) {
+                const ticketId = currentKayakoTicketId();
+                const pid = store.selectedProjectId || "";
+                const key = pid && ticketId ? `${pid}::${ticketId}` : "";
+                const sysCtx = key ? (store.systemPromptBodiesByContext?.[key] || {}) : {};
+                const needsFetch = !sysCtx.pastTickets || sysCtx.pastTickets.trim().length === 0;
+                if (needsFetch) {
+                    opts.onStatus?.("Fetching recent tickets for Past Tickets placeholder…");
+                    try {
+                        const { waitForRequesterId, waitForOrganization } = await import("@/modules/kayako/utils/caseContext.ts");
+                        const { searchConversationIds, fetchTranscriptByCase, quoteForSearch } = await import("@/modules/kayako/utils/search.ts");
+                        const requesterId = await waitForRequesterId(1500).catch(() => "");
+                        const org = await waitForOrganization(1500).catch(() => null);
+                        const orgName = (org?.name || '').trim();
+                        const LIMIT = 10;
+                        const POSTS_PER_CASE = 100;
+                        const results: string[] = [];
+                        // Requester branch
+                        try {
+                            if (requesterId) {
+                                const q = `requester:${quoteForSearch(String(requesterId))}`;
+                                const ids = await searchConversationIds(q, LIMIT, 0);
+                                const texts = await Promise.all(ids.map(async id => {
+                                    const raw = await fetchTranscriptByCase(id, POSTS_PER_CASE);
+                                    return raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                                }));
+                                const section = [
+                                    '===== Recent Requester Tickets =====',
+                                    ...texts.map((t, i) => `--- [Requester ${i+1}] ---\n${t}`),
+                                ].join('\n\n');
+                                results.push(section);
+                            }
+                        } catch {}
+                        // Organization branch
+                        try {
+                            if (orgName) {
+                                const q = `organization:${quoteForSearch(orgName)}`;
+                                const ids = await searchConversationIds(q, LIMIT, 0);
+                                const texts = await Promise.all(ids.map(async id => {
+                                    const raw = await fetchTranscriptByCase(id, POSTS_PER_CASE);
+                                    return raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                                }));
+                                const section = [
+                                    '===== Recent Organization Tickets =====',
+                                    ...texts.map((t, i) => `--- [Org ${i+1}] ---\n${t}`),
+                                ].join('\n\n');
+                                results.push(section);
+                            }
+                        } catch {}
+                        const text = results.join('\n\n[=========== Next Conversation ===========]\n\n');
+                        if (text) {
+                            store.systemPromptBodiesByContext = store.systemPromptBodiesByContext || {} as any;
+                            (store.systemPromptBodiesByContext as any)[key] = {
+                                ...(store.systemPromptBodiesByContext as any)[key],
+                                pastTickets: text,
+                            };
+                            await saveEphorStore(store);
+                            opts.onStatus?.("Past tickets cached for this ticket.");
+                        }
+                    } catch (err: any) {
+                        opts.onStatus?.(`Past tickets fetch failed: ${err?.message || 'unknown error'}`);
+                    }
+                }
+            }
+        } catch {}
+        // Replace system placeholders (prefer per-ticket overrides)
+        try {
+            const ticketId = currentKayakoTicketId();
+            const projectId = store.selectedProjectId || "" as any;
+            const key = projectId && ticketId ? `${projectId}::${ticketId}` : "";
+            const sysGlobal = store.systemPromptBodies || { fileAnalysis: "", pastTickets: "", styleGuide: "" };
+            const sysCtx = key ? (store.systemPromptBodiesByContext?.[key] || {}) : {};
+            const bodyOf = (field: "fileAnalysis"|"pastTickets"|"styleGuide"): string => {
+                const v = (sysCtx as any)[field];
+                return (typeof v === 'string' && v) ? v : (sysGlobal as any)[field] || "";
+            };
+            expanded = expanded
+                .replace(/@#\s*FILE_ANALYSIS\s*#@/gi, bodyOf("fileAnalysis"))
+                .replace(/@#\s*PAST_TICKETS\s*#@/gi, bodyOf("pastTickets"))
+                .replace(/@#\s*STYLE_GUIDE\s*#@/gi, bodyOf("styleGuide"));
+        } catch {}
         if (expanded !== prompt) tell("Expanded placeholders in prompt");
-        // overwrite prompt for remainder of function
         (opts as any).prompt = expanded;
     } catch {
         // non-fatal; fall back to original prompt

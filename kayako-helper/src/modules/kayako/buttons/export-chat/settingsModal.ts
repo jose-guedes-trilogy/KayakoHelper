@@ -100,9 +100,6 @@ export function openSettingsModal(store: Store): void {
 
           /* Content container spacing */
           ${EXTENSION_SELECTORS.exportSettingsContent}{margin-top:8px;}
-          /* Snap scrolling to one provider at a time */
-          ${EXTENSION_SELECTORS.exportSettingsContent}{ scroll-snap-type: y mandatory; }
-          .${EXTENSION_SELECTORS.exportProviderWrapper.slice(1)}{ scroll-snap-align: start; scroll-snap-stop: always; }
           /* Accordion */
           .kh-accordion { border-top:1px solid #e5e7f2; margin-top:8px; }
           .kh-acc-item { border-bottom:1px solid #e5e7f2; }
@@ -227,68 +224,14 @@ export function openSettingsModal(store: Store): void {
         e.preventDefault();
     };
 
-    modal .addEventListener('mousedown', startDrag);  // padding
+    // Dragging restricted to header only to preserve resize handle
     headerEl.addEventListener('mousedown', startDrag); // header
 
     /* render provider list */
     console.info('[exportSettings] opening settings modal – building UI');
     rebuildSettingsUi(modal.querySelector(EXTENSION_SELECTORS.exportSettingsContent)! as HTMLElement, store);
 
-    /* Snap-sizing: fit exactly one provider and discrete scroll between them */
-    (function applySnapSizing(){
-        const content = modal.querySelector<HTMLElement>(EXTENSION_SELECTORS.exportSettingsContent);
-        if (!content) return;
-        const contentEl = content as HTMLElement;
-
-        const getWrappers = (): HTMLElement[] => Array.from(contentEl.querySelectorAll<HTMLElement>(EXTENSION_SELECTORS.exportProviderWrapper));
-
-        const sizeToOne = () => {
-            try {
-                const first = getWrappers()[0];
-                if (!first) return;
-                const rect = first.getBoundingClientRect();
-                const targetHeight = Math.ceil(rect.height);
-                contentEl.style.height = targetHeight + 'px';
-            } catch {}
-        };
-
-        let scrollLock = false;
-        const scrollToIndex = (idx: number) => {
-            const list = getWrappers();
-            if (!list.length) return;
-            const clamped = Math.max(0, Math.min(list.length - 1, idx));
-            const top = list[clamped]!.offsetTop;
-            contentEl.scrollTo({ top, behavior: 'smooth' });
-        };
-        const currentIndex = (): number => {
-            const list = getWrappers();
-            if (!list.length) return 0;
-            let best = 0; let bestDist = Number.POSITIVE_INFINITY;
-            const st = contentEl.scrollTop;
-            for (let i = 0; i < list.length; i++) {
-                const d = Math.abs(list[i]!.offsetTop - st);
-                if (d < bestDist) { bestDist = d; best = i; }
-            }
-            return best;
-        };
-        const onWheel = (e: WheelEvent) => {
-            if (e.ctrlKey) return; // allow zooming
-            e.preventDefault();
-            if (scrollLock) return;
-            scrollLock = true;
-            const dir = e.deltaY > 0 ? 1 : -1;
-            const next = currentIndex() + dir;
-            scrollToIndex(next);
-            setTimeout(() => { scrollLock = false; }, 280);
-        };
-
-        sizeToOne();
-        contentEl.addEventListener('wheel', onWheel, { passive: false });
-        window.addEventListener('resize', sizeToOne);
-        // Recalculate when providers render/update
-        const mo = new MutationObserver(() => requestAnimationFrame(sizeToOne));
-        mo.observe(contentEl, { childList: true, subtree: true });
-    })();
+    // Normal scrolling: remove snap-sizing and wheel interception
 
     /* add-provider */
     modal.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportAddProviderBtn)!

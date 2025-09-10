@@ -133,6 +133,7 @@ export interface KayakoSelectors {
   unifiedSearchOriginalInput: string;
   unifiedSearchResultsListContainer: string;
   unifiedSearchResultsList: string;
+  unifiedSearchResultsItemContent: string;
   unifiedSearchResultsListInner: string;
   unifiedSearchResultsSeeMore: string;
   unifiedSearchInputInline: string;
@@ -180,6 +181,7 @@ export interface ExtensionSelectors {
   qcerButton: string;
   createFolderButton: string;
   copyChatButton: string;
+  copyRequesterChatsButton: string;
   newLinesButton: string;
   sendToQcButton: string;
   sendToQcButtonRight: string;
@@ -470,6 +472,8 @@ export const KAYAKO_SELECTORS: KayakoSelectors = {
     "[class*=ko-universal-search__input][type=search]",
   unifiedSearchResultsListContainer: "[class*=ko-universal-search__results_]",
   unifiedSearchResultsList: "[class*=ko-universal-search__results-list_]",
+  unifiedSearchResultsItemContent:
+    "[class*=ko-universal-search_result_layout__content_]",
   unifiedSearchResultsListInner: "[class*=ko-universal-search__list_]",
   unifiedSearchResultsSeeMore:
     "[class*=ko-universal-search_result-see-more__seeMore_]",
@@ -532,6 +536,7 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   qcerButton: ".kh-qcer-btn",
   createFolderButton: "#kh-create-folder-btn",
   copyChatButton: "#kh-copy-chat-btn",
+  copyRequesterChatsButton: "#kh-copy-requester-chats-btn",
   newLinesButton: "#kh-newlines-btn",
   sendToQcButton: "#kh-send-to-qc-btn",
   sendToQcButtonRight: "#kh-send-to-qc-btn-right",

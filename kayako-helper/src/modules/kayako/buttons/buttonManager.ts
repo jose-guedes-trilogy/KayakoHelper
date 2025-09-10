@@ -222,7 +222,15 @@ export function registerSplitButton(cfg: SplitButtonConfig): void {
                 EXTENSION_SELECTORS.defaultButtonClass.replace(/^./,''),
                 EXTENSION_SELECTORS.twoPartBtnLeftHalf.slice(1),
             ].join(' ');
-            left.addEventListener('click', () => cfg.onClick(left!));
+            /* Fire only on left-button mouseup to avoid accidental drags and to
+               comply with UX requirement to activate on release. */
+            left.addEventListener('mouseup', (ev) => {
+                if ((ev as MouseEvent).button !== 0) return;
+                ev.stopPropagation();
+                cfg.onClick(left!);
+            });
+            // Prevent default click activation to avoid double-fire on some UIs
+            left.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); });
             if (cfg.onContextMenu) {
                 left.addEventListener('contextmenu', ev => {
                     ev.preventDefault(); cfg.onContextMenu!(ev, left!);
@@ -244,22 +252,93 @@ export function registerSplitButton(cfg: SplitButtonConfig): void {
                 .twoPartBtnChevron.replace(/^./,'')}">${cfg.rightLabel ?? '▾'}</div>`;
             wrap.appendChild(right);
 
+            /* Render dropdown in a fixed-position portal attached to body to
+               avoid clipping and layout feedback loops. */
             const menu = document.createElement('div');
             menu.className = EXTENSION_SELECTORS.twoPartBtnDropdown.slice(1);
             Object.assign(menu.style, {
-                position:'absolute', left:'0', top:'100%', zIndex:'2147483647',
-                display:'none',
-            });
-            right.appendChild(menu);
+                position: 'fixed',
+                left: '0px',
+                top: '0px',
+                zIndex: '2147483647',
+                display: 'none',
+                width: 'max-content',
+            } as Partial<CSSStyleDeclaration>);
+            menu.dataset['khAnchor'] = right.id;
+            document.body.appendChild(menu);
 
             let to: number | null = null;
-            const show = () => { if (to) { clearTimeout(to); to = null; } menu.style.display='flex'; };
-            const hide = () => { to = window.setTimeout(()=>{ menu.style.display='none'; }, HOVER_MS); };
+            let outsideDownAttached = false;
+            const updateMenuPosition = () => {
+                const rect = right!.getBoundingClientRect();
+                // Temporarily reveal to measure size
+                const prevDisplay = menu.style.display;
+                const prevVisibility = menu.style.visibility;
+                menu.style.visibility = 'hidden';
+                menu.style.display = 'flex';
+                const menuWidth = menu.offsetWidth;
+                const menuHeight = menu.offsetHeight;
+                const margin = 8;
+                let left = rect.right - menuWidth; // align right edges
+                let top  = rect.bottom;            // open downward by default
+                // Clamp within viewport
+                if (left < margin) left = margin;
+                const maxLeft = Math.max(margin, window.innerWidth - menuWidth - margin);
+                if (left > maxLeft) left = maxLeft;
+                // If bottom overflows, try opening upwards
+                if (top + menuHeight + margin > window.innerHeight) {
+                    const upTop = rect.top - menuHeight;
+                    if (upTop >= margin) top = upTop;
+                }
+                menu.style.left = `${Math.round(left)}px`;
+                menu.style.top  = `${Math.round(top)}px`;
+                // Restore visibility state
+                if (prevDisplay === 'none') {
+                    menu.style.display = prevDisplay;
+                    menu.style.visibility = prevVisibility || '';
+                } else {
+                    menu.style.visibility = '';
+                }
+            };
+            const onOutsidePointerDown = (ev: Event) => {
+                const target = (ev as MouseEvent | TouchEvent).target as Node | null;
+                if (!target) return;
+                if (menu.contains(target) || right!.contains(target as Node)) return;
+                menu.style.display = 'none';
+                if (outsideDownAttached) {
+                    window.removeEventListener('mousedown', onOutsidePointerDown, true);
+                    window.removeEventListener('touchstart', onOutsidePointerDown, true);
+                    outsideDownAttached = false;
+                }
+            };
+            const show = () => {
+                if (to) { clearTimeout(to); to = null; }
+                menu.style.display='flex';
+                updateMenuPosition();
+                if (!outsideDownAttached) {
+                    window.addEventListener('mousedown', onOutsidePointerDown, true);
+                    window.addEventListener('touchstart', onOutsidePointerDown, true);
+                    outsideDownAttached = true;
+                }
+            };
+            const hide = () => {
+                to = window.setTimeout(()=>{
+                    menu.style.display='none';
+                    if (outsideDownAttached) {
+                        window.removeEventListener('mousedown', onOutsidePointerDown, true);
+                        window.removeEventListener('touchstart', onOutsidePointerDown, true);
+                        outsideDownAttached = false;
+                    }
+                }, HOVER_MS);
+            };
 
             right.addEventListener('mouseenter', show);
             right.addEventListener('mouseleave', hide);
             menu .addEventListener('mouseenter', show);
             menu .addEventListener('mouseleave', hide);
+            const onScrollOrResize = () => { if (menu.style.display !== 'none') updateMenuPosition(); };
+            window.addEventListener('scroll', onScrollOrResize, true);
+            window.addEventListener('resize', onScrollOrResize);
         }
 
         /* order-fix */
@@ -270,11 +349,18 @@ export function registerSplitButton(cfg: SplitButtonConfig): void {
         const txt = cfg.label();
         setHtmlIfChanged(left!, txt);     // HTML-aware & stable
 
-        /* build / rebuild dropdown */
-        const dropdown = right!.querySelector<HTMLElement>(
-            EXTENSION_SELECTORS.twoPartBtnDropdown,
+        /* build dropdown once to avoid MutationObserver feedback loops */
+        const dropdown = document.querySelector<HTMLElement>(
+            `.${EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./,'')}[data-kh-anchor="${right!.id}"]`
         )!;
-        cfg.buildMenu(dropdown);
+        if (dropdown.childElementCount === 0) cfg.buildMenu(dropdown);
+
+        /* cleanup orphaned portaled menus */
+        const dropdownClass = EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./,'');
+        document.querySelectorAll<HTMLElement>(`.${dropdownClass}[data-kh-anchor]`).forEach(el => {
+            const anchorId = el.dataset['khAnchor'];
+            if (anchorId && !document.getElementById(anchorId)) el.remove();
+        });
 
         cfg.onRouteChange?.(left);
     };
@@ -396,20 +482,73 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                 const menu = document.createElement('div');
                 menu.className = EXTENSION_SELECTORS.twoPartBtnDropdown.slice(1);
                 menu.style.display = 'none';
-                // Position so that dropdown opens upwards, and its left edge aligns
-                // with the right edge of the right-half button
+                // Render in a portal to avoid clipping by overflow:hidden ancestors
+                // Use fixed positioning relative to the viewport
                 Object.assign(menu.style, {
-                    position: 'absolute',
-                    left: '100%',
-                    bottom: '100%',
-                    top: 'auto',
+                    position: 'fixed',
+                    left: '0px',
+                    top: '0px',
                     right: 'auto',
+                    bottom: 'auto',
+                    width: 'max-content',
+                    zIndex: '2147483647',
                 } as Partial<CSSStyleDeclaration>);
-                right.appendChild(menu);
+                // Anchor id for rebuilds/cleanup
+                menu.dataset['khAnchor'] = right.id;
+                document.body.appendChild(menu);
 
                 let hideTo: number|null = null;
                 const delay = sCfg.hideDelayMs ?? 250;
-                const show = () => { if (hideTo){clearTimeout(hideTo);hideTo=null;} menu.style.display='flex'; };
+                const updateMenuPosition = () => {
+                    const rect = right!.getBoundingClientRect();
+                    // Show below the right-half; align right edges; keep on-screen
+                    // Temporarily make visible to measure width/height
+                    const prevDisplay = menu.style.display;
+                    const prevVisibility = menu.style.visibility;
+                    menu.style.visibility = 'hidden';
+                    menu.style.display = 'flex';
+                    const menuWidth = menu.offsetWidth;
+                    const menuHeight = menu.offsetHeight;
+                    const margin = 8;
+                    let left = rect.right - menuWidth;
+                    let top  = rect.bottom;
+                    // Clamp horizontally
+                    if (left < margin) left = margin;
+                    const maxLeft = Math.max(margin, window.innerWidth - menuWidth - margin);
+                    if (left > maxLeft) left = maxLeft;
+                    // If bottom overflows, try opening upwards
+                    if (top + menuHeight + margin > window.innerHeight) {
+                        const upTop = rect.top - menuHeight;
+                        if (upTop >= margin) top = upTop;
+                    }
+                    menu.style.left = `${Math.round(left)}px`;
+                    menu.style.top  = `${Math.round(top)}px`;
+                    console.debug('[KH][HeaderSplit] dropdown positioned', { left: menu.style.left, top: menu.style.top, menuWidth, menuHeight });
+                    // Restore visibility state if we only measured
+                    if (prevDisplay === 'none') {
+                        menu.style.display = prevDisplay;
+                        menu.style.visibility = prevVisibility || '';
+                    } else {
+                        menu.style.visibility = '';
+                    }
+                };
+                const onScrollOrResize = () => { if (menu.style.display !== 'none') updateMenuPosition(); };
+                const onOutsidePointerDown = (ev: Event) => {
+                    const e = ev as MouseEvent | TouchEvent;
+                    const target = (e as MouseEvent).target as Node | null;
+                    if (!target) return;
+                    // If clicking inside the menu or on the right button, ignore
+                    if (menu.contains(target) || right!.contains(target as Node)) return;
+                    menu.style.display = 'none';
+                };
+                const show = () => {
+                    if (hideTo){clearTimeout(hideTo);hideTo=null;}
+                    menu.style.display='flex';
+                    updateMenuPosition();
+                    window.addEventListener('mousedown', onOutsidePointerDown, true);
+                    window.addEventListener('touchstart', onOutsidePointerDown, true);
+                    console.info('[KH][HeaderSplit] dropdown show');
+                };
                 const hide = () => { hideTo = window.setTimeout(()=>{menu.style.display='none';}, delay); };
                 const toggle = () => {
                     if (hideTo) { clearTimeout(hideTo); hideTo = null; }
@@ -417,20 +556,45 @@ export function registerEditorHeaderButton(cfg: HeaderCfg): void {
                     const next = visible ? 'none' : 'flex';
                     console.info('[KH][HeaderSplit] right-half toggle', { visible: !visible });
                     menu.style.display = next;
+                    if (next !== 'none') updateMenuPosition();
+                    if (next === 'none') {
+                        window.removeEventListener('mousedown', onOutsidePointerDown, true);
+                        window.removeEventListener('touchstart', onOutsidePointerDown, true);
+                    } else {
+                        window.addEventListener('mousedown', onOutsidePointerDown, true);
+                        window.addEventListener('touchstart', onOutsidePointerDown, true);
+                    }
                 };
 
                 right.addEventListener('mouseenter',show);
                 right.addEventListener('mouseleave',hide);
                 menu .addEventListener('mouseenter',show);
                 menu .addEventListener('mouseleave',hide);
-                right.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); toggle(); });
+                right.addEventListener('click', (ev) => {
+                    if ((ev as MouseEvent).button !== 0) return; // left-click only
+                    ev.preventDefault(); ev.stopPropagation(); toggle();
+                });
+                right.addEventListener('contextmenu', (ev) => { ev.stopPropagation(); });
+                window.addEventListener('scroll', onScrollOrResize, true);
+                window.addEventListener('resize', onScrollOrResize);
             }
 
             /* rebuild dropdown every cycle */
-            const menuDiv = right!.querySelector<HTMLElement>(
-                `.${EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./,'')}`
+            const menuDiv = document.querySelector<HTMLElement>(
+                `.${EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./,'')}[data-kh-anchor="${right!.id}"]`
             )!;
-            sCfg.buildMenu(menuDiv);
+            // Build once to avoid MutationObserver feedback loops causing flicker
+            if (menuDiv.childElementCount === 0) {
+                sCfg.buildMenu(menuDiv);
+            }
+        });
+        // Cleanup orphaned portaled menus whose anchors are gone
+        const dropdownClass = EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./,'');
+        document.querySelectorAll<HTMLElement>(`.${dropdownClass}[data-kh-anchor]`).forEach(el => {
+            const anchorId = el.dataset['khAnchor'];
+            if (anchorId && !document.getElementById(anchorId)) {
+                el.remove();
+            }
         });
     };
 

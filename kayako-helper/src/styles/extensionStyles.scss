@@ -129,6 +129,8 @@
   text-align: center;
   font-size: 16px;
   padding-bottom: 8px;
+  display: block;
+
 }
 
 /* Bodies: unified rectangular block */
@@ -137,14 +139,13 @@
 #{sel.$qcHighlightBodyAdditional} {
   background: white;
   padding: 6px 26px !important;
-  border: 1px solid hsl(218 23% 87% / 1);
-  box-shadow: rgba(0, 0, 0, 0.035) 0px 0px 8px 0px, rgba(0, 0, 0, 0.01) 0px 0px 18px 0px;
+  border: 1px solid hsl(215 50% 88% / 1);
+  box-shadow: rgba(0, 0, 0, 0.03) 0px 0px 8px 0px, rgba(0, 0, 0, 0.02) 0px 0px 18px 0px;
   border-radius: 8px;
   margin-bottom: 12px;
   text-align: left;
   font-weight: normal;
 
-  border-color: hsl(216deg 55.33% 91.52%);
 }
 
 /* Keep Proposed Action body centered */
@@ -531,6 +532,7 @@
 }
 
 #{sel.$twoPartBtnDropdown} {
+  /* When portaled, JS sets position:fixed; these styles remain compatible */
   position: absolute;
   top: 100%;
   right: 0;
@@ -538,32 +540,36 @@
   background: #fff;
 
   border: 1px solid #ddd;
-  border-radius: 5px;
+  border-radius: 8px 0 8px 8px;
 
   padding: 4px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+  box-shadow: rgba(0, 0, 0, 0.10) 0px 2px 8px;
   display: none;          /* opened by TS on hover */
   text-align: left;
 
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 
-  min-width: 102px;
+  min-width: 128px;
+  max-width: 320px;
 
   font-size: 14px;
+  overflow: visible;      /* allow submenus to overflow */
 }
 
 #{sel.$twoPartBtnDropdownItem},
 #{sel.$twoPartBtnDropdownSub} {
-  padding: 8px 10px;
+  padding: 8px 12px;
   white-space: nowrap;
   cursor: pointer;
-
-  border-radius: 5px;
+  position: relative;
 
   top: 0;
 
-  &:hover { background: #f2f2f2; }
+  /* subtle hover/active animation */
+  transition: background-color 120ms ease, color 120ms ease;
+  &:hover { background: #f7f7f7; }
+  &:active { background: #efefef; }
 }
 
 #{sel.$twoPartBtnDropdownItem} {
@@ -587,6 +593,7 @@
 
   flex-direction: column;
   gap: 8px;
+  z-index: 4;                     /* ensure above parent dropdown */
 }
 
 /* ===== Settings modal ===== */
@@ -616,6 +623,9 @@
   display: flex;
   gap: 4px;
   margin-bottom: 4px;
+  padding: 0 !important;
+  background: none !important;
+  border: none !important;
 }
 
 #{sel.$exportLabelInput}   { flex: 0 0 120px; }
@@ -1065,4 +1075,15 @@ root {
 
 #kp-ephor-channel-list {
   background: hsl(225, 40%, 97.5%);
+}
+
+.kh-title-row label {
+  display: flex;
+  gap: 6px;
+}
+
+
+.kh-send-ephor-review-btn {
+  position: relative;
+  top: -2px;
 }

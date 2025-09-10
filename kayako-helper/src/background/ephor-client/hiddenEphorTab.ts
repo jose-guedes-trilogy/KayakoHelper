@@ -43,6 +43,18 @@ export class HiddenEphorTab {
         return this.sharedTabId!;
     }
 
+    /** Close and clear the shared hidden tab if it exists. */
+    private static async closeTabIfOpen(reason: string = ""): Promise<void> {
+        try {
+            if (this.sharedTabId != null) {
+                const id = this.sharedTabId;
+                this.sharedTabId = null;
+                try { await chrome.tabs.remove(id); } catch {}
+                try { console.info('[HiddenEphorTab] closed hidden tab', { id, reason }); } catch {}
+            }
+        } catch {}
+    }
+
     /* ---------- Clerk session JWT ---------------------------------- */
     public async getSessionJwt(): Promise<{ token: string; expiresAt: number }> {
         const tabId = await HiddenEphorTab.ensureTab();
@@ -67,12 +79,20 @@ export class HiddenEphorTab {
                 return { token: jwt, exp: payload.exp * 1000 };
             },
         });
+        // Close the hidden tab after obtaining the JWT to honor user request
+        void HiddenEphorTab.closeTabIfOpen('getSessionJwt');
         return { token: result.token, expiresAt: result.exp };
     }
 
     /* ---------- proxy fetch through the tab (cookies!) -------------- */
     public async fetch<T = unknown>(url: string, init: RequestInit = {}) {
         const tabId = await HiddenEphorTab.ensureTab();      // may be undefined
-        return hiddenFetch<T>(tabId, url, init);
+        try {
+            const res = await hiddenFetch<T>(tabId, url, init);
+            return res;
+        } finally {
+            // Close the hidden tab after proxied fetch completes
+            void HiddenEphorTab.closeTabIfOpen('hiddenFetch');
+        }
     }
 }

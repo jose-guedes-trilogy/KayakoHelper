@@ -2,8 +2,9 @@
 // Manager for AI model selection presets. Mirrors canned-prompt modal structure.
 
 import { EphorStore, AISelection, saveEphorStore } from "./ephorStore.ts";
+import { apiToDisplay, buildAvailablePairs } from "./modelCatalog.ts";
 
-export function openAiSelectionsModal(store: EphorStore, availableModels: string[]): void {
+export function openAiSelectionsModal(store: EphorStore, availableModels: string[], currentModels: string[] = []): void {
     if (document.getElementById("kh-ai-sel-modal")) return;
 
     const modal = document.createElement("div");
@@ -51,24 +52,26 @@ export function openAiSelectionsModal(store: EphorStore, availableModels: string
     const rebuildModels = (selected: string[]) => {
         modelsDiv.textContent = "";
         const sel = new Set((selected || []).map(x => x.toLowerCase()));
-        for (const m of availableModels) {
+        const pairs = buildAvailablePairs(availableModels);
+        for (const { api, display } of pairs) {
             const label = document.createElement("label");
             Object.assign(label.style, { display:"flex", alignItems:"center", gap:"6px", padding:"4px 6px" });
             const cb = document.createElement("input");
             cb.type = "checkbox";
-            cb.value = m;
-            cb.checked = sel.has(m.toLowerCase());
+            cb.value = api;
+            cb.checked = sel.has(api.toLowerCase());
             cb.addEventListener("change", () => {
                 const idx = store.aiSelections!.findIndex(x => x.id === currentId);
                 if (idx === -1) return;
                 const list = new Set(store.aiSelections![idx].models.map(x => x.toLowerCase()));
-                if (cb.checked) list.add(m.toLowerCase()); else list.delete(m.toLowerCase());
-                // write back preserving original casing from availableModels
+                if (cb.checked) list.add(api.toLowerCase()); else list.delete(api.toLowerCase());
+                // write back preserving original casing from availableModels (api ids)
                 store.aiSelections![idx].models = availableModels.filter(x => list.has(x.toLowerCase()));
                 void saveEphorStore(store).then(() => document.dispatchEvent(new CustomEvent("aiSelectionsChanged")));
             });
             label.appendChild(cb);
-            label.appendChild(document.createTextNode(m));
+            // Show only the display name
+            label.appendChild(document.createTextNode(display));
             modelsDiv.appendChild(label);
         }
     };
@@ -164,10 +167,30 @@ export function openAiSelectionsModal(store: EphorStore, availableModels: string
     // Cleanup on close
     closeBtn.addEventListener("click", () => document.removeEventListener("aiSelectionsChanged", onAiSelChanged));
 
-    // init
+    // init & ensure default selections exist
     if (!Array.isArray(store.aiSelections)) store.aiSelections = [];
+    try {
+        const have = new Set((store.aiSelections ?? []).map(s => (s.name || "").toLowerCase()));
+        const ensure = (name: string, models: string[]) => {
+            if (have.has(name.toLowerCase())) return;
+            store.aiSelections!.push({ id: crypto.randomUUID(), name, models: models.slice() });
+        };
+        // Defaults (editable/deletable):
+        ensure("Top 3", ["o3", "gemini-2.5-pro", "claude-4-opus-latest-thinking"]);
+        ensure("Fast", ["cerebras-4-scout"]);
+        ensure("o3", ["o3"]);
+        void saveEphorStore(store).then(() => document.dispatchEvent(new CustomEvent("aiSelectionsChanged")));
+    } catch {}
+    // Choose the selection matching current models if any
+    const currSet = new Set((currentModels || []).map(x => x.toLowerCase()));
+    const match = (store.aiSelections ?? []).find(s => {
+        const sSet = new Set((s.models || []).map(x => x.toLowerCase()));
+        if (sSet.size !== currSet.size) return false;
+        for (const m of sSet) if (!currSet.has(m)) return false;
+        return true;
+    });
     rebuildList();
-    loadSelection(store.aiSelections[0]?.id ?? null);
+    loadSelection(match?.id ?? (store.aiSelections[0]?.id ?? null));
 }
 
 

@@ -199,7 +199,7 @@
     "unifiedSearchLowerContainer": "[class*=ko-universal-search__content-absolute_]",
     "unifiedSearchOriginalInput": "[class*=ko-universal-search__input][type=search]",
     "unifiedSearchResultsListContainer": "[class*=ko-universal-search__results_]",
-    "unifiedSearchResultsList": "[class*=ko-universal-search__results-list_]",
+    "unifiedSearchResultsList": "[class*=ko-universal-search__results-list_]","unifiedSearchResultsItemContent": "[class*=ko-universal-search_result_layout__content_]",
     "unifiedSearchResultsListInner": "[class*=ko-universal-search__list_]",
     "unifiedSearchResultsSeeMore": "[class*=ko-universal-search_result-see-more__seeMore_]",
 
@@ -283,6 +283,8 @@
 
     "createFolderButton": "#kh-create-folder-btn",
     "copyChatButton": "#kh-copy-chat-btn",
+    // New: button to copy current requester's last 20 chats (next to Copy chat)
+    "copyRequesterChatsButton": "#kh-copy-requester-chats-btn",
     "newLinesButton": "#kh-newlines-btn",
     "sendToQcButton": "#kh-send-to-qc-btn",
     // Right half (▾) of the split “Send to QC” button (editor header)

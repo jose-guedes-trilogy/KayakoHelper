@@ -19,14 +19,17 @@
 
         /* Tabs (top-level + settings) */
         nav       { display:flex;border-bottom:1px solid #ddd; padding: 6px 10px 0; }
-        .kh-bar-btn { border: none; background: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-weight:600; }
+        .kh-bar-btn { border: none; background: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-weight:600; position:relative; }
+        .kh-bar-btn { transition: background-color .18s ease, color .18s ease, border-color .18s ease, transform .12s ease; }
+        .kh-bar-btn::after{ content:""; position:absolute; left:12px; right:12px; bottom:-2px; height:2px; background:linear-gradient(90deg, #8db3ff, #2e73e9); transform:scaleX(0); transform-origin:left; transition: transform .22s ease; border-radius:2px; }
         .kh-bar-btn:hover{ background:hsl(217 40% 98% / 1); color:#1a2b4f; border:1px solid #adc1e3; }
+        .kh-bar-btn:hover::after{ transform:scaleX(1); }
         .kh-bar-btn.active{ background:hsl(216 20% 98% / 1); color:#333; border:1px solid #cfd3d9; border-bottom-color: transparent; position: relative; top: 1px; }
 
         /* Top-level tabs behave like tabs, not buttons, on hover */
         nav .kh-bar-btn{ border:0; background:transparent; border-radius:0; }
-        nav .kh-bar-btn:hover{ background:#f8f8f8; border:0; border-bottom:2px solid #adc1e3; }
-        nav .kh-bar-btn.active{ background:#fff; border:0; border-bottom:2px solid dodgerblue; top:0; }
+        nav .kh-bar-btn:hover{ background:#f8f8f8; border:0; }
+        nav .kh-bar-btn.active{ background:#fff; border:0; top:0; }
 
         /* Buttons */
         .kh-btn { padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04); }
@@ -120,6 +123,13 @@
         .kh-item-meta{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.2rem; color:#555; }
         .kh-badge{ display:inline-block; padding:.05rem .35rem; border-radius:999px; background:#eef3ff; border:1px solid #c7d6ff; font-size:.75rem; }
         .kh-date{ font-size:.8rem; color:#666; }
+
+        /* Reply resizer settings (consistent styles, no inline) */
+        .kh-reply-height-settings{ border-top:1px solid #eee; padding-top:.5rem; }
+        .kh-reply-height-settings .kh-reply-height-title{ font-weight:600; margin-bottom:.3rem; }
+        .kh-reply-height-row{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+        .kh-reply-height-row label{ display:inline-flex; align-items:center; gap:.4rem; }
+        .kh-reply-fixed-input{ width:6rem; padding:.2rem; }
     </style>
 </head>
 <body>
@@ -128,6 +138,7 @@
 <nav>
     <button class="tab kh-bar-btn active" data-tab="main">Main</button>
     <button class="tab kh-bar-btn"        data-tab="settings">Settings</button>
+<!--    <button class="tab kh-bar-btn"        data-tab="alpha">Alpha SIS</button>-->
 </nav>
 
 <!-- Global: Copy open Kayako ticket URLs/IDs (outside of tabs) -->
@@ -265,6 +276,29 @@
                 <input type="color" id="kh-ui-dark-bg-color" value="#1E1E1E" />
             </div>
 
+            <!-- Expand internal notes width -->
+            <div class="kh-popup-setting">
+                <label><input type="checkbox" id="kh-expand-note-width" /> Allow internal notes to expand (unset max-width)</label>
+            </div>
+
+
+            <!-- Reply resizer behavior -->
+            <div class="kh-popup-setting kh-reply-height-settings">
+                <div class="kh-reply-height-title">Reply box height</div>
+                <div class="kh-reply-height-row">
+                    <label>
+                        <input type="checkbox" id="kh-reply-fixed-height-enabled" /> Use fixed height
+                    </label>
+                    <label>
+                        Height (px)
+                        <input type="number" class="kh-reply-fixed-input" id="kh-reply-fixed-height-px" min="44" max="1000" step="2" value="200" disabled />
+                    </label>
+                </div>
+                <div class="kh-popup-setting">
+                    <label><input type="checkbox" id="kh-reply-remember-last-height" /> Remember last used height</label>
+                </div>
+            </div>
+
 
             <!-- Results page auto-update -->
             <div class="kh-popup-setting">
@@ -286,6 +320,20 @@
                 </div>
             </div>
         </div>
+    </div>
+</section>
+
+<!-- ALPHA SIS UI -->
+<section id="tab-alpha">
+    <h4>Alpha SIS</h4>
+    <div id="kh-alpha-ui-root" class="kh-popup-setting" style="border-top:1px solid #eee; padding-top:.5rem;"></div>
+
+    <div class="kh-popup-setting" style="border-top:1px solid #eee; padding-top:.5rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-weight:600;">Output</div>
+            <button id="kh-alpha-clear-output" class="kh-btn">Clear</button>
+        </div>
+        <pre id="kh-alpha-output" style="max-height:14rem; overflow:auto; background:#0b1020; color:#e6efff; padding:.5rem; border-radius:6px; border:1px solid #1b2542;">(no output)</pre>
     </div>
 </section>
 

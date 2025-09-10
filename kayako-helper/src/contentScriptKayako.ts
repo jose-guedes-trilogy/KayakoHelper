@@ -8,6 +8,7 @@ import { setUpUI }                  from '@/utils/setUpUI';
 
 import { bootLocationWatcher }      from '@/modules/kayako/locationWatcher.ts';
 import { bootCopyChatButton }       from '@/modules/kayako/buttons/copy-chat/copyChatButton.ts';
+import { bootCopyRequesterChatsButton } from '@/modules/kayako/buttons/requester-history/copyRequesterChatsButton.ts';
 import { bootAtlasHighlighter }     from '@/modules/kayako/atlasHighlighter.js';
 import { bootLightboxEnhancer }     from '@/modules/kayako/lightboxEnhancer.js';
 import { bootReplyResizer }         from '@/modules/kayako/reply-box/replyResizer.js';
@@ -59,8 +60,10 @@ bootTargetBlankLinks();
 bootExtraPostButtons();
 bootQcerFeatures();
 bootDownloadManager();
-bootCopyChatButton();
 bootSendToQcButton();
+bootCopyRequesterChatsButton();
+
+bootCopyChatButton();
 bootExportChatButton().then(r => {});
 bootEphorButton().then(r => {});
 

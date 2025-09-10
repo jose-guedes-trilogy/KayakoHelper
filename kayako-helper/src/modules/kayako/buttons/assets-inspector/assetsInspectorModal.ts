@@ -61,7 +61,7 @@ const jumpToPost = (id: number) => {
 };
 
 /* Utilities */
-const log = (...args: unknown[]) => console.log('[AssetsInspector]', ...args);
+const log = (...args: unknown[]) => console.log('[AssetsInspector][ui]', ...args);
 
 const cssEscape = (s: string) => (window as any).CSS?.escape?.(s) ?? s.replace(/"/g, '\\"');
 
@@ -278,6 +278,7 @@ const injectStyles = (modal: HTMLElement) => {
 
 /* Modal shell */
 export const buildModal = (): HTMLElement => {
+    try { console.debug('[AssetsInspector][ui] buildModal'); } catch {}
     const wrap = document.createElement('div');
     wrap.className = MODAL_SEL.slice(1);
     wrap.innerHTML = `
@@ -300,6 +301,7 @@ export const buildModal = (): HTMLElement => {
 
 /* UI helpers */
 const setActiveTab = (modal: HTMLElement, tab: keyof ReturnType<typeof getState>['cache']) => {
+    try { console.debug('[AssetsInspector][ui] setActiveTab', { tab }); } catch {}
     modal.querySelectorAll<HTMLElement>(NAV_ITEM_SEL)
         .forEach(li => li.classList.toggle('active', (li.dataset as any)['tab'] === tab));
     // Extension search removed; nothing to toggle
@@ -307,6 +309,7 @@ const setActiveTab = (modal: HTMLElement, tab: keyof ReturnType<typeof getState>
 };
 
 const renderSummary = (modal: HTMLElement) => {
+    try { console.debug('[AssetsInspector][ui] renderSummary'); } catch {}
     const s = modal.querySelector<HTMLElement>(SUMMARY_SEL);
     if (!s) return;
 
@@ -325,6 +328,7 @@ const renderSummary = (modal: HTMLElement) => {
 
 /* Links tab – categorized table with descriptive header */
 const buildGrid = (items: { url:string; post:number; text?: string }[]) => {
+    try { console.debug('[AssetsInspector][ui] buildGrid', { count: items.length }); } catch {}
     const grid = document.createElement('div');
     grid.className = GRID_SEL.slice(1);
 
@@ -423,6 +427,7 @@ const groupByPost = (items: { url:string; post:number }[]) => {
 };
 
 const buildAttachmentGroups = (items: { url:string; post:number }[]) => {
+    try { console.debug('[AssetsInspector][ui] buildAttachmentGroups', { count: items.length }); } catch {}
     const container = document.createElement('div');
     // Global toolbar for Attachments: Download all ticket attachments (ZIP)
     const toolbar = Object.assign(document.createElement('div'), { className: 'kh-toolbar' });
@@ -500,6 +505,7 @@ const buildAttachmentGroups = (items: { url:string; post:number }[]) => {
 };
 
 const buildImagesGroups = (items: { url:string; post:number }[]) => {
+    try { console.debug('[AssetsInspector][ui] buildImagesGroups', { count: items.length }); } catch {}
     const container = document.createElement('div');
 
     // Global toolbar
@@ -652,6 +658,7 @@ export const renderPane = (
     tab: keyof ReturnType<typeof getState>['cache'],
     options?: { skipSummary?: boolean },
 ) => {
+    try { console.debug('[AssetsInspector][ui] renderPane', { tab, skipSummary: !!options?.skipSummary }); } catch {}
     const box   = modal.querySelector<HTMLElement>(RESULTS_SEL)!;
     const state = getState();
     if (!options?.skipSummary) renderSummary(modal);
@@ -659,6 +666,20 @@ export const renderPane = (
 
     if (state.isLoading) { box.textContent = 'Loading…'; return; }
     const items = state.cache[tab] as any;
+    try {
+        console.info('[AssetsInspector][ui] pane state snapshot', {
+            tab,
+            isLoading: state.isLoading,
+            fetched: state.fetched,
+            totalPosts: state.totalPosts,
+            counts: {
+                links: state.cache.links.length,
+                images: state.cache.images.length,
+                attachments: state.cache.attachments.length,
+            },
+            firstItemsSample: (items as Array<{url:string;post:number; text?: string }>).slice(0, 10),
+        });
+    } catch {}
 
     // Read search inputs
     const searchInput = modal.querySelector<HTMLInputElement>(SEARCH_INPUT_SEL);
@@ -693,6 +714,15 @@ export const renderPane = (
     })();
 
     log('Search filter', { tab, query: q, exts, before: items.length, after: filtered.length });
+    try {
+        const sampleIn  = (items as any[]).slice(0, 10);
+        const sampleOut = (filtered as any[]).slice(0, 10);
+        console.debug('[AssetsInspector][ui] filter samples', {
+            tab,
+            inputSample: sampleIn,
+            outputSample: sampleOut,
+        });
+    } catch {}
 
     if (!filtered.length) {
         const empty = document.createElement('div');
@@ -709,12 +739,19 @@ export const renderPane = (
 
 /* Public helpers for index.ts */
 export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: () => void) => {
+    try { console.debug('[AssetsInspector][ui] wireModal'); } catch {}
     modal.addEventListener('mouseover', ev => {
         const li = (ev.target as HTMLElement).closest<HTMLElement>(NAV_ITEM_SEL);
         if (li) setActiveTab(modal, (li.dataset as any)['tab'] as any);
     });
     modal.addEventListener('click', ev => {
         const t = ev.target as HTMLElement;
+        if (t.closest(NAV_ITEM_SEL)) {
+            try {
+                const active = (t.closest(NAV_ITEM_SEL) as HTMLElement | null)?.dataset?.tab;
+                console.debug('[AssetsInspector][ui] nav click', { active });
+            } catch {}
+        }
         if (t.matches(FETCH_NEXT_SEL)) fetchNext();
         if (t.matches(FETCH_ALL_SEL))  fetchAll();
         if (t.closest('.kh-assets-close')) {

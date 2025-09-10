@@ -5,8 +5,24 @@
  * page it returns `null`.
  */
 export function currentConvId(): string | null {
-    const match = window.location.pathname.match(/\/agent\/conversations\/(\d+)$/);
-    return match ? match[1] : null;
+    try {
+        const path = window.location.pathname;
+        // Accept URLs like:
+        // - /agent/conversations/123456
+        // - /agent/conversations/123456/
+        // - /agent/conversations/123456/anything
+        const match = path.match(/\/agent\/conversations\/(\d+)(?:\/|$)/);
+        const id = match ? match[1] : null;
+        if (!id) {
+            try { console.debug('[KH][location] currentConvId: not a conversation path', { path }); } catch {}
+        } else {
+            try { console.debug('[KH][location] currentConvId', { id, path }); } catch {}
+        }
+        return id;
+    } catch (err) {
+        try { console.warn('[KH][location] currentConvId failed', err); } catch {}
+        return null;
+    }
 }
 
 /** `true` only when the current URL is a real conversation tab. */

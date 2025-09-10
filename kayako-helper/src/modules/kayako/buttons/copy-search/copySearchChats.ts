@@ -18,6 +18,7 @@
 
 import { cleanConversation, Post }            from '@/modules/kayako/buttons/copy-chat/cleanConversation.ts';
 import { onRouteChange }                      from '@/utils/location.ts';
+import { confirmLargeOperation }              from '@/utils/dialog.ts';
 import {
     EXTENSION_SELECTORS,
     KAYAKO_SELECTORS,
@@ -28,10 +29,12 @@ import {
 /* ------------------------------------------------------------------ */
 
 const STORAGE_KEY          = 'copySearchChats.limit';
+const STORAGE_MODE_KEY     = 'copySearchChats.mode';
 const DEFAULT_CHAT_LIMIT   = 3;          // conversations
 const POST_LIMIT_PER_CASE  = 100;        // messages per conversation
 const ICON                 = { idle: '📄', work: '⏳', ok: '✅', err: '❌' } as const;
 type UiState = keyof typeof ICON;
+type ActionMode = 'copy' | 'download';
 
 const CONTAINER_SEL        = KAYAKO_SELECTORS.searchPageContainer;   // outlet for the button
 const SEARCH_INPUT         = KAYAKO_SELECTORS.searchInput;
@@ -47,18 +50,9 @@ const CHV_BTN_CLASS        = EXTENSION_SELECTORS.twoPartBtnChevron.replace(/^./,
 const DD_CLASS             = EXTENSION_SELECTORS.twoPartBtnDropdown.replace(/^./, '');
 const DD_OPT_CLASS         = EXTENSION_SELECTORS.twoPartBtnDropdownItem.replace(/^./, '');
 
-/* Descriptive dropdown entries – *not* raw numbers any more */
-const CUSTOM_LABEL  = 'Custom';
-const DROPDOWN_OPTS = [
-    'Copy 1 ticket',
-    'Copy 2 tickets',
-    'Copy 3 tickets',
-    'Copy 5 tickets',
-    'Copy 10 tickets',
-    'Copy 15 tickets',
-    'Copy 20 tickets',
-    CUSTOM_LABEL,
-] as const;
+/* Count presets */
+const CUSTOM_LABEL  = 'Custom…';
+const COUNT_PRESETS = [1, 2, 3, 5, 10, 15, 20] as const;
 
 /* Pagination */
 const RESULTS_PER_PAGE     = 20;         /* 🔄 NEW – matches Kayako UI */
@@ -75,6 +69,17 @@ export function bootCopySearchChats(): void {
     onRouteChange(() => ensureButtonWithRetry(), { immediate: true });
 }
 
+/** Quick left-button action: always copy */
+async function quickCopy(
+    ui: { state: UiState; limit: number; mode: ActionMode },
+    btn: HTMLButtonElement,
+): Promise<void> {
+    const prev = ui.mode;
+    ui.mode = 'copy';
+    try { await execute(ui, btn); }
+    finally { ui.mode = prev; }
+}
+
 /* ------------------------------------------------------------------ */
 /* DOM helpers                                                        */
 /* ------------------------------------------------------------------ */
@@ -82,16 +87,24 @@ export function bootCopySearchChats(): void {
 /** Try to insert the button, retrying if the outlet hasn’t rendered yet. */
 function ensureButtonWithRetry(attempt = 0): void {
     /* Guard: only run on the canonical search page of the right host */
-    if (
-        location.hostname !== 'central-supportdesk.kayako.com' ||
-        !/^\/agent\/search\//.test(location.pathname)
-    ) {
+    const isKayakoHost = /\.kayako\.com$/i.test(location.hostname);
+    const isSearchPath = /^\/agent\/search\//.test(location.pathname);
+    if (!isKayakoHost || !isSearchPath) {
+        // logging per user rules
+        console.debug('[copySearchChats] Skipping insert: host/path not eligible', {
+            host: location.hostname,
+            isKayakoHost,
+            path: location.pathname,
+            isSearchPath,
+        });
         return;
     }
 
     const container = document.querySelector<HTMLElement>(CONTAINER_SEL);
 
     if (!container) {
+        // logging per user rules
+        console.debug('[copySearchChats] Search container not found yet; retrying', { attempt, selector: CONTAINER_SEL });
         if (attempt < MAX_RETRIES) {
             setTimeout(() => ensureButtonWithRetry(attempt + 1), RETRY_DELAY);
         }
@@ -106,9 +119,10 @@ function ensureButtonWithRetry(attempt = 0): void {
 }
 
 function buildAndInsertButton(container: HTMLElement): void {
-    const ui: { state: UiState; limit: number } = {
+    const ui: { state: UiState; limit: number; mode: ActionMode } = {
         state: 'idle',
         limit: loadLimit(),
+        mode : loadMode(),
     };
 
     /* --- Wrapper ----------------------------------------------------- */
@@ -120,7 +134,7 @@ function buildAndInsertButton(container: HTMLElement): void {
     mainBtn.type = 'button';
     mainBtn.classList.add(DEFAULT_BTN_CLASS, MAIN_BTN_CLASS);
     mainBtn.textContent = label(ui);
-    mainBtn.addEventListener('click', () => copyChats(ui, mainBtn));
+    mainBtn.addEventListener('click', () => quickCopy(ui, mainBtn));
 
     /* --- Chevron (right) button -------------------------------------- */
     const right = document.createElement('button');
@@ -157,45 +171,41 @@ function buildAndInsertButton(container: HTMLElement): void {
  * or shows a prompt when “Custom” is chosen.
  */
 function buildDropdown(
-    ui: { state: UiState; limit: number },
+    ui: { state: UiState; limit: number; mode: ActionMode },
     mainBtn: HTMLButtonElement
 ): HTMLElement {
     const list = document.createElement('div');
     list.className = DD_CLASS; // hidden by default (CSS)
-    list.style.minWidth = `141.5px`;
+    list.style.minWidth = `180px`;
 
-    DROPDOWN_OPTS.forEach(optText => {
+    const mkItem = (text: string, handler: () => void) => {
         const li = document.createElement('div');
         li.className = DD_OPT_CLASS;
-        li.textContent = optText;
+        li.textContent = text;
+        li.addEventListener('click', ev => { ev.stopPropagation(); handler(); list.style.display = 'none'; });
+        return li;
+    };
 
-        li.addEventListener('click', ev => {
-            ev.stopPropagation();
+    list.append(
+        mkItem('Copy now', () => { ui.mode = 'copy'; saveMode(ui.mode); void execute(ui, mainBtn); }),
+        mkItem('Download file', () => { ui.mode = 'download'; saveMode(ui.mode); void execute(ui, mainBtn); }),
+    );
 
-            /* “Custom” option – prompt for any positive integer */
-            if (optText === CUSTOM_LABEL) {
-                const input = prompt('Copy how many tickets?', String(ui.limit));
-                if (input === null) return; // cancelled
+    const divider = document.createElement('div');
+    divider.style.cssText = 'border-top:1px solid #e5e7eb;margin:4px 0;';
+    list.append(divider);
 
-                const num = parseInt(input.trim(), 10);
-                if (!Number.isFinite(num) || num <= 0) {
-                    alert('Please enter a positive integer.');
-                    return;
-                }
-
-                applyLimit(num);
-                return;
-            }
-
-            /* Regular predefined limits ----------------------------- */
-            const numMatch = optText.match(/\d+/);
-            if (!numMatch) return; // should never happen
-
-            applyLimit(parseInt(numMatch[0], 10));
-        });
-
+    COUNT_PRESETS.forEach(n => {
+        const li = mkItem(`Count: ${n}`, () => { applyLimit(n); void execute(ui, mainBtn); });
         list.append(li);
     });
+    list.append(mkItem(`Count: ${CUSTOM_LABEL}`, () => {
+        const input = prompt('How many tickets?', String(ui.limit));
+        if (input === null) return; // cancelled
+        const num = parseInt(input.trim(), 10);
+        if (!Number.isFinite(num) || num <= 0) { alert('Please enter a positive integer.'); return; }
+        applyLimit(num); void execute(ui, mainBtn);
+    }));
 
     return list;
 
@@ -205,10 +215,7 @@ function buildDropdown(
         saveLimit(limit);
         ui.state = 'idle';
         mainBtn.textContent = label(ui);
-        list.style.display = 'none';       // close after pick
-
-        /* Run immediately after choosing */
-        copyChats(ui, mainBtn).catch(() => {/* errors handled in copyChats */});
+        list.style.display = 'none';
     }
 }
 
@@ -242,8 +249,8 @@ function isConversationSearch(): boolean {
     return !group || group === 'CASES' || group === 'CONVERSATIONS';
 }
 
-async function copyChats(
-    ui: { state: UiState; limit: number },
+async function execute(
+    ui: { state: UiState; limit: number; mode: ActionMode },
     btn: HTMLButtonElement
 ): Promise<void> {
     if (ui.state === 'work') return;                 // ignore double-clicks
@@ -260,31 +267,30 @@ async function copyChats(
     const offset       = (page - 1) * RESULTS_PER_PAGE;
 
     try {
+        const proceed = await confirmLargeOperation(ui.limit);
+        if (!proceed) return;
+
         setUi('work');
-        const ids = await firstNConversationIds(q, ui.limit, offset);  /* 🔄 NEW arg */
+        const ids = await firstNConversationIds(q, ui.limit, offset);
         if (!ids.length) throw new Error('No matching conversations.');
 
-        /* --------------------------------------------------------------
-           Fetch, patch and format each transcript
-           ---------------------------------------------------------- */
-        const texts = await Promise.all(
-            ids.map(async id => {
-                const raw = await fetchTranscriptByCase(id, POST_LIMIT_PER_CASE);
+        const { concurrency, spacingMs } = throttlePlan(ids.length);
+        console.info('[copySearchChats] batch start', { count: ids.length, mode: ui.mode, concurrency, spacingMs });
 
-                /* 🔄 CHANGED: put the real ticket ID in place of “Unknown ID” */
-                const fixed = raw.replace(
-                    /^Ticket ID:\s+Unknown ID\b/m,
-                    `Ticket ID: ${id}`
-                );
+        const texts = await parallelMap(ids, async (id) => {
+            const raw = await fetchTranscriptByCase(id, POST_LIMIT_PER_CASE);
+            const fixed = raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+            return fixed;
+        }, { concurrency, spacingMs });
 
-                return fixed;
-            })
-        );
+        const bundle = texts.join('\n\n[=========== Next Conversation ===========]\n\n');
 
-        const bundle =
-            texts.join('\n\n[=========== Next Conversation ===========]\n\n');
-
-        await navigator.clipboard.writeText(bundle);
+        if (ui.mode === 'download') {
+            const fname = makeFilename(q, ids.length);
+            triggerDownload(bundle, fname);
+        } else {
+            await navigator.clipboard.writeText(bundle);
+        }
         setUi('ok');
     } catch (err: any) {
         console.error('[copySearchChats]', err);
@@ -368,4 +374,74 @@ function loadLimit(): number {
 
 function saveLimit(n: number): void {
     localStorage.setItem(STORAGE_KEY, String(n));
+}
+
+function loadMode(): ActionMode {
+    const v = localStorage.getItem(STORAGE_MODE_KEY);
+    return v === 'download' ? 'download' : 'copy';
+}
+
+function saveMode(m: ActionMode): void {
+    localStorage.setItem(STORAGE_MODE_KEY, m);
+}
+
+/* ------------------------------------------------------------------ */
+/* Throttling helpers                                                 */
+/* ------------------------------------------------------------------ */
+
+function throttlePlan(total: number): { concurrency: number; spacingMs: number } {
+    if (total <= 20) return { concurrency: 6, spacingMs: 100 };
+    if (total <= 100) return { concurrency: 3, spacingMs: 300 };
+    return { concurrency: 2, spacingMs: 600 };
+}
+
+async function parallelMap<T, R>(
+    items: T[],
+    worker: (item: T, index: number) => Promise<R>,
+    opts: { concurrency: number; spacingMs: number },
+): Promise<R[]> {
+    const { concurrency, spacingMs } = opts;
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+    let active = 0;
+    let resolveAll: (v: R[]) => void;
+    let rejectAll: (e: unknown) => void;
+    const done = new Promise<R[]>((res, rej) => { resolveAll = res; rejectAll = rej; });
+
+    const startNext = (): void => {
+        if (nextIndex >= items.length) { if (active === 0) resolveAll(results); return; }
+        const current = nextIndex++;
+        active++;
+        void worker(items[current], current)
+            .then(r => { results[current] = r; })
+            .catch(err => { rejectAll(err); })
+            .finally(() => {
+                active--;
+                setTimeout(startNext, spacingMs);
+            });
+    };
+
+    const starters = Math.min(concurrency, items.length);
+    for (let i = 0; i < starters; i++) startNext();
+    return done;
+}
+
+function makeFilename(query: string, count: number): string {
+    const ts = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const date = `${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}`;
+    const safeQ = query.replace(/[^a-z0-9]+/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'search';
+    return `kayako-${safeQ}-${count}chats-${date}.txt`;
+}
+
+function triggerDownload(content: string, filename: string): void {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 }

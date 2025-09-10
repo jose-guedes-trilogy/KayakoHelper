@@ -134,16 +134,28 @@ export function bootSendToQcButton(): void {
                 for (const action of ACTION_OPTIONS) {
                     const li = document.createElement('div');
                     li.className = clsItem;
+                    // Left-click only
+                    li.addEventListener('click', (ev) => { if ((ev as MouseEvent).button !== 0) ev.preventDefault(); });
                     li.textContent = action;
-                    li.addEventListener('click', async (ev) => {
-                        ev.stopPropagation();
-                        const leftBtn = document.getElementById(BTN_ID.replace(/^#/,'')) as HTMLButtonElement | null;
-                        if (!leftBtn) return;
-                        const setState = (s: UiState) => { uiState=s; leftBtn.textContent=label(); };
-                        console.info('[KH][SendToQC] Menu action selected:', action);
-                        await handleClick(leftBtn, setState, action);
-                        if (uiState !== 'idle') {
-                            setTimeout(() => { setState('idle'); }, RESET_MS);
+                    // Use mousedown to ensure handler fires before any hover-hide timers
+                    li.addEventListener('mousedown', async (ev) => {
+                        try {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            if ((ev as MouseEvent).button !== 0) return;  // left-click only
+                            const leftBtn = document.getElementById(BTN_ID.replace(/^#/,'')) as HTMLButtonElement | null;
+                            if (!leftBtn) { console.warn('[KH][SendToQC] Left button not found for menu action'); return; }
+                            const setState = (s: UiState) => { uiState=s; leftBtn.textContent=label(); };
+                            console.info('[KH][SendToQC] Menu action selected (mousedown):', action);
+                            await handleClick(leftBtn, setState, action);
+                        } catch (e) {
+                            console.error('[KH][SendToQC] Menu action failed', e);
+                        } finally {
+                            // Close the dropdown menu after selection
+                            (menu as HTMLElement).style.display = 'none';
+                            if (uiState !== 'idle') {
+                                setTimeout(() => { const leftBtn = document.getElementById(BTN_ID.replace(/^#/,'')) as HTMLButtonElement | null; if (!leftBtn) return; const setState = (s: UiState) => { uiState=s; leftBtn.textContent=label(); }; setState('idle'); }, RESET_MS);
+                            }
                         }
                     });
                     menu.appendChild(li);
@@ -256,18 +268,32 @@ function normalizeParagraphs(fragment: string): string {
         Array.from(el.attributes).forEach(attr => {
             if (attr.name.startsWith('data-')) el.removeAttribute(attr.name);
         });
-        // Strip color and background-color styles, keep other styles intact
+        // Strip color, background-color, and any font-family (including font shorthand)
         const style = (el as HTMLElement).getAttribute('style');
         if (style) {
-            const cleaned = style
+            const rules = style
                 .split(';')
                 .map(s => s.trim())
-                .filter(Boolean)
-                .filter(rule => {
-                    const k = rule.split(':')[0]?.trim().toLowerCase();
-                    return k !== 'color' && k !== 'background-color';
-                })
-                .join('; ');
+                .filter(Boolean);
+            const removed: string[] = [];
+            const keptRules = rules.filter(rule => {
+                const key = rule.split(':')[0]?.trim().toLowerCase();
+                const shouldRemove = key === 'color'
+                    || key === 'background-color'
+                    || key === 'font-family'
+                    || key === 'font';
+                if (shouldRemove && key) removed.push(key);
+                return !shouldRemove;
+            });
+            if (removed.some(k => k === 'font-family' || k === 'font')) {
+                try {
+                    console.debug('[KH][SendToQC] Stripped font-family from inline styles', {
+                        tag: (el as HTMLElement).tagName.toLowerCase(),
+                        removed,
+                    });
+                } catch {}
+            }
+            const cleaned = keptRules.join('; ');
             if (cleaned) (el as HTMLElement).setAttribute('style', cleaned);
             else (el as HTMLElement).removeAttribute('style');
         }
@@ -295,15 +321,15 @@ function buildTemplate(clip: string | null, action: string = DEFAULT_ACTION): st
         ? ''
         : normalizeParagraphs(clip || '<i>(clipboard empty)</i>');
     return (
-        `What is your proposed action?<br><br>
+        `<strong>What is your proposed action?</strong><br><br>
 • ${action}<br><br>
 ===============================================================<br>
-What is the PR to the customer?<br><br>
+<strong>What is the PR to the customer?</strong><br><br>
 ${body}<br><br>
 ===============================================================<br>
-Additional Context?<br><br><br>
+<strong>Additional Context?</strong><br><br><br>
 ===============================================================<br><br>
-GPT<br>
+<strong>GPT</strong><br>
 Did you use GPT: Yes`
     );
 }

@@ -145,6 +145,13 @@ export interface EphorStore {
         styleGuide  : string;
     };
 
+    /* Per-ticket system prompt bodies (key: `${projectId}::${ticketId}`) */
+    systemPromptBodiesByContext?: Record<string, {
+        fileAnalysis?: string;
+        pastTickets?: string;
+        styleGuide?: string;
+    }>;
+
     /* 👇 NEW: saved AI model selection presets */
     aiSelections?: AISelection[];
 
@@ -248,6 +255,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
             pastTickets : "",
             styleGuide  : "",
         },
+        systemPromptBodiesByContext: {},
         aiSelections: [],
         workflows: [],
         savedInstructions: [],
@@ -270,6 +278,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
             pastTickets : saved?.systemPromptBodies?.pastTickets  ?? "",
             styleGuide  : saved?.systemPromptBodies?.styleGuide   ?? "",
         },
+        systemPromptBodiesByContext: saved?.systemPromptBodiesByContext ?? {},
         aiSelections: saved?.aiSelections ?? [],
         workflows: saved?.workflows ?? [],
         savedInstructions: saved?.savedInstructions ?? [],

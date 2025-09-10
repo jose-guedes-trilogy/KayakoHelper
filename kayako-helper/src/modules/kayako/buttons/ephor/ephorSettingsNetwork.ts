@@ -7,6 +7,7 @@ import type { LogFn }   from "./ephorSettingsLogger.ts";
 import type { ModalRefs } from "./ephorSettingsUI.ts";
 import { EphorClient }  from "@/background/ephorClient.ts";
 import { saveEphorStore } from "./ephorStore.ts";
+import { apiToDisplay, buildAvailablePairs } from "./modelCatalog.ts";
 
 export interface ModalState {
     store          : EphorStore;
@@ -116,7 +117,10 @@ export function rebuildModelList(
     const { store, availableModels } = state;
     refs.aiListDiv.textContent = "";
 
-    const visible = availableModels.filter(m => m.toLowerCase().includes(filter.toLowerCase()));
+    // Convert into display/api pairs and filter by display text
+    const pairs = buildAvailablePairs(availableModels);
+    const visible = pairs.filter(p => p.display.toLowerCase().includes(filter.toLowerCase()))
+                         .map(p => ({ api: p.api, display: p.display }));
     if (visible.length === 0) {
         refs.aiListDiv.innerHTML =
             `<em style="color:#666;padding:8px;display:block;">No models found.</em>`;
@@ -126,25 +130,29 @@ export function rebuildModelList(
     const isStage = !!stage;
     const sel = isStage ? stage!.selectedModels : store.selectedModels;
 
-    for (const m of visible) {
+    for (const rec of visible) {
         const label = document.createElement("label");
         const cb    = document.createElement("input");
         cb.type    = "checkbox";
-        cb.value   = m;
-        cb.checked = sel.includes(m);
+        cb.value   = rec.api;
+        cb.checked = sel.some(x => x.toLowerCase() === rec.api.toLowerCase());
 
         cb.addEventListener("change", () => {
-            if (cb.checked) sel.push(m);
+            // keep API ids in selection; avoid duplicates by case-insensitive check
+            const idxCI = sel.findIndex(x => x.toLowerCase() === rec.api.toLowerCase());
+            if (cb.checked) {
+                if (idxCI === -1) sel.push(rec.api);
+            }
             else {
-                const idx = sel.indexOf(m);
-                if (idx !== -1) sel.splice(idx, 1);
+                if (idxCI !== -1) sel.splice(idxCI, 1);
             }
             /* persist */
             void saveEphorStore(store);
         });
 
         label.appendChild(cb);
-        label.appendChild(document.createTextNode(m));
+        // Show only the display name
+        label.appendChild(document.createTextNode(rec.display));
         refs.aiListDiv.appendChild(label);
     }
 }

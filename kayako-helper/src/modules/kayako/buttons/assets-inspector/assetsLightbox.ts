@@ -17,6 +17,7 @@ let keysAttached = false;
 const log = (...args: unknown[]) => console.debug('[AssetsLightbox]', ...args);
 
 const ensureStyles = (): void => {
+    try { console.debug('[AssetsLightbox] ensureStyles'); } catch {}
     if (document.querySelector('style.kh-assets-lightbox-style')) return;
     const style = document.createElement('style');
     style.className = 'kh-assets-lightbox-style';
@@ -45,6 +46,7 @@ const ensureStyles = (): void => {
 };
 
 const createWrap = (): HTMLElement => {
+    try { console.debug('[AssetsLightbox] createWrap'); } catch {}
     let wrap = document.querySelector<HTMLElement>(WRAP_SEL);
     if (wrap) return wrap;
     wrap = document.createElement('div');
@@ -108,6 +110,7 @@ const createWrap = (): HTMLElement => {
 };
 
 const ensureUi = (): { wrap: HTMLElement; img: HTMLImageElement; counter: HTMLElement } => {
+    try { console.debug('[AssetsLightbox] ensureUi'); } catch {}
     ensureStyles();
     const wrap = createWrap();
     const img = wrap.querySelector<HTMLImageElement>(IMG_SEL)!;

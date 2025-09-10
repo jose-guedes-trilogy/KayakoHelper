@@ -126,8 +126,17 @@ async function onQcClick(post: HTMLElement): Promise<void> {
         // Insert cleaned HTML so newlineSpacer formats from a minimal baseline
         editor.innerHTML = toInsertHtml;
 
+        // Defense-in-depth cleanup in the live editor before spacing normalization
+        try { removeInteractiveArtifacts(editor); } catch (e) { console.debug('[KH][QCer] removeInteractiveArtifacts skipped:', e); }
+        try { replaceNbspWithSpaces(editor); } catch (e) { console.debug('[KH][QCer] replaceNbspWithSpaces skipped:', e); }
         // Pre-clean: remove any legacy wrappers/empties so newlineSpacer formats cleanly
         try { preCleanEditorContent(editor); } catch (e) { console.debug('[KH][QCer] preClean skipped:', e); }
+        // Remove empty list items that can confuse Froala's list handling on backspace
+        try { pruneEmptyListItems(editor); } catch (e) { console.debug('[KH][QCer] pruneEmptyListItems skipped:', e); }
+        // Remove whitespace-only text nodes inside UL/OL and trim LI boundaries
+        try { sanitizeLists(editor); } catch (e) { console.debug('[KH][QCer] sanitizeLists skipped:', e); }
+        try { removeWhitespaceTextNodes(editor); } catch (e) { console.debug('[KH][QCer] removeWhitespaceTextNodes skipped:', e); }
+        try { editor.normalize(); } catch {}
 
         try { addNewlines(editor); } catch (e) { console.debug('[KH][QCer] addNewlines skipped/failed:', e); }
 
@@ -140,6 +149,9 @@ async function onQcClick(post: HTMLElement): Promise<void> {
             console.debug('[KH][QCer] Mode after insertion (should be reply):', inReply);
         } catch {}
         try { applySize(500); } catch (e) { /* non-fatal */ }
+
+        // Attach stability guards to mitigate Froala inserting leading NBSP on backspace
+        try { attachEditorStabilityGuards(editor); } catch (e) { console.debug('[KH][QCer] attachEditorStabilityGuards failed:', e); }
 
         const insertedLen = (extractedHtml ?? extractedText ?? rawText).length;
         console.debug('[KH][QCer] Inserted content into reply (chars):', insertedLen, {
@@ -281,8 +293,19 @@ function extractProposedResponseHtml(html: string): string | null {
             resultRoot.removeChild(resultRoot.lastElementChild);
         }
 
+        // Replace NBSPs with normal spaces to avoid Froala list quirks on backspace
+        try { replaceNbspWithSpaces(resultRoot); } catch (e) { console.debug('[KH][QCer] replaceNbspWithSpaces failed:', e); }
+
+        // Remove interactive artifacts (PR-local toolbars, role buttons, ephor icon, etc.)
+        try { removeInteractiveArtifacts(resultRoot); } catch (e) { console.debug('[KH][QCer] removeInteractiveArtifacts failed:', e); }
+
         // Strip non-text styling (extension classes, inline styles, wrappers)
         try { stripNonTextStyling(resultRoot); } catch (e) { console.debug('[KH][QCer] stripNonTextStyling failed:', e); }
+
+        // Clean whitespace-only text nodes in lists to avoid empty <li> creation on edits
+        try { sanitizeLists(resultRoot); } catch (e) { console.debug('[KH][QCer] sanitizeLists(html) failed:', e); }
+        try { removeWhitespaceTextNodes(resultRoot); } catch (e) { console.debug('[KH][QCer] removeWhitespaceTextNodes(html) failed:', e); }
+        try { resultRoot.normalize(); } catch {}
 
         const cleaned = resultRoot.innerHTML.trim();
         return cleaned.length ? cleaned : null;
@@ -508,6 +531,9 @@ function stripNonTextStyling(root: HTMLElement): void {
         w.remove();
     });
 
+    // Proactively drop interactive artifacts that do not belong in editor content
+    removeInteractiveArtifacts(root);
+
     // Remove inline styles and extension/Kayako classes; drop data-kh* attrs
     const all = Array.from(root.querySelectorAll<HTMLElement>('*'));
     for (const el of all) {
@@ -525,5 +551,218 @@ function stripNonTextStyling(root: HTMLElement): void {
             });
         } catch {}
     }
+}
+
+/* ----------  EXTRA SANITIZERS (defense-in-depth)  ------------------------ */
+function removeInteractiveArtifacts(root: HTMLElement): void {
+    try {
+        let removed = 0;
+        // Remove any PR-local toolbars and generic interactive buttons that may have leaked from the timeline
+        root.querySelectorAll<HTMLElement>('[data-kh-pr-toolbar], [role="button"], .kh-send-ephor-review-btn').forEach(el => {
+            el.remove();
+            removed++;
+        });
+        // Remove bare SVG-only action containers that became empty
+        Array.from(root.querySelectorAll<HTMLElement>('div, span'))
+            .filter(el => el.children.length > 0 && Array.from(el.children).every(c => c.tagName === 'SVG'))
+            .forEach(el => { el.remove(); removed++; });
+        // Remove ephor icon images if any remain
+        root.querySelectorAll('img[alt="Ephor"]').forEach(n => { (n as HTMLElement).remove(); removed++; });
+        if (removed) { try { console.debug('[KH][QCer] Removed interactive artifacts from content:', removed); } catch {} }
+    } catch {}
+}
+
+function replaceNbspWithSpaces(root: HTMLElement): void {
+    try {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const toUpdate: Text[] = [];
+        while (walker.nextNode()) {
+            const t = walker.currentNode as Text;
+            if (t.nodeValue && /\u00A0/.test(t.nodeValue)) toUpdate.push(t);
+        }
+        toUpdate.forEach(t => { t.nodeValue = (t.nodeValue || '').replace(/\u00A0/g, ' '); });
+        if (toUpdate.length) { try { console.debug('[KH][QCer] Replaced NBSPs in text nodes:', toUpdate.length); } catch {} }
+    } catch {}
+}
+
+function pruneEmptyListItems(root: HTMLElement): void {
+    const isEmptyLi = (li: HTMLElement): boolean => {
+        const clone = li.cloneNode(true) as HTMLElement;
+        // Drop <br> and NBSP-only nodes for the emptiness check
+        clone.querySelectorAll('br').forEach(n => n.remove());
+        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+        let text = '';
+        while (walker.nextNode()) {
+            text += (walker.currentNode as Text).nodeValue || '';
+        }
+        return text.replace(/\u00A0/g, ' ').trim() === '' && clone.children.length === 0;
+    };
+    let removed = 0;
+    Array.from(root.querySelectorAll<HTMLElement>('li')).forEach(li => {
+        try {
+            if (isEmptyLi(li)) { li.remove(); removed++; }
+        } catch {}
+    });
+    if (removed) { try { console.debug('[KH][QCer] Removed empty <li> nodes:', removed); } catch {} }
+}
+
+function sanitizeLists(root: HTMLElement): void {
+    let adjusted = 0;
+    const lists = Array.from(root.querySelectorAll<HTMLElement>('ul, ol'));
+    for (const list of lists) {
+        // Remove whitespace-only text nodes directly under the list
+        let n: ChildNode | null = list.firstChild;
+        while (n) {
+            const next = n.nextSibling;
+            if (n.nodeType === Node.TEXT_NODE && !(n.nodeValue || '').replace(/\u00A0/g, ' ').trim()) {
+                list.removeChild(n);
+                adjusted++;
+            }
+            n = next;
+        }
+        // For each LI: trim leading/trailing whitespace-only text nodes
+        const items = Array.from(list.children).filter(el => el.tagName === 'LI') as HTMLElement[];
+        for (const li of items) {
+            // Remove whitespace-only text nodes at boundaries
+            while (li.firstChild && li.firstChild.nodeType === Node.TEXT_NODE && !((li.firstChild as Text).nodeValue || '').replace(/\u00A0/g, ' ').trim()) {
+                li.removeChild(li.firstChild);
+                adjusted++;
+            }
+            while (li.lastChild && li.lastChild.nodeType === Node.TEXT_NODE && !((li.lastChild as Text).nodeValue || '').replace(/\u00A0/g, ' ').trim()) {
+                li.removeChild(li.lastChild);
+                adjusted++;
+            }
+            // Remove <span> or <div> that are purely whitespace
+            Array.from(li.querySelectorAll<HTMLElement>('span, div')).forEach(el => {
+                if (el.children.length === 0 && ((el.textContent || '').replace(/\u00A0/g, ' ').trim() === '')) {
+                    el.remove(); adjusted++;
+                }
+            });
+        }
+    }
+    if (adjusted) { try { console.debug('[KH][QCer] sanitizeLists adjusted nodes:', adjusted); } catch {} }
+}
+
+function removeWhitespaceTextNodes(root: HTMLElement): void {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const toRemove: Text[] = [];
+    while (walker.nextNode()) {
+        const t = walker.currentNode as Text;
+        const parent = t.parentElement as HTMLElement | null;
+        if (!parent) continue;
+        const onlyWs = !((t.nodeValue || '').replace(/\u00A0/g, ' ').trim());
+        if (!onlyWs) continue;
+        // Only remove whitespace-only text that sits in structural blocks or lists
+        const tag = parent.tagName;
+        if (tag === 'UL' || tag === 'OL' || tag === 'LI' || tag === 'DIV' || tag === 'H1' || tag === 'H2' || tag === 'H3' || tag === 'H4' || tag === 'H5' || tag === 'H6') {
+            toRemove.push(t);
+        }
+    }
+    toRemove.forEach(t => t.parentNode?.removeChild(t));
+    if (toRemove.length) { try { console.debug('[KH][QCer] Removed whitespace-only text nodes:', toRemove.length); } catch {} }
+}
+
+/* ----------  LIVE GUARDS FOR FROALA EDGE CASES  -------------------------- */
+function attachEditorStabilityGuards(editor: HTMLElement): void {
+    const FLAG = 'khBackspaceGuard';
+    if ((editor as any).dataset?.[FLAG] === 'yes') return;
+    try { (editor as any).dataset[FLAG] = 'yes'; } catch {}
+
+    const scheduleNormalize = (() => {
+        let rafId = 0;
+        return () => {
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = 0;
+                try {
+                    normalizeEditorWhitespace(editor);
+                } catch (e) {
+                    console.debug('[KH][QCer] normalizeEditorWhitespace failed:', e);
+                }
+            });
+        };
+    })();
+
+    editor.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            scheduleNormalize();
+        }
+    });
+    editor.addEventListener('input', (e: Event) => {
+        const ie = e as InputEvent;
+        const t = ie.inputType || '';
+        if (t.includes('delete')) scheduleNormalize();
+    });
+
+    console.debug('[KH][QCer] Backspace guard attached.');
+}
+
+function normalizeEditorWhitespace(root: HTMLElement): void {
+    // Replace NBSPs first
+    replaceNbspWithSpaces(root);
+    // Trim block boundaries for common block-level elements
+    const blocks = Array.from(root.querySelectorAll<HTMLElement>('div,p,h1,h2,h3,h4,h5,h6,li'));
+    let touched = 0;
+    for (const blk of blocks) {
+        const a = trimLeadingSpacesInBlock(blk);
+        const b = trimTrailingSpacesInBlock(blk);
+        if (a || b) touched++;
+    }
+    if (touched) {
+        // Clean leftover whitespace-only text nodes and normalize DOM
+        removeWhitespaceTextNodes(root);
+        try { root.normalize(); } catch {}
+        try { console.debug('[KH][QCer] Normalized editor whitespace on delete; blocks touched:', touched); } catch {}
+    }
+}
+
+function findFirstTextNode(root: Node): Text | null {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+        const t = walker.currentNode as Text;
+        if ((t.nodeValue || '').replace(/\u00A0/g, ' ').length > 0) return t;
+    }
+    return null;
+}
+
+function findLastTextNode(root: Node): Text | null {
+    // Walk manually backwards to avoid reverse TreeWalker complexity
+    const stack: Node[] = [root];
+    let last: Text | null = null;
+    while (stack.length) {
+        const n = stack.pop()!;
+        if (n.nodeType === Node.TEXT_NODE) {
+            const t = n as Text;
+            if ((t.nodeValue || '').replace(/\u00A0/g, ' ').length > 0) last = t;
+            continue;
+        }
+        const el = n as Element;
+        for (let i = el.childNodes.length - 1; i >= 0; i--) stack.push(el.childNodes[i]!);
+    }
+    return last;
+}
+
+function trimLeadingSpacesInBlock(block: HTMLElement): boolean {
+    const first = findFirstTextNode(block);
+    if (!first) return false;
+    const before = first.nodeValue || '';
+    const next = before.replace(/^[ \u00A0]+/, '');
+    if (next !== before) {
+        first.nodeValue = next;
+        return true;
+    }
+    return false;
+}
+
+function trimTrailingSpacesInBlock(block: HTMLElement): boolean {
+    const last = findLastTextNode(block);
+    if (!last) return false;
+    const before = last.nodeValue || '';
+    const next = before.replace(/[ \u00A0]+$/, '');
+    if (next !== before) {
+        last.nodeValue = next;
+        return true;
+    }
+    return false;
 }
 

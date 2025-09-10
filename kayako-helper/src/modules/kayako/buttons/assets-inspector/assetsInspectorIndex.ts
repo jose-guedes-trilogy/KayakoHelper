@@ -12,6 +12,7 @@ const CHEVRON_CLS= EXTENSION_SELECTORS.twoPartBtnChevron.replace(/^./, '')
 export function bootAssetsInspector(): void {
     if ((window as any).__assetsInspectorBooted) return;
     (window as any).__assetsInspectorBooted = true;
+    try { console.info('[AssetsInspector][boot] initializing'); } catch {}
 
     /* register a detachable-modal tab button */
     registerModalButton({
@@ -24,16 +25,26 @@ export function bootAssetsInspector(): void {
         routeTest: isConvPage,
 
         buildModal: () => {
+            try { console.debug('[AssetsInspector][boot] buildModal called'); } catch {}
             const modal = buildModal();
             wireModal(
                 modal,
-                async () => { await loadAssets(getState().totalPosts); renderPane(modal, 'links'); },
-                async () => { await loadAssets(getState().totalPosts); renderPane(modal, 'links'); },
+                async () => {
+                    try { console.debug('[AssetsInspector][boot] fetchNext'); } catch {}
+                    await loadAssets(getState().totalPosts);
+                    renderPane(modal, 'links');
+                },
+                async () => {
+                    try { console.debug('[AssetsInspector][boot] fetchAll'); } catch {}
+                    await loadAssets(getState().totalPosts);
+                    renderPane(modal, 'links');
+                },
             );
             return modal;
         },
 
         onFirstOpen: async (modal) => {
+            try { console.info('[AssetsInspector][boot] first open: load + render'); } catch {}
             await loadAssets(getState().totalPosts || PAGE_LIMIT);
             renderPane(modal, 'links');
         },

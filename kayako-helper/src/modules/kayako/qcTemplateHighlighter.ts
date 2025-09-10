@@ -29,8 +29,8 @@ function isSeparator(t: string): boolean {
 }
 
 const HEADER = {
-    action: /what\s+is\s+your\s+proposed\s+action\s*\??/i,
-    pr: /what\s+is\s+the\s+pr\s+to\s+the\s+customer\s*\??/i,
+    action: /^what\s+is\s+your\s+proposed\s+action\s*\??$/i,
+    pr: /^what\s+is\s+the\s+pr\s+to\s+the\s+customer\s*\??$/i,
     additional: /^additional\s+context\s*\??$/i,
     gpt: /^gpt$/i,
     didUseGpt: /^did\s+you\s+use\s+gpt\s*:?/i,
@@ -41,41 +41,107 @@ type SectionKind = 'action' | 'pr' | 'additional';
 function findHeaderElement(container: HTMLElement, kind: SectionKind): HTMLElement | null {
     const re = HEADER[kind];
     const all = Array.from(container.querySelectorAll<HTMLElement>('*'));
+    // Prefer strong/headers that exactly match the header regex to avoid partial matches inside body
+    const prioritized = all.filter(el => /^(STRONG|H1|H2|H3|H4|H5|H6)$/i.test(el.tagName));
+    const candidates = prioritized.length ? prioritized : all;
     return (
-        all.find(el => re.test(textNorm(el.textContent))) ?? null
+        candidates.find(el => re.test(textNorm(el.textContent))) ?? null
     );
 }
 
 function findHeaderBlock(el: HTMLElement, root: HTMLElement): HTMLElement {
     // Prefer the closest block-level wrapper (p/div/li) to paint header background
-    const block = el.closest('p,div,li,section,header,article');
-    if (block && root.contains(block)) return block as HTMLElement;
+    const block = el.closest('h1,h2,h3,h4,h5,h6,p,div,li,section,header,article');
+    if (block && root.contains(block) && block !== root) return block as HTMLElement;
+    // Avoid applying header styles to the root container; fallback to the title element
     return el;
 }
 
-function collectSectionSiblings(headerEl: HTMLElement): HTMLElement[] {
-    const parent = headerEl.parentElement;
-    if (!parent) return [];
-    const siblings = Array.from(parent.children) as HTMLElement[];
-    const startIdx = siblings.indexOf(headerEl);
-    if (startIdx === -1) return [];
+function collectSectionNodes(headerEl: HTMLElement, headerBlock: HTMLElement): ChildNode[] {
+    // Collect nodes that belong to the section body:
+    // 1) Nodes within the header's block AFTER the header element
+    // 2) Then nodes in subsequent sibling blocks, up to (but not including) a separator or the next header
 
-    const out: HTMLElement[] = [];
-    for (let i = startIdx + 1; i < siblings.length; i++) {
-        const el = siblings[i];
-        if (!el) continue;
-        const t = textNorm(el.textContent);
-        // Stop on separators or the start of another section or GPT area
+    const out: ChildNode[] = [];
+
+    const pushIfContent = (node: ChildNode): boolean => {
+        // returns true if we should continue, false if we hit a stop condition
+        const t = textNorm((node as HTMLElement | Text).textContent || '');
         const isAnotherHeader = HEADER.action.test(t) || HEADER.pr.test(t) || HEADER.additional.test(t) || HEADER.gpt.test(t) || HEADER.didUseGpt.test(t);
-        if (isSeparator(t) || isAnotherHeader) break;
-        // Skip Froala wrappers that are just spacer shims
-        if (el.classList.contains('br-wrapper')) continue;
-        out.push(el);
+        if (t && (isSeparator(t) || isAnotherHeader)) return false;
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+            // Skip content already inside any wrapper to avoid double-wrapping
+            if (el.closest('div[data-kh-qc-wrap]')) return true;
+        }
+        out.push(node);
+        return true;
+    };
+
+    // 1) Within the header block, collect child nodes after the header element
+    try {
+        const children = Array.from(headerBlock.childNodes);
+        const startIdx = children.indexOf(headerEl);
+        if (startIdx !== -1) {
+            for (let i = startIdx + 1; i < children.length; i++) {
+                const child = children[i]!;
+                const t = textNorm((child as HTMLElement | Text).textContent || '');
+                const isAnotherHeader = HEADER.action.test(t) || HEADER.pr.test(t) || HEADER.additional.test(t) || HEADER.gpt.test(t) || HEADER.didUseGpt.test(t);
+                if (t && (isSeparator(t) || isAnotherHeader)) break;
+                if (child.nodeType === Node.ELEMENT_NODE) {
+                    const el = child as HTMLElement;
+                    if (el.closest('div[data-kh-qc-wrap]')) continue;
+                }
+                out.push(child);
+            }
+        }
+    } catch {}
+
+    // 2) Walk subsequent sibling blocks and include their children until stop
+    const parent = headerBlock.parentElement;
+    if (!parent) return out;
+    const siblings = Array.from(parent.childNodes);
+    const startIdx = siblings.indexOf(headerBlock);
+    if (startIdx === -1) return out;
+
+    let stop = false;
+    for (let i = startIdx + 1; i < siblings.length && !stop; i++) {
+        const sib = siblings[i]!;
+        if (sib.nodeType === Node.TEXT_NODE) {
+            // Plain text between blocks
+            const shouldContinue = pushIfContent(sib);
+            if (!shouldContinue) break;
+            continue;
+        }
+        if (sib.nodeType === Node.ELEMENT_NODE) {
+            const el = sib as HTMLElement;
+            if (el.closest('div[data-kh-qc-wrap]')) continue;
+            // If we hit a table or table-related element, stop collecting PR content
+            const tag = el.tagName.toUpperCase();
+            if (tag === 'TABLE' || tag === 'TBODY' || tag === 'THEAD' || tag === 'TFOOT' || tag === 'TR' || tag === 'TD' || tag === 'TH') {
+                stop = true; break;
+            }
+            // Iterate children to preserve internal structure but stop before the next header/separator
+            const kids = Array.from(el.childNodes);
+            for (const k of kids) {
+                const t = textNorm((k as HTMLElement | Text).textContent || '');
+                const isAnotherHeader = HEADER.action.test(t) || HEADER.pr.test(t) || HEADER.additional.test(t) || HEADER.gpt.test(t) || HEADER.didUseGpt.test(t);
+                if (t && (isSeparator(t) || isAnotherHeader)) { stop = true; break; }
+                if (k.nodeType === Node.ELEMENT_NODE) {
+                    const kel = k as HTMLElement;
+                    const kt = kel.tagName.toUpperCase();
+                    if (kt === 'TABLE' || kt === 'TBODY' || kt === 'THEAD' || kt === 'TFOOT' || kt === 'TR' || kt === 'TD' || kt === 'TH') { stop = true; break; }
+                    if (kel.closest('div[data-kh-qc-wrap]')) continue;
+                }
+                out.push(k);
+            }
+        }
     }
+
     return out;
 }
 
-function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyBlocks: HTMLElement[], kind: SectionKind): void {
+function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyNodes: ChildNode[], kind: SectionKind): void {
     const headerClass =
         kind === 'action' ? EXTENSION_SELECTORS.qcHighlightHeaderAction
         : kind === 'pr' ? EXTENSION_SELECTORS.qcHighlightHeaderPR
@@ -89,17 +155,45 @@ function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyBl
     // Mark only the header block (keep container clean to avoid inherited styles)
     try { headerBlock.classList.add(cls(headerClass)); } catch {}
 
-    // Wrap all body blocks into a single rectangular wrapper if not already wrapped
-    if (!bodyBlocks.length) return;
+    // Wrap all body nodes into a single rectangular wrapper if not already wrapped
+    if (!bodyNodes.length) return;
 
-    const first = bodyBlocks[0]!;
-    const parent = first.parentElement;
+    const first = bodyNodes[0]!;
+    // Determine the correct parent for insertion. If the first node is an element,
+    // we must use its parentElement (not the element itself) to avoid DOMException
+    // when calling insertBefore.
+    const parent = (first.nodeType === Node.ELEMENT_NODE)
+        ? ((first as HTMLElement).parentElement as HTMLElement | null)
+        : (first.parentNode as HTMLElement | null);
     if (!parent) return;
 
-    // If already wrapped for this section kind, skip
-    const existingWrapper = parent.querySelector<HTMLElement>(`div[data-kh-qc-wrap="${kind}"]`);
-    if (existingWrapper) {
-        try { console.debug('[KH][QC-TPL-HL] Wrapper already exists for', kind); } catch {}
+    // If nodes are already inside an existing wrapper for this kind, do nothing
+    try {
+        const closestBase = (first.nodeType === Node.ELEMENT_NODE)
+            ? (first as HTMLElement)
+            : ((first.parentElement as HTMLElement | null));
+        const nearestWrapper = closestBase?.closest?.(`div[data-kh-qc-wrap="${kind}"]`) as HTMLElement | null;
+        if (nearestWrapper) {
+            try { console.debug('[KH][QC-TPL-HL] First node already inside wrapper for', kind); } catch {}
+            return;
+        }
+    } catch {}
+
+    // If a wrapper for this kind already exists anywhere in the container, merge nodes into it
+    const containerExisting = container.querySelector<HTMLElement>(`div[data-kh-qc-wrap="${kind}"]`);
+    if (containerExisting) {
+        try {
+            for (const node of bodyNodes) {
+                if (!node) continue;
+                const alreadyInside = (node.parentElement?.closest?.(`div[data-kh-qc-wrap="${kind}"]`) ?? null) === containerExisting;
+                if (!alreadyInside) containerExisting.appendChild(node);
+            }
+            dedupeSpacerWrappers(containerExisting);
+            removeSeparatorElements(container);
+            console.debug('[KH][QC-TPL-HL] Merged nodes into existing wrapper for', kind);
+        } catch (e) {
+            console.debug('[KH][QC-TPL-HL] merge into existing wrapper failed:', e);
+        }
         return;
     }
 
@@ -107,17 +201,29 @@ function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyBl
     wrapper.setAttribute('data-kh-qc-wrap', kind);
     wrapper.classList.add(cls(bodyClass));
 
-    // Insert wrapper before the first body block and move all collected blocks into it
-    parent.insertBefore(wrapper, first);
-    for (const el of bodyBlocks) {
-        if (!el) continue;
-        wrapper.appendChild(el);
+    // Insert wrapper before the first body node and move all collected nodes into it
+    try {
+        parent.insertBefore(wrapper, first);
+        for (const node of bodyNodes) {
+            if (!node) continue;
+            // Avoid hierarchy errors by ensuring we never try to append an ancestor of the wrapper
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const el = node as HTMLElement;
+                if (el.contains(wrapper)) continue;
+            }
+            wrapper.appendChild(node);
+        }
+    } catch (err) {
+        try { console.debug('[KH][QC-TPL-HL] Failed wrapping body nodes:', err); } catch {}
+        return;
     }
 
     // Post-wrap cleanup: remove consecutive spacer wrappers and stray separators
     try {
         dedupeSpacerWrappers(wrapper);
         removeSeparatorElements(container);
+        // Within this wrapper, ensure there is at most one multi spacer in a row
+        dedupeSpacerWrappers(wrapper);
     } catch (e) {
         console.debug('[KH][QC-TPL-HL] cleanup failed:', e);
     }
@@ -140,19 +246,9 @@ function processContainer(container: HTMLElement): void {
         if (!originalHtmlByContainer.has(container)) {
             try { originalHtmlByContainer.set(container, container.innerHTML); } catch {}
         }
-        const targets: SectionKind[] = ['action', 'pr', 'additional'];
         let any = false;
-        for (const kind of targets) {
-            const headerEl = findHeaderElement(container, kind);
-            if (!headerEl) continue;
-            const headerBlock = findHeaderBlock(headerEl, container);
-            const bodyBlocks = collectSectionSiblings(headerEl);
-            // Always add container highlight when a header is present
-            applyHighlight(container, headerBlock, bodyBlocks, kind);
-            any = true;
-        }
-        // Try to parse extra ad-hoc sections separated by =====
-        try { if (tryProcessGenericSections(container)) any = true; } catch {}
+        // Only wrap when at least one divider is present (segments detected)
+        try { if (processByDividers(container)) any = true; } catch {}
 
         if (any) {
             container.dataset['khQcTplHasSections'] = 'yes';
@@ -160,6 +256,8 @@ function processContainer(container: HTMLElement): void {
             const postEl = container.closest(KAYAKO_SELECTORS.timelineItem) as HTMLElement | null
                 ?? container.closest(KAYAKO_SELECTORS.messageOrNote) as HTMLElement | null;
             if (postEl) ensureButtons(postEl);
+            // Remove divider lines now that sections are wrapped; snapshot ensures they can be restored on toggle off
+            try { removeSeparatorElements(container); } catch {}
         }
         try { console.debug('[KH][QC-TPL-HL] processed container', { any }); } catch {}
     } catch (e) {
@@ -203,6 +301,12 @@ function dedupeSpacerWrappers(root: HTMLElement): void {
             if (el.children.length === 0 && textNorm(el.textContent) === '') {
                 root.removeChild(el);
             }
+        } else if (node.nodeType === Node.TEXT_NODE) {
+            // Remove pure whitespace text nodes between spacers to prevent visual gaps
+            if (!textNorm((node as Text).nodeValue || '')) {
+                root.removeChild(node);
+                node = next; continue;
+            }
         }
         node = next;
     }
@@ -211,12 +315,35 @@ function dedupeSpacerWrappers(root: HTMLElement): void {
 function removeSeparatorElements(container: HTMLElement): void {
     // Deep-scan: remove any simple block whose text is only separator characters
     const all = Array.from(container.querySelectorAll<HTMLElement>('*'));
+    let removedElements = 0;
     for (const el of all) {
         const t = textNorm(el.textContent);
         if (!t) continue;
         if (isSeparator(t)) {
             el.remove();
+            removedElements++;
         }
+    }
+    // Also remove standalone text nodes that are only separators
+    try {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        const toRemove: Text[] = [];
+        // Collect first to avoid invalidating walker during iteration
+        while (walker.nextNode()) {
+            const n = walker.currentNode as Text;
+            const t = textNorm(n.nodeValue || '');
+            if (t && isSeparator(t)) {
+                toRemove.push(n);
+            }
+        }
+        for (const n of toRemove) {
+            n.parentNode?.removeChild(n);
+        }
+        if (toRemove.length || removedElements) {
+            try { console.debug('[KH][QC-TPL-HL] Removed separator nodes', { removedElements, removedTextNodes: toRemove.length }); } catch {}
+        }
+    } catch (e) {
+        console.debug('[KH][QC-TPL-HL] Failed removing separator text nodes:', e);
     }
 }
 
@@ -243,12 +370,224 @@ function tryProcessGenericSections(container: HTMLElement): boolean {
         // Skip if already wrapped/processed
         if (el.closest('div[data-kh-qc-wrap]')) continue;
         const headerBlock = findHeaderBlock(el, container);
-        const bodyBlocks = collectSectionSiblings(el);
+        const bodyBlocks = collectSectionNodes(el, headerBlock);
         if (!bodyBlocks.length) continue;
         applyHighlight(container, headerBlock, bodyBlocks, 'additional');
         added = true;
     }
     return added;
+}
+
+/* ----------  DIVIDER-BASED GENERAL PARSER  ------------------------------- */
+function isDividerNode(node: ChildNode): boolean {
+    try {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const t = textNorm((node as Text).nodeValue || '');
+            return !!t && isSeparator(t);
+        }
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+            // Consider only simple leaf elements as potential dividers
+            if (el.children.length === 0) {
+                const t = textNorm(el.textContent || '');
+                return !!t && isSeparator(t);
+            }
+        }
+    } catch {}
+    return false;
+}
+
+function determineSectionKindFromTitle(titleText: string): SectionKind {
+    const t = textNorm(titleText);
+    // Relaxed matching: detect keywords anywhere in the title text
+    const ACTION_ANY = /what\s+is\s+your\s+proposed\s+action/i;
+    const PR_ANY = /what\s+is\s+the\s+pr\s+to\s+the\s+customer/i;
+    const ADDITIONAL_ANY = /additional\s+context/i;
+    if (ACTION_ANY.test(t) || HEADER.action.test(t)) return 'action';
+    if (PR_ANY.test(t) || HEADER.pr.test(t)) return 'pr';
+    if (ADDITIONAL_ANY.test(t) || HEADER.additional.test(t)) return 'additional';
+    // Treat other/generic as 'additional'
+    return 'additional';
+}
+
+function wrapBodyWithoutCleanup(container: HTMLElement, headerBlock: HTMLElement, bodyNodes: ChildNode[], kind: SectionKind): void {
+    const headerClass =
+        kind === 'action' ? EXTENSION_SELECTORS.qcHighlightHeaderAction
+        : kind === 'pr' ? EXTENSION_SELECTORS.qcHighlightHeaderPR
+        : EXTENSION_SELECTORS.qcHighlightHeaderAdditional;
+
+    const bodyClass =
+        kind === 'action' ? EXTENSION_SELECTORS.qcHighlightBodyAction
+        : kind === 'pr' ? EXTENSION_SELECTORS.qcHighlightBodyPR
+        : EXTENSION_SELECTORS.qcHighlightBodyAdditional;
+
+    try { headerBlock.classList.add(cls(headerClass)); } catch {}
+    if (!bodyNodes.length) return;
+
+    const first = bodyNodes[0]!;
+    const parent = (first.nodeType === Node.ELEMENT_NODE)
+        ? ((first as HTMLElement).parentElement as HTMLElement | null)
+        : (first.parentNode as HTMLElement | null);
+    if (!parent) return;
+
+    // Skip if already wrapped for this kind
+    try {
+        const closestBase = (first.nodeType === Node.ELEMENT_NODE)
+            ? (first as HTMLElement)
+            : ((first.parentElement as HTMLElement | null));
+        const nearestWrapper = closestBase?.closest?.(`div[data-kh-qc-wrap="${kind}"]`) as HTMLElement | null;
+        if (nearestWrapper) return;
+    } catch {}
+
+    // Do not merge segments of the same kind across the container; keep each segment separate
+
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('data-kh-qc-wrap', kind);
+    wrapper.classList.add(cls(bodyClass));
+    try {
+        parent.insertBefore(wrapper, first);
+        for (const node of bodyNodes) {
+            if (!node) continue;
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const el = node as HTMLElement;
+                if (el.contains(wrapper)) continue;
+            }
+            wrapper.appendChild(node);
+        }
+    } catch (err) {
+        try { console.debug('[KH][QC-TPL-HL][DIV] Failed wrapping body nodes:', err); } catch {}
+        return;
+    }
+
+    if (kind === 'pr') {
+        try {
+            const postEl = container.closest(KAYAKO_SELECTORS.timelineItem) as HTMLElement | null
+                ?? container.closest(KAYAKO_SELECTORS.messageOrNote) as HTMLElement | null;
+            if (postEl) ensurePrControls(wrapper, postEl);
+        } catch (e) {
+            console.debug('[KH][QC-TPL-HL][DIV] ensurePrControls failed:', e);
+        }
+    }
+}
+
+function processBlockByDividers(block: HTMLElement, rootContainer: HTMLElement): boolean {
+    try {
+        const nodes = Array.from(block.childNodes);
+        if (!nodes.length) return false;
+
+        // Build segments split by divider nodes
+        const dividerIdxs: number[] = [];
+        nodes.forEach((n, idx) => { if (isDividerNode(n)) dividerIdxs.push(idx); });
+        if (!dividerIdxs.length) return false;
+
+        const segments: ChildNode[][] = [];
+        let start = 0;
+        for (const d of dividerIdxs) {
+            if (d > start) segments.push(nodes.slice(start, d));
+            start = d + 1;
+        }
+        if (start < nodes.length) segments.push(nodes.slice(start));
+
+        let anyLocal = false;
+        for (const seg of segments) {
+            if (!seg.length) continue;
+            // Determine title boundary
+            let titleEnd = 0;
+            let foundQ = false;
+            let titleTextAcc = '';
+            for (let i = 0; i < seg.length; i++) {
+                const n = seg[i]!;
+                const t = textNorm((n as HTMLElement | Text).textContent || '');
+                if (t) titleTextAcc += (titleTextAcc ? ' ' : '') + t;
+                if (HEADER.action.test(t) || HEADER.pr.test(t) || HEADER.additional.test(t) || /\?/.test(t)) {
+                    titleEnd = i; foundQ = true; break;
+                }
+            }
+            if (!foundQ) {
+                // Default: first node is the title
+                titleEnd = 0;
+                titleTextAcc = textNorm((seg[0] as HTMLElement | Text).textContent || '');
+            }
+
+            const body = seg.slice(titleEnd + 1);
+            if (!body.length) continue;
+
+            const titleNode = seg[titleEnd] as HTMLElement | Text;
+            const titleEl = (titleNode.nodeType === Node.ELEMENT_NODE)
+                ? (titleNode as HTMLElement)
+                : ((titleNode.parentElement as HTMLElement | null) ?? block);
+            const headerBlock = findHeaderBlock(titleEl, block);
+            const kind = determineSectionKindFromTitle(titleTextAcc);
+
+            wrapBodyWithoutCleanup(rootContainer, headerBlock, body, kind);
+            anyLocal = true;
+            try { console.debug('[KH][QC-TPL-HL][DIV] Processed segment with kind', kind); } catch {}
+        }
+        return anyLocal;
+    } catch (e) {
+        console.error('[KH][QC-TPL-HL][DIV] Failed processing block by dividers:', e);
+        return false;
+    }
+}
+
+function processByDividers(container: HTMLElement): boolean {
+    let any = false;
+    try {
+        const nodes = Array.from(container.childNodes);
+        if (!nodes.length) return false;
+
+        const dividerIdxs: number[] = [];
+        nodes.forEach((n, idx) => { if (isDividerNode(n)) dividerIdxs.push(idx); });
+        if (!dividerIdxs.length) return false;
+
+        // Build segments between divider indices (dividers themselves excluded)
+        const segments: ChildNode[][] = [];
+        let start = 0;
+        for (const d of dividerIdxs) {
+            if (d > start) segments.push(nodes.slice(start, d));
+            start = d + 1;
+        }
+        if (start < nodes.length) segments.push(nodes.slice(start));
+
+        for (const seg of segments) {
+            if (!seg.length) continue;
+
+            // Determine title node and kind
+            let titleIndex = 0;
+            let titleTextAcc = '';
+            let foundTitle = false;
+            for (let i = 0; i < seg.length; i++) {
+                const n = seg[i]!;
+                const t = textNorm((n as HTMLElement | Text).textContent || '');
+                if (t) titleTextAcc += (titleTextAcc ? ' ' : '') + t;
+                if (HEADER.action.test(t) || HEADER.pr.test(t) || HEADER.additional.test(t) || /\?/.test(t)) {
+                    titleIndex = i; foundTitle = true; break;
+                }
+            }
+            if (!foundTitle) {
+                titleIndex = 0;
+                titleTextAcc = textNorm((seg[0] as HTMLElement | Text).textContent || '');
+            }
+
+            const bodyNodes = seg.slice(titleIndex + 1);
+            if (!bodyNodes.length) continue;
+
+            const titleNode = seg[titleIndex] as ChildNode | undefined;
+            if (!titleNode) continue;
+            const titleEl = (titleNode.nodeType === Node.ELEMENT_NODE)
+                ? (titleNode as HTMLElement)
+                : ((titleNode.parentElement as HTMLElement | null) ?? container);
+            const headerBlock = findHeaderBlock(titleEl, container);
+            const kind = determineSectionKindFromTitle(titleTextAcc);
+
+            wrapBodyWithoutCleanup(container, headerBlock, bodyNodes, kind);
+            any = true;
+            try { console.debug('[KH][QC-TPL-HL][DIV] Processed container-level segment with kind', kind); } catch {}
+        }
+    } catch (e) {
+        console.error('[KH][QC-TPL-HL][DIV] processByDividers failed:', e);
+    }
+    return any;
 }
 
 /* ----------  BUTTONS: PREV/NEXT/TOGGLE  ---------------------------------- */
@@ -283,6 +622,8 @@ function ensureButtons(post: HTMLElement): void {
             const existingQc = feedMenu.querySelector<HTMLElement>(EXTENSION_SELECTORS.qcerButton);
             if (existingQc) {
                 feedMenu.insertBefore(existingQc, toggleBtn.nextSibling);
+                // Ensure the feed-menu QC button remains hidden; PR-local toolbars will proxy its action
+                try { (existingQc as HTMLElement).style.display = 'none'; } catch {}
             }
         } catch {}
 
@@ -376,6 +717,10 @@ function resetContainer(container: HTMLElement): void {
         EXTENSION_SELECTORS.qcHighlightBodyAdditional,
     ].map(cls);
     [container, ...all].forEach(el => classesToRemove.forEach(c => el.classList.remove(c)));
+    // Also clear any inline text centering introduced by highlighting styles
+    try {
+        [container, ...all].forEach(el => { if ((el.style?.textAlign || '') === 'center') el.style.textAlign = ''; });
+    } catch {}
 }
 
 function updateToggleVisuals(): void {
@@ -385,6 +730,33 @@ function updateToggleVisuals(): void {
         btn.style.opacity = highlightEnabled ? '' : '0.5';
         btn.setAttribute('title', highlightEnabled ? 'Disable QC highlighting' : 'Enable QC highlighting');
     });
+    // Remove visual header styles when disabled so text is not centered
+    if (!highlightEnabled) {
+        const classesToRemove = [
+            EXTENSION_SELECTORS.qcHighlightHeaderAction,
+            EXTENSION_SELECTORS.qcHighlightHeaderPR,
+            EXTENSION_SELECTORS.qcHighlightHeaderAdditional,
+            EXTENSION_SELECTORS.qcHighlightBodyAction,
+            EXTENSION_SELECTORS.qcHighlightBodyPR,
+            EXTENSION_SELECTORS.qcHighlightBodyAdditional,
+        ].map(cls);
+        try {
+            const els = Array.from(document.querySelectorAll<HTMLElement>(
+                [
+                    EXTENSION_SELECTORS.qcHighlightHeaderAction,
+                    EXTENSION_SELECTORS.qcHighlightHeaderPR,
+                    EXTENSION_SELECTORS.qcHighlightHeaderAdditional,
+                    EXTENSION_SELECTORS.qcHighlightBodyAction,
+                    EXTENSION_SELECTORS.qcHighlightBodyPR,
+                    EXTENSION_SELECTORS.qcHighlightBodyAdditional,
+                ].join(',')));
+            els.forEach(el => {
+                classesToRemove.forEach(c => el.classList.remove(c));
+                // Clear any inline centering that might have been applied
+                if ((el.style?.textAlign || '') === 'center') el.style.textAlign = '';
+            });
+        } catch {}
+    }
 }
 
 function processExisting(): void {
@@ -413,7 +785,8 @@ function ensurePrControls(prWrapper: HTMLElement, post: HTMLElement): void {
             btn.style.opacity = '0.65';
             // Keep extension class for styling consistency
             try { btn.classList.add(cls(EXTENSION_SELECTORS.qcerButton)); } catch {}
-            btn.innerHTML = '<strong>✔️</strong>';
+            // Use SVG icon only (no text) to avoid polluting text extraction
+            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" stroke="#2ca24f" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 try {
@@ -455,6 +828,7 @@ function ensurePrControls(prWrapper: HTMLElement, post: HTMLElement): void {
 
         const buildEphorBtn = (): HTMLElement => {
             const btn = document.createElement('div');
+            btn.classList.add('kh-send-ephor-review-btn');
             btn.setAttribute('role', 'button');
             btn.setAttribute('aria-label', 'Send to Ephor for review');
             btn.setAttribute('title', 'Send to Ephor for review');
@@ -481,10 +855,10 @@ function ensurePrControls(prWrapper: HTMLElement, post: HTMLElement): void {
             const wrap = document.createElement('div');
             wrap.setAttribute('data-kh-pr-toolbar', pos);
             wrap.style.position = 'absolute';
+            wrap.style.right = '12px';
             wrap.style.display = 'flex';
             wrap.style.gap = '6px';
             wrap.style.alignItems = 'center';
-            wrap.style.right = '4px';
             wrap.style.zIndex = '1';
             if (pos === 'top') wrap.style.top = '4px'; else wrap.style.bottom = '4px';
             return wrap;
@@ -510,6 +884,7 @@ function ensurePrControls(prWrapper: HTMLElement, post: HTMLElement): void {
                         bottomBar.appendChild(buildCopyBtn());
                         bottomBar.appendChild(buildEphorBtn());
                         prWrapper.appendChild(bottomBar);
+                        try { console.debug('[KH][QC-TPL-HL] Added bottom PR toolbar (with QC checkmark)'); } catch {}
                     }
                 } else if (existing) {
                     existing.remove();

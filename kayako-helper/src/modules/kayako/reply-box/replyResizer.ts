@@ -27,10 +27,36 @@ const LISTENER_KEY   = 'resizeListeners';      // on the <div> bar itself
 let stored: Record<string, number> = {};
 let currentConv: string | null = null;
 
+/* ───────────── Preferences (from chrome.storage) ───────────── */
+
+const STORAGE_KEYS = {
+    fixedEnabled: 'replyFixedHeightEnabled',
+    fixedPx: 'replyFixedHeightPx',
+    rememberLast: 'replyRememberLastHeight',
+    lastPx: 'replyLastHeightPx',
+} as const;
+
+let prefFixedEnabled = false;
+let prefFixedPx = 200;
+let prefRememberLast = false;
+let lastHeightPx: number | null = null;
+let settingsLoaded = false;
+
 /* ───────────── Public bootstrap ─────────────── */
 
 export function bootReplyResizer(): void {
-    ensureChrome();
+    loadSettings(() => {
+        ensureChrome();
+        attachStorageListener();
+        try {
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    reapplyAllVisibleEditors();
+                    try { console.debug('[KH][ReplyResizer] visibilitychange → reapply'); } catch {}
+                }
+            });
+        } catch {}
+    });
     watchConversation();
     attachCollapseOnSend();
 }
@@ -59,7 +85,7 @@ function ensureChrome(): void {
         else {
             chromeEl.style.position = 'relative';
             injectBar(chromeEl);
-            applyInitialSize(wrap);          // collapse by default
+            applyInitialSize(wrap);          // initial size from prefs/last
         }
 
         /* ───────── auto-expand handlers (idempotent) ───────── */
@@ -92,6 +118,13 @@ function toggleCollapseExpand(bar: HTMLElement): void {
     const wrap  = chromeRoot.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
     const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea);
     if (!wrap || !inner) return;
+
+    // Fixed height mode: toggling collapse/expand should apply fixed height and bail
+    if (prefFixedEnabled) {
+        applySize(prefFixedPx, wrap, inner);
+        persistLastIfNeeded(prefFixedPx);
+        return;
+    }
 
     const curH = getCurrentHeight(wrap);
     const key  = currentConvId() ?? 'global';
@@ -126,6 +159,12 @@ function attachDrag(bar: HTMLElement): void {
         const wrap = chromeRoot.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper);
         if (!wrap) return;
 
+        // In fixed height mode, prevent manual drag resize
+        if (prefFixedEnabled) {
+            try { console.debug('[KH][ReplyResizer] Drag ignored (fixed height enabled)'); } catch {}
+            return;
+        }
+
         const startY = e.clientY;
         const startH = wrap.getBoundingClientRect().height;
 
@@ -137,7 +176,9 @@ function attachDrag(bar: HTMLElement): void {
         const onUp = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup',   onUp);
-            stored[currentConvId() ?? 'global'] = getCurrentHeight(wrap);
+            const h = getCurrentHeight(wrap);
+            stored[currentConvId() ?? 'global'] = h;
+            persistLastIfNeeded(h);
         };
 
         document.addEventListener('mousemove', onMove);
@@ -171,6 +212,10 @@ function maybeAttachAutoExpand(chromeRoot: HTMLElement): void {
 
 function checkOverflowAndExpand(wrap: HTMLElement, inner: HTMLElement): void {
     const curH = getCurrentHeight(wrap);
+    if (prefFixedEnabled) {                         // no auto-expand in fixed mode
+        applySize(prefFixedPx, wrap, inner);
+        return;
+    }
     if (curH >= DEFAULT_MAX) return;               // already maxed
 
     const overflow = inner.scrollHeight - inner.clientHeight;
@@ -180,6 +225,7 @@ function checkOverflowAndExpand(wrap: HTMLElement, inner: HTMLElement): void {
 
     applySize(newHeight, wrap, inner);
     stored[currentConvId() ?? 'global'] = newHeight;
+    persistLastIfNeeded(newHeight);
 }
 
 /* ───────────────────── height helpers ───────────────────── */
@@ -203,7 +249,16 @@ function getCurrentHeight(wrap?: HTMLElement | null): number {
 }
 
 function applyInitialSize(wrap: HTMLElement): void {
-    applySize(MIN_HEIGHT, wrap);
+    // Prefer fixed height if enabled; else use remembered last; else collapse
+    if (prefFixedEnabled) {
+        applySize(prefFixedPx, wrap);
+        persistLastIfNeeded(prefFixedPx);
+        return;
+    }
+    const key = currentConvId() ?? 'global';
+    const remembered = prefRememberLast ? (lastHeightPx ?? stored[key]) : stored[key];
+    const initial = Math.max(MIN_HEIGHT, Math.min(DEFAULT_MAX, remembered || MIN_HEIGHT));
+    applySize(initial, wrap);
 }
 
 /* ────────── conversation‑change watch (Kayako SPA) ───────── */
@@ -213,6 +268,10 @@ function watchConversation(): void {
     if (id !== currentConv) {
         currentConv = id;
         setTimeout(ensureChrome, 100);   // editor mounts a tick later
+        // When conversation changes, re-apply fixed/remembered height shortly after mount
+        setTimeout(() => {
+            reapplyAllVisibleEditors();
+        }, 400);
     }
     requestAnimationFrame(watchConversation);
 }
@@ -229,6 +288,108 @@ function attachCollapseOnSend(): void {
         const wrap  = chromeRoot?.querySelector<HTMLElement>(KAYAKO_SELECTORS.editorWrapper) || null;
         const inner = wrap?.querySelector<HTMLElement>(KAYAKO_SELECTORS.replyBoxInputArea) || null;
 
-        setTimeout(() => applySize(MIN_HEIGHT, wrap, inner), 50);
+        setTimeout(() => {
+            // Respect popup settings: do not override fixed or remember-last preferences
+            if (prefFixedEnabled) {
+                try { console.debug('[KH][ReplyResizer] send → enforcing fixed height', { px: prefFixedPx }); } catch {}
+                applySize(prefFixedPx, wrap, inner);
+                persistLastIfNeeded(prefFixedPx);
+                return;
+            }
+
+            if (prefRememberLast) {
+                // Keep the last remembered height; fall back to current computed height if unavailable
+                const key = currentConvId() ?? 'global';
+                const remembered = lastHeightPx ?? stored[key] ?? getCurrentHeight(wrap);
+                const px = Math.max(MIN_HEIGHT, Math.min(DEFAULT_MAX, remembered));
+                try { console.debug('[KH][ReplyResizer] send → preserving remembered height', { px }); } catch {}
+                applySize(px, wrap, inner);
+                persistLastIfNeeded(px);
+                return;
+            }
+
+            // Default behavior (no special preference): collapse after send
+            try { console.debug('[KH][ReplyResizer] send → collapsing to min height'); } catch {}
+            applySize(MIN_HEIGHT, wrap, inner);
+            persistLastIfNeeded(MIN_HEIGHT);
+        }, 50);
     }, true);
+}
+
+function reapplyAllVisibleEditors(): void {
+    try {
+        document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.editorWrapper).forEach(wrap => {
+            // Only apply to visible editors to avoid affecting hidden tabs
+            const rect = wrap.getBoundingClientRect();
+            const isVisible = rect.width > 0 && rect.height >= MIN_HEIGHT && wrap.offsetParent !== null;
+            if (isVisible) applyInitialSize(wrap);
+        });
+    } catch {}
+}
+
+/* ───────────── settings load / react helpers ───────────── */
+
+function loadSettings(done?: () => void): void {
+    try {
+        chrome.storage.sync.get([
+            STORAGE_KEYS.fixedEnabled,
+            STORAGE_KEYS.fixedPx,
+            STORAGE_KEYS.rememberLast,
+            STORAGE_KEYS.lastPx,
+        ] as const, raw => {
+            prefFixedEnabled = !!raw[STORAGE_KEYS.fixedEnabled];
+            const px = Number(raw[STORAGE_KEYS.fixedPx] ?? 200);
+            prefFixedPx = Math.max(MIN_HEIGHT, Math.min(1000, isFinite(px) ? px : 200));
+            prefRememberLast = !!raw[STORAGE_KEYS.rememberLast];
+            const last = Number(raw[STORAGE_KEYS.lastPx]);
+            lastHeightPx = isFinite(last) && last >= MIN_HEIGHT ? last : null;
+            settingsLoaded = true;
+            try { console.debug('[KH][ReplyResizer] settings loaded', { prefFixedEnabled, prefFixedPx, prefRememberLast, lastHeightPx }); } catch {}
+            if (done) done();
+        });
+    } catch {
+        settingsLoaded = true;
+        if (done) done();
+    }
+}
+
+function attachStorageListener(): void {
+    try {
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area !== 'sync') return;
+            let touched = false;
+            if (STORAGE_KEYS.fixedEnabled in changes) {
+                prefFixedEnabled = !!changes[STORAGE_KEYS.fixedEnabled]?.newValue;
+                touched = true;
+            }
+            if (STORAGE_KEYS.fixedPx in changes) {
+                const v = Number(changes[STORAGE_KEYS.fixedPx]?.newValue ?? 200);
+                prefFixedPx = Math.max(MIN_HEIGHT, Math.min(1000, isFinite(v) ? v : 200));
+                touched = true;
+            }
+            if (STORAGE_KEYS.rememberLast in changes) {
+                prefRememberLast = !!changes[STORAGE_KEYS.rememberLast]?.newValue;
+                touched = true;
+            }
+            if (STORAGE_KEYS.lastPx in changes) {
+                const v = Number(changes[STORAGE_KEYS.lastPx]?.newValue);
+                lastHeightPx = isFinite(v) && v >= MIN_HEIGHT ? v : lastHeightPx;
+            }
+
+            if (touched) {
+                // Re-apply to any visible editor(s)
+                try {
+                    document.querySelectorAll<HTMLElement>(KAYAKO_SELECTORS.editorWrapper).forEach(wrap => {
+                        applyInitialSize(wrap);
+                    });
+                } catch {}
+            }
+        });
+    } catch {}
+}
+
+function persistLastIfNeeded(px: number): void {
+    if (!prefRememberLast) return;
+    lastHeightPx = px;
+    try { chrome.storage.sync.set({ [STORAGE_KEYS.lastPx]: px }); } catch {}
 }

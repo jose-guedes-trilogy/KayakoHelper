@@ -323,6 +323,41 @@ export async function openEphorSettingsModal(
         rebuildOutputTabs();
     };
     document.addEventListener("ephorOutputsUpdated", outputsUpdatedListener);
+    // Listen for per-ticket system body updates (e.g., Recent Tickets placeholder)
+    const onSetPerTicketSystemBody = (ev: Event) => {
+        try {
+            const d = (ev as CustomEvent).detail || {};
+            const field = String(d.field || '');
+            const body  = String(d.body ?? '');
+            if (!field) return;
+            const ticketId = currentKayakoTicketId();
+            const projectId = store.selectedProjectId || '';
+            if (!(ticketId && projectId)) return;
+            store.systemPromptBodiesByContext = store.systemPromptBodiesByContext || {};
+            const key = `${projectId}::${ticketId}`;
+            const rec = store.systemPromptBodiesByContext[key] || {};
+            (rec as any)[field] = body;
+            store.systemPromptBodiesByContext[key] = rec;
+            void saveEphorStore(store);
+            // Update highlight preview immediately
+            try { (modal.querySelector('#kh-ephor-prompt-highlight') as HTMLElement | null)?.dispatchEvent(new Event('input')); } catch {}
+        } catch {}
+    };
+    document.addEventListener('ephorSetPerTicketSystemBody', onSetPerTicketSystemBody as EventListener);
+
+    // Allow external actions (like placeholder flows) to skip current stage
+    const skipStageListener = () => {
+        if (!useWorkflow) return;
+        const stages = store.workflowStages;
+        const idx = stages.findIndex(s => s.id === currentStageId);
+        if (idx >= 0 && idx < stages.length - 1) {
+            currentStageId = stages[idx + 1].id;
+            onStageChange();
+            setMainTab("settings");
+            try { log("UI", "Stage skipped by external action"); } catch {}
+        }
+    };
+    document.addEventListener("ephorSkipCurrentStage", skipStageListener as EventListener);
 
     /* ------------------------------------------------------------------ *
      * Main-tab helper                                                    *
@@ -437,14 +472,61 @@ export async function openEphorSettingsModal(
     }
 
     function setMainTab(t: "settings" | "outputs") {
-        const isSettings = t === "settings";
-        // Use class-based visibility to avoid conflicts with .kh-hidden !important
-        refs.paneSettings.classList.toggle("kh-hidden", !isSettings);
-        refs.paneOutputs.classList.toggle("kh-hidden", isSettings);
-        refs.tabSettingsBtn.classList.toggle("active", isSettings);
-        refs.tabOutputsBtn.classList.toggle("active", !isSettings);
+        const targetIsSettings = t === "settings";
+        const fromEl = targetIsSettings ? refs.paneOutputs : refs.paneSettings;
+        const toEl = targetIsSettings ? refs.paneSettings : refs.paneOutputs;
 
-        if (!isSettings) rebuildOutputTabs();
+        // Update active state on tab buttons immediately
+        refs.tabSettingsBtn.classList.toggle("active", targetIsSettings);
+        refs.tabOutputsBtn.classList.toggle("active", !targetIsSettings);
+
+        // If already in desired state, nothing to do
+        const toHidden = toEl.classList.contains("kh-hidden");
+        const fromHidden = fromEl.classList.contains("kh-hidden");
+        if (!toHidden && fromHidden) return;
+
+        // Prepare target pane
+        toEl.classList.remove("kh-hidden");
+        // Immediately hide previous pane to prevent double-scrollbars/layout jump
+        fromEl.classList.add("kh-hidden");
+
+        // Respect reduced motion
+        const prefersNoMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const duration = prefersNoMotion ? 0 : 220;
+
+        try { log("UI", `Tab switch → ${targetIsSettings ? "Prompt Setup" : "AI Outputs"}`); } catch {}
+
+        if (duration === 0) {
+            fromEl.classList.add("kh-hidden");
+            if (!targetIsSettings) rebuildOutputTabs();
+            return;
+        }
+
+        // Animate: slide/fade in next (outgoing is already hidden to avoid layout shift)
+        const easing = "cubic-bezier(.2,.7,.2,1)";
+        const toOriginalTransition = toEl.style.transition;
+
+        // Establish initial states
+        toEl.style.opacity = "0";
+        toEl.style.transform = "translateY(6px)";
+        toEl.style.transition = `opacity ${duration}ms ${easing}, transform ${duration}ms ${easing}`;
+
+        // next frame to ensure styles apply
+        requestAnimationFrame(() => {
+            // Trigger animations
+            toEl.style.opacity = "1";
+            toEl.style.transform = "translateY(0)";
+
+            // Cleanup after animation
+            window.setTimeout(() => {
+                // Reset inline styles
+                toEl.style.opacity = "";
+                toEl.style.transform = "";
+                toEl.style.transition = toOriginalTransition;
+
+                if (!targetIsSettings) rebuildOutputTabs();
+            }, duration);
+        });
     }
     refs.tabSettingsBtn.addEventListener("click", () => setMainTab("settings"));
     refs.tabOutputsBtn.addEventListener("click", () => setMainTab("outputs"));
@@ -505,6 +587,7 @@ export async function openEphorSettingsModal(
         if (useWorkflow) {
             onStageChange();
         } else {
+            // Always reflect global default instructions in the prompt input
             refs.promptInput.value = store.messagePrompt;
             rebuildModelList(state, refs, refs.modelSearchInp.value, null);
         }
@@ -660,10 +743,6 @@ export async function openEphorSettingsModal(
               <label style=\"display:block\">Stage name</label>
               <input id=\"dlg-stage-name\" type=\"text\" style=\"width:100%;padding:6px\" placeholder=\"e.g. Review\">
             </div>
-            <div style=\"margin:6px 0\">
-              <label style=\"display:block\">Prompt template</label>
-              <input id=\"dlg-stage-prompt\" type=\"text\" style=\"width:100%;padding:6px\" value=\"@#TRANSCRIPT#@\">
-            </div>
           </main>
           <footer>
             <button class=\"kh-btn\" data-act=\"cancel\">Cancel</button>
@@ -673,12 +752,12 @@ export async function openEphorSettingsModal(
         dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", close);
         dlg.querySelector<HTMLButtonElement>("[data-act=ok]")!.addEventListener("click", () => {
             const name = (dlg.querySelector<HTMLInputElement>("#dlg-stage-name")!.value || "").trim();
-            const promptText = (dlg.querySelector<HTMLInputElement>("#dlg-stage-prompt")!.value || "").trim();
             if (!name) return;
             const stg: WorkflowStage = {
                 id: crypto.randomUUID(),
                 name,
-                prompt: promptText || "@#TRANSCRIPT#@",
+                // Per-stage prompt removed; keep empty for compatibility
+                prompt: "",
                 selectedModels: [state.availableModels[0] ?? "gpt-4o"],
             };
             store.workflowStages.push(stg);
@@ -733,12 +812,8 @@ export async function openEphorSettingsModal(
 
     /* keep prompt text isolated between single-stage and workflow */
     refs.promptInput.addEventListener("input", () => {
-        if (useWorkflow) {
-            const stg = store.workflowStages.find(x => x.id === currentStageId);
-            if (stg) stg.prompt = refs.promptInput.value;
-        } else {
-            store.messagePrompt = refs.promptInput.value;
-        }
+        // Per-stage prompt removed; always persist to global default instructions
+        store.messagePrompt = refs.promptInput.value;
         void saveEphorStore(store);
     });
 
@@ -758,7 +833,15 @@ export async function openEphorSettingsModal(
     /* ------------------------------------------------------------------ *
      * Live tab sync on (un)checking model boxes                          *
      * ------------------------------------------------------------------ */
-    refs.aiListDiv.addEventListener("change", () => { rebuildOutputTabs(); updateWorkflowDirtyIndicator(); });
+    refs.aiListDiv.addEventListener("change", () => {
+        rebuildOutputTabs();
+        updateWorkflowDirtyIndicator();
+        // Keep Insert row split-button menus in sync with selected AIs
+        try { 
+            rebuildPlaceholderRow(store, refs, useWorkflow, currentStageId, rebuildCannedButtons);
+            log("UI", "Rebuilt placeholder row after AI selection change");
+        } catch {}
+    });
 
     /* ------------------------------------------------------------------ *
      * Verbose log toggle                                                 *
@@ -776,6 +859,8 @@ export async function openEphorSettingsModal(
     refs.closeBtn.addEventListener("click", () => {
         EphorClient.setLogger(null);
         document.removeEventListener("ephorOutputsUpdated", outputsUpdatedListener);
+        document.removeEventListener('ephorSetPerTicketSystemBody', onSetPerTicketSystemBody as EventListener);
+        document.removeEventListener("ephorSkipCurrentStage", skipStageListener as EventListener);
         modal.remove();
     });
     modal
@@ -999,8 +1084,9 @@ export async function openEphorSettingsModal(
         let promptToSend = "";
         let modelsToUse: string[] = [];
         if (useWorkflow) {
+            // Use global default instructions for all stages
+            promptToSend = refs.promptInput.value.trim();
             const stg = store.workflowStages.find(x => x.id === currentStageId)!;
-            promptToSend = stg.prompt;
             modelsToUse = [...stg.selectedModels];
         } else {
             promptToSend = refs.promptInput.value.trim();
@@ -1623,6 +1709,16 @@ export async function openEphorSettingsModal(
         t1.addEventListener("click", onClick);
         t2.addEventListener("click", onClick);
         t3.addEventListener("click", onClick);
+        // Allow clicking any "Click to expand" note to expand back
+        const onExpandClick = () => {
+            if (collapsed) {
+                collapsed = false; apply();
+                try { log("UI", "Grid expanded via collapsed note"); } catch {}
+            }
+        };
+        c1.addEventListener("click", onExpandClick);
+        c2.addEventListener("click", onExpandClick);
+        c3.addEventListener("click", onExpandClick);
         apply();
     })();
 
@@ -1750,7 +1846,10 @@ export async function openEphorSettingsModal(
     // Open manager modal
     refs.aiSelGearBtn?.addEventListener("click", () => {
         try { log("UI", "Open AI Selections manager"); } catch {}
-        openAiSelectionsModal(store, state.availableModels);
+        const currentModels = useWorkflow
+            ? (store.workflowStages.find(x => x.id === currentStageId)?.selectedModels ?? [])
+            : (store.selectedModels ?? []);
+        openAiSelectionsModal(store, state.availableModels, currentModels);
     });
 
     // Live updates when presets change from the manager

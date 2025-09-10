@@ -32,10 +32,25 @@ export async function fetchCasePostsWithAssets(
         `https://${hostname}/api/v1/cases/${caseId}` +
         `/posts?include=attachment,post,note&filters=all&limit=${limit}`;
 
-    const res = await fetch(url, { credentials: 'include' });
-    if (!res.ok) throw new Error(`Kayako API error ${res.status}`);
-
-    return res.json();                                  //  ← change #2
+    const t0 = Date.now();
+    try {
+        try { console.debug('[KH][API] fetchCasePostsWithAssets:start', { caseId, limit, url }); } catch {}
+        const res = await fetch(url, { credentials: 'include' });
+        const dt = Date.now() - t0;
+        if (!res.ok) {
+            try { console.error('[KH][API] fetchCasePostsWithAssets:error', { status: res.status, statusText: res.statusText, ms: dt, url }); } catch {}
+            throw new Error(`Kayako API error ${res.status}`);
+        }
+        const json = await res.json();
+        try {
+            const total = (json && (json as any).total_count) ?? (json as any).total ?? (Array.isArray((json as any).data) ? (json as any).data.length : undefined);
+            console.debug('[KH][API] fetchCasePostsWithAssets:ok', { ms: dt, total });
+        } catch {}
+        return json as RawApiResponse;                  //  ← change #2
+    } catch (err) {
+        try { console.error('[KH][API] fetchCasePostsWithAssets:exception', err); } catch {}
+        throw err;
+    }
 }
 
 /**

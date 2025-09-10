@@ -1,10 +1,12 @@
 /* Ephor Settings Modal – extracted styles from inline CSS */
-
-#kh-ephor-settings-modal {
+:root {
   --kh-input-border: hsl(213deg 15% 84%);
   --kh-input-shadow: inset 0 0 4px 0 hsla(0,0%,0%,0.0325), inset 0 0 2px 0 hsla(0,0%,0%,0.0805), inset 0 0 1px 0 hsla(0,0%,0%,0.089);
   --kh-input-bg: #fff;
-  -webkit-user-select: none; user-select: none;
+  //-webkit-user-select: none; user-select: none;
+}
+
+#kh-ephor-settings-modal {
 
   input, textarea, select, pre { -webkit-user-select: text; user-select: text; }
 
@@ -66,8 +68,17 @@
 #kh-ephor-stage-bar { padding: 2px 12px 2px 2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 #kh-ephor-stage-bar button,
 #kh-ephor-stage-bar > span { padding: 0 10px; border-radius: 4px; cursor: pointer; }
-#kh-ephor-stage-bar .active { background: hsl(216 20% 98% / 1); color: #454545; border: 1px solid hsl(216 69% 77% / 1);
-  font-weight: 600;}
+#kh-ephor-stage-bar .active {
+  /* Raised 3D look opposite to inset: subtle inner highlight and soft outer lift */
+  background: linear-gradient(180deg, hsl(216 40% 99% / 1), hsl(216 35% 96% / 1));
+  color: #454545;
+  border: 1px solid hsl(216 35% 78% / 1);
+  box-shadow:
+    inset 0 1px 0 hsla(0,0%,100%,.75),
+    inset 0 -1px 0 hsla(216, 30%, 70%, .25),
+    0 1px 2px rgba(0,0,0,.05);
+  font-weight: 600;
+}
 #kh-ephor-stage-bar .kh-bar-btn:not(.active) { border: 1px solid transparent; transition: background .12s ease, border-color .12s ease, color .12s ease; }
 #kh-ephor-stage-bar .kh-bar-btn:hover { background: hsl(217 40% 98% / 1); color: #1a2b4f; border-color: #adc1e3; }
 #kh-ephor-stage-bar .kh-bar-btn.active:hover { background: #e4edfd; border-color: #88a5da; }
@@ -93,14 +104,20 @@
   box-shadow: none !important;
 }
 
-input[type="text"], input[type="search"], select, textarea {
-  border: 1px solid var(--kh-input-border);
-  border-radius: 4px;
-  background: var(--kh-input-bg);
-  box-shadow: var(--kh-input-shadow);
-}
-input[type="text"]:focus, input[type="search"]:focus, textarea:focus {
-  outline: none; border-color: hsl(218 100% 86% / 1) !important; box-shadow: 0 0 0 2px rgba(46,115,233,.15) !important;
+#kh-ephor-settings-modal {
+  input[type="text"], input[type="search"], select, textarea {
+    border: 1px solid var(--kh-input-border);
+    border-radius: 4px;
+    background: var(--kh-input-bg);
+    box-shadow: var(--kh-input-shadow);
+  }
+
+  input[type="text"]:focus, input[type="search"]:focus, textarea:focus {
+    outline: none;
+    border-color: hsl(218 100% 86% / 1) !important;
+    box-shadow: 0 0 0 2px rgba(46, 115, 233, .15) !important;
+    background: hsl(218 20% 99%);
+  }
 }
 
 /* Subtle 3D checkboxes inside Ephor modal */
@@ -155,7 +172,7 @@ input[type="text"]:focus, input[type="search"]:focus, textarea:focus {
 
 #kh-workflow-name:placeholder-shown + #kh-workflow-name-clear { display:none; }
 
-input[type="radio"] { position: relative; top: 2px; margin-right: 1px; }
+#kh-ephor-settings-modal input[type="radio"] { position: relative; top: 2px; margin-right: 1px; }
 #kh-ephor-log-verbose { position: relative; top: 2px; }
 #kh-ephor-instr-label { display:inline-block; min-width:220px; }
 
@@ -246,7 +263,7 @@ input[type="radio"] { position: relative; top: 2px; margin-right: 1px; }
 .kh-flex-spacer { flex:1 1 auto; }
 
 .kh-insert-row { margin-bottom:6px; }
-.kh-insert-seg { flex:1 1 auto; align-items:center; gap:8px; }
+.kh-insert-seg { flex:1 1 auto; align-items:center; gap:8px; padding:6px 12px; }
 .kh-placeholder-row { display:flex; gap:12px; align-items:center; overflow-x:auto; white-space:nowrap; flex:1 1 auto; }
 .kh-canned-wrap { background:#fff; display:inline-flex; align-items:center; }
 
@@ -309,6 +326,15 @@ input[type="radio"] { position: relative; top: 2px; margin-right: 1px; }
 #kh-ephor-log-container::-webkit-scrollbar,
 textarea::-webkit-scrollbar,
 .kh-dialog main::-webkit-scrollbar { width:14px; height:14px; }
+
+/* Placeholder row scrollbar: reduced thickness and pinned to bottom */
+.kh-placeholder-row { overflow-x:auto; overflow-y:hidden; }
+.kh-placeholder-row::-webkit-scrollbar { height:9px; }
+.kh-placeholder-row::-webkit-scrollbar-thumb { background:#b7c0d3; border-radius:10px; border:3px solid #fff; }
+.kh-placeholder-row::-webkit-scrollbar-track { background:transparent; }
+
+/* Visual separator before the Add placeholder button */
+.kh-canned-wrap { border-left:1px solid var(--kh-input-border); padding-left:8px; }
 
 #kh-ephor-project-list::-webkit-scrollbar-thumb,
 #kh-ephor-channel-list::-webkit-scrollbar-thumb,

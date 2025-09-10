@@ -3,6 +3,8 @@
 import type { ToBackground, FromBackground } from '@/utils/messageTypes';
 import { TicketData } from '@/background/replyDataBg.ts';
 import { sendMessageSafe } from '@/utils/sendMessageSafe';
+import { AIHorizonsAPI } from '@/modules/alpha/sis/alphaInfoFetch';
+import alphaUiHtml from '@/modules/alpha/sis/alpha-ui.html?raw';
 
 interface Prefs {
     trainingMode?: boolean;
@@ -17,6 +19,10 @@ interface Prefs {
     qcButtonEnabled?: boolean;
     qcTemplateOnly?: boolean;
     hideMessenger?: boolean;
+    replyFixedHeightEnabled?: boolean;
+    replyFixedHeightPx?: number;
+    replyRememberLastHeight?: boolean;
+    expandNoteWidth?: boolean;
 }
 
 /* ─ constants & state ─ */
@@ -41,6 +47,7 @@ const refs = {
     chkTraining: document.getElementById('kh-training-mode-checkbox') as HTMLInputElement,
     chkHideMessenger: document.getElementById('kh-hide-messenger-checkbox') as HTMLInputElement,
     chkStyles  : document.getElementById('kh-toggle-styles-checkbox') as HTMLInputElement,
+    chkExpandNotes: document.getElementById('kh-expand-note-width') as HTMLInputElement,
     inpWpm     : document.getElementById('kh-send-in-chunks-wpm-limit') as HTMLInputElement,
 
     /* Send to QC settings */
@@ -61,6 +68,11 @@ const refs = {
 
     /* search results auto-update */
     chkSearchResultsAuto: document.getElementById('kh-search-results-autoupdate') as HTMLInputElement,
+
+    /* Reply resizer settings */
+    chkReplyFixedEnabled: document.getElementById('kh-reply-fixed-height-enabled') as HTMLInputElement,
+    inpReplyFixedPx: document.getElementById('kh-reply-fixed-height-px') as HTMLInputElement,
+    chkReplyRememberLast: document.getElementById('kh-reply-remember-last-height') as HTMLInputElement,
 
     /* current ticket read-outs */
     lblId     : document.getElementById('kh-popup-ticket-info-id')       as HTMLElement,
@@ -93,6 +105,32 @@ const refs = {
     dateApply  : document.getElementById('kh-date-apply') as HTMLButtonElement,
     dateClear  : document.getElementById('kh-date-clear') as HTMLButtonElement,
     dateDisplay: document.getElementById('kh-date-range-display') as HTMLElement,
+
+    /* Alpha SIS tester */
+    alphaSearchTerm: document.getElementById('kh-alpha-search-term') as HTMLInputElement,
+    alphaSearchPage: document.getElementById('kh-alpha-search-page') as HTMLInputElement,
+    alphaSearchPageSize: document.getElementById('kh-alpha-search-page-size') as HTMLInputElement,
+    alphaSearchBtn: document.getElementById('kh-alpha-search-btn') as HTMLButtonElement,
+    alphaStudentsPage: document.getElementById('kh-alpha-students-page') as HTMLInputElement,
+    alphaStudentsPageSize: document.getElementById('kh-alpha-students-page-size') as HTMLInputElement,
+    alphaStudentsBtn: document.getElementById('kh-alpha-students-btn') as HTMLButtonElement,
+    alphaStaffPage: document.getElementById('kh-alpha-staff-page') as HTMLInputElement,
+    alphaStaffPageSize: document.getElementById('kh-alpha-staff-page-size') as HTMLInputElement,
+    alphaStaffBtn: document.getElementById('kh-alpha-staff-btn') as HTMLButtonElement,
+    alphaOrgsPage: document.getElementById('kh-alpha-orgs-page') as HTMLInputElement,
+    alphaOrgsPageSize: document.getElementById('kh-alpha-orgs-page-size') as HTMLInputElement,
+    alphaOrgsBtn: document.getElementById('kh-alpha-orgs-btn') as HTMLButtonElement,
+    alphaStudentId: document.getElementById('kh-alpha-student-id') as HTMLInputElement,
+    alphaProfileBtn: document.getElementById('kh-alpha-profile-btn') as HTMLButtonElement,
+    alphaUserFormId: document.getElementById('kh-alpha-userform-id') as HTMLInputElement,
+    alphaUserFormBtn: document.getElementById('kh-alpha-userform-btn') as HTMLButtonElement,
+    alphaAdmissionId: document.getElementById('kh-alpha-admission-id') as HTMLInputElement,
+    alphaAdmissionBtn: document.getElementById('kh-alpha-admission-btn') as HTMLButtonElement,
+    // notifications UI is hidden; keep references guarded if present in DOM
+    alphaNotifsRecipient: document.getElementById('kh-alpha-notifs-recipient') as HTMLInputElement,
+    alphaNotifsBtn: document.getElementById('kh-alpha-notifs-btn') as HTMLButtonElement,
+    alphaOutput: document.getElementById('kh-alpha-output') as HTMLElement,
+    alphaClearOutput: document.getElementById('kh-alpha-clear-output') as HTMLButtonElement,
 };
 
 
@@ -138,12 +176,17 @@ document.addEventListener('DOMContentLoaded', () => {
         'qcButtonEnabled',
         'qcTemplateOnly',
         'hideMessenger',
+        'replyFixedHeightEnabled',
+        'replyFixedHeightPx',
+        'replyRememberLastHeight',
+        'expandNoteWidth',
     ] as const, res => {
-        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate, qcButtonEnabled, qcTemplateOnly, hideMessenger } = res as Prefs;
+        const { trainingMode, allStyles, sendChunksWPM, uiDarkCompat, uiDarkTextColor, uiDarkBgColor, searchInRemember, searchInDefaults, searchResultsAutoUpdate, qcButtonEnabled, qcTemplateOnly, hideMessenger, replyFixedHeightEnabled, replyFixedHeightPx, replyRememberLastHeight, expandNoteWidth } = res as Prefs;
         refs.chkTraining.checked = !!trainingMode;
         if (refs.chkHideMessenger) refs.chkHideMessenger.checked = !!hideMessenger;
         refs.chkStyles.checked   = allStyles       ?? true;
         refs.inpWpm.value        = (sendChunksWPM ?? 200).toString();
+        if (refs.chkExpandNotes) refs.chkExpandNotes.checked = !!expandNoteWidth; // default OFF
 
         refs.chkDarkCompat.checked = !!uiDarkCompat;
         refs.inpDarkText.value     = uiDarkTextColor ?? '#EAEAEA';
@@ -168,6 +211,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // Send to QC settings
         if (refs.chkQcBtnEnabled)  refs.chkQcBtnEnabled.checked   = typeof qcButtonEnabled === 'boolean' ? qcButtonEnabled : true;
         if (refs.chkQcTemplateOnly) refs.chkQcTemplateOnly.checked = !!qcTemplateOnly;
+
+        // Reply resizer settings
+        const fixedEnabled = !!replyFixedHeightEnabled && !replyRememberLastHeight; // enforce mutual exclusivity on load
+        const fixedPx = Math.max(44, Math.min(1000, Number(replyFixedHeightPx ?? 200)));
+        const rememberLast = !!replyRememberLastHeight && !fixedEnabled;
+        if (refs.chkReplyFixedEnabled) refs.chkReplyFixedEnabled.checked = fixedEnabled;
+        if (refs.inpReplyFixedPx) {
+            refs.inpReplyFixedPx.value = String(fixedPx);
+            refs.inpReplyFixedPx.disabled = !fixedEnabled;
+        }
+        if (refs.chkReplyRememberLast) refs.chkReplyRememberLast.checked = rememberLast;
+        // If both were true due to old state, normalize storage
+        if (replyFixedHeightEnabled && replyRememberLastHeight) {
+            chrome.storage.sync.set({ replyRememberLastHeight: false });
+        }
     });
 
     refs.chkTraining.addEventListener('change', () => {
@@ -184,6 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const enabled = refs.chkStyles.checked;
         sendMessageSafe<ToBackground>({ action: 'setAllStylesEnabled', enabled }, 'popup:setAllStylesEnabled');
         chrome.storage.sync.set({ allStyles: enabled });
+    });
+    refs.chkExpandNotes?.addEventListener('change', () => {
+        const on = !!refs.chkExpandNotes.checked;
+        try { console.debug('[KH] Setting expandNoteWidth ->', on); } catch {}
+        chrome.storage.sync.set({ expandNoteWidth: on });
     });
     refs.inpWpm.addEventListener('change', () => {
         const wpm = Math.max(50, Math.min(800, Number(refs.inpWpm.value) || 200));
@@ -240,6 +303,39 @@ document.addEventListener('DOMContentLoaded', () => {
     refs.chkSearchResultsAuto?.addEventListener('change', () => {
         const enabled = !!refs.chkSearchResultsAuto.checked;
         chrome.storage.sync.set({ searchResultsAutoUpdate: enabled });
+    });
+
+    /* ------- Reply resizer settings ------- */
+    refs.chkReplyFixedEnabled?.addEventListener('change', () => {
+        const enabled = !!refs.chkReplyFixedEnabled.checked;
+        try { console.debug('[KH][ReplyResizer] fixedHeightEnabled →', enabled); } catch {}
+        if (refs.inpReplyFixedPx) refs.inpReplyFixedPx.disabled = !enabled;
+        // Mutual exclusivity: turning this on turns off remember-last
+        const set: Record<string, unknown> = { replyFixedHeightEnabled: enabled };
+        if (enabled && refs.chkReplyRememberLast) {
+            refs.chkReplyRememberLast.checked = false;
+            set['replyRememberLastHeight'] = false;
+        }
+        chrome.storage.sync.set(set);
+    });
+    refs.inpReplyFixedPx?.addEventListener('change', () => {
+        let px = Number(refs.inpReplyFixedPx.value) || 200;
+        px = Math.max(44, Math.min(1000, px));
+        refs.inpReplyFixedPx.value = String(px);
+        try { console.debug('[KH][ReplyResizer] fixedHeightPx →', px); } catch {}
+        chrome.storage.sync.set({ replyFixedHeightPx: px });
+    });
+    refs.chkReplyRememberLast?.addEventListener('change', () => {
+        const remember = !!refs.chkReplyRememberLast.checked;
+        try { console.debug('[KH][ReplyResizer] rememberLastHeight →', remember); } catch {}
+        // Mutual exclusivity: turning this on turns off fixed-height
+        const set: Record<string, unknown> = { replyRememberLastHeight: remember };
+        if (remember && refs.chkReplyFixedEnabled) {
+            refs.chkReplyFixedEnabled.checked = false;
+            if (refs.inpReplyFixedPx) refs.inpReplyFixedPx.disabled = true;
+            set['replyFixedHeightEnabled'] = false;
+        }
+        chrome.storage.sync.set(set);
     });
 
     /* ------- Ephor API token ------- */
@@ -312,6 +408,84 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return false;
     });
+
+    /* ------- Alpha SIS: mount UI and wire persistence ------- */
+    try {
+        initAlphaUi();
+    } catch (e) {
+        try { console.error('[KH][AlphaSIS] failed to initialize Alpha UI', e); } catch {}
+    }
+
+    /* ------- Alpha SIS: load stored role and wire UI ------- */
+    const ALPHA_KEY = 'kh-alpha-misc';
+    try { console.debug('[KH][AlphaSIS] init: wiring UI and loading stored role'); } catch {}
+    // Role UI removed; rely on storage capture or pinned tab acquisition
+
+    refs.alphaClearOutput?.addEventListener('click', () => {
+        if (refs.alphaOutput) refs.alphaOutput.textContent = '(no output)';
+    });
+
+    // Bind buttons to API calls
+    refs.alphaSearchBtn?.addEventListener('click', () => withApi('searchUsers', async (api) => {
+        const term = (refs.alphaSearchTerm?.value || '').trim();
+        const page = Math.max(1, Number(refs.alphaSearchPage?.value) || 1);
+        const size = Math.max(1, Number(refs.alphaSearchPageSize?.value) || 5);
+        try { console.debug('[KH][AlphaSIS] searchUsers', { term, page, size }); } catch {}
+        const res = await api.searchUsers(term, page, size);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaStudentsBtn?.addEventListener('click', () => withApi('getStudents', async (api) => {
+        const page = Math.max(1, Number(refs.alphaStudentsPage?.value) || 1);
+        const size = Math.max(1, Number(refs.alphaStudentsPageSize?.value) || 4);
+        try { console.debug('[KH][AlphaSIS] getStudents', { page, size }); } catch {}
+        const res = await api.getStudents(page, size);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaStaffBtn?.addEventListener('click', () => withApi('getStaff', async (api) => {
+        const page = Math.max(1, Number(refs.alphaStaffPage?.value) || 1);
+        const size = Math.max(1, Number(refs.alphaStaffPageSize?.value) || 4);
+        try { console.debug('[KH][AlphaSIS] getStaff', { page, size }); } catch {}
+        const res = await api.getStaff(page, size);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaOrgsBtn?.addEventListener('click', () => withApi('getOrganizations', async (api) => {
+        const page = Math.max(1, Number(refs.alphaOrgsPage?.value) || 1);
+        const size = Math.max(1, Number(refs.alphaOrgsPageSize?.value) || 4);
+        try { console.debug('[KH][AlphaSIS] getOrganizations', { page, size }); } catch {}
+        const res = await api.getOrganizations(page, size);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaProfileBtn?.addEventListener('click', () => withApi('getStudentProfile', async (api) => {
+        const id = (refs.alphaStudentId?.value || '').trim();
+        try { console.debug('[KH][AlphaSIS] getStudentProfile', { id }); } catch {}
+        const res = await api.getStudentProfile(id);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaUserFormBtn?.addEventListener('click', () => withApi('getUserForm', async (api) => {
+        const id = (refs.alphaUserFormId?.value || '').trim();
+        try { console.debug('[KH][AlphaSIS] getUserForm', { id }); } catch {}
+        const res = await api.getUserForm(id);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaAdmissionBtn?.addEventListener('click', () => withApi('getAdmissionProcessStep', async (api) => {
+        const id = (refs.alphaAdmissionId?.value || '').trim();
+        try { console.debug('[KH][AlphaSIS] getAdmissionProcessStep', { id }); } catch {}
+        const res = await api.getAdmissionProcessStep(id);
+        appendAlphaOutput(res);
+    }));
+
+    refs.alphaNotifsBtn?.addEventListener('click', () => withApi('getNotifications', async (api) => {
+        const id = (refs.alphaNotifsRecipient?.value || '').trim();
+        try { console.debug('[KH][AlphaSIS] getNotifications', { id }); } catch {}
+        const res = await api.getNotifications(id);
+        appendAlphaOutput(res);
+    }));
 });
 
 /* ─ background messages ─ */
@@ -520,6 +694,249 @@ function fallbackCopy(text: string): void {
     ta.select();
     try { document.execCommand('copy'); } catch {}
     document.body.removeChild(ta);
+}
+
+/* ─ Alpha SIS helpers ─ */
+function initAlphaUi(): void {
+    const root = document.getElementById('kh-alpha-ui-root');
+    if (!root) return;
+    try { console.debug('[KH][AlphaSIS] Mounting Alpha UI template into popup'); } catch {}
+    try {
+        root.innerHTML = alphaUiHtml;
+    } catch (e) {
+        try { console.error('[KH][AlphaSIS] Failed to inject alpha-ui.html', e); } catch {}
+        return;
+    }
+
+    restoreAlphaUiState(root).then(() => {
+        try { console.debug('[KH][AlphaSIS] Restored Alpha UI state'); } catch {}
+    }).catch(err => {
+        try { console.warn('[KH][AlphaSIS] Could not restore Alpha UI state', err); } catch {}
+    });
+    wireAlphaUiPersistence(root);
+}
+
+type AlphaFieldValue = string | number | boolean | null;
+type AlphaUiState = Record<string, AlphaFieldValue>;
+
+function makeAlphaFieldKey(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, index: number): string {
+    const id = el.getAttribute('id');
+    const name = el.getAttribute('name');
+    const type = (el as HTMLInputElement).type || el.tagName.toLowerCase();
+    const base = id || name || `${el.tagName.toLowerCase()}[${type}]`;
+    return `${base}#${index}`;
+}
+
+function readAlphaFieldValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): AlphaFieldValue {
+    if (el instanceof HTMLInputElement) {
+        if (el.type === 'checkbox') return !!el.checked;
+        if (el.type === 'radio') return !!el.checked;
+        if (el.type === 'number') {
+            const n = Number(el.value);
+            return Number.isFinite(n) ? n : null;
+        }
+        if (el.type === 'file') return null; // skip files
+        return el.value;
+    }
+    if (el instanceof HTMLSelectElement) return el.value;
+    return (el as HTMLTextAreaElement).value;
+}
+
+function writeAlphaFieldValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, v: AlphaFieldValue): void {
+    if (el instanceof HTMLInputElement) {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = !!v;
+            return;
+        }
+        if (el.type === 'number') {
+            if (typeof v === 'number') el.value = String(v);
+            else if (typeof v === 'string') el.value = v;
+            return;
+        }
+        if (el.type === 'file') return; // cannot restore
+        if (v == null) return;
+        el.value = String(v);
+        return;
+    }
+    if (el instanceof HTMLSelectElement) {
+        if (v != null) el.value = String(v);
+        return;
+    }
+    (el as HTMLTextAreaElement).value = v == null ? '' : String(v);
+}
+
+function collectAlphaUiState(root: HTMLElement): AlphaUiState {
+    const state: AlphaUiState = {};
+    const fields = root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
+    fields.forEach((el, idx) => {
+        const key = makeAlphaFieldKey(el, idx);
+        const value = readAlphaFieldValue(el);
+        state[key] = value;
+    });
+    return state;
+}
+
+async function restoreAlphaUiState(root: HTMLElement): Promise<void> {
+    return new Promise(resolve => {
+        const STORAGE_KEY = 'kh-alpha-ui-state';
+        chrome.storage.local.get(STORAGE_KEY, raw => {
+            const stored = (raw && raw[STORAGE_KEY]) as AlphaUiState | undefined;
+            if (!stored) return resolve();
+            const fields = root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
+            fields.forEach((el, idx) => {
+                const key = makeAlphaFieldKey(el, idx);
+                if (Object.prototype.hasOwnProperty.call(stored, key)) {
+                    writeAlphaFieldValue(el, stored[key]);
+                }
+            });
+            resolve();
+        });
+    });
+}
+
+function wireAlphaUiPersistence(root: HTMLElement): void {
+    const STORAGE_KEY = 'kh-alpha-ui-state';
+    const save = () => {
+        const state = collectAlphaUiState(root);
+        try { console.debug('[KH][AlphaSIS] Persisting Alpha UI state', { keys: Object.keys(state).length }); } catch {}
+        chrome.storage.local.set({ [STORAGE_KEY]: state });
+    };
+    const fields = root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
+    fields.forEach(el => {
+        el.addEventListener('change', save);
+        el.addEventListener('input', save);
+    });
+}
+
+function getAlphaRole(): Promise<string> {
+    return new Promise(resolve => {
+        const ALPHA_KEY = 'kh-alpha-misc';
+        // Try sync first (captured from aihorizons), then local fallback
+        chrome.storage.sync.get('aih_customSisRole', syncRes => {
+            const syncRole = (syncRes?.aih_customSisRole || '').trim();
+            if (syncRole) return resolve(syncRole);
+            chrome.storage.local.get(ALPHA_KEY, raw => {
+                const role = raw[ALPHA_KEY]?.role ?? '';
+                resolve(typeof role === 'string' ? role : '');
+            });
+        });
+    });
+}
+
+async function withApi(label: string, fn: (api: AIHorizonsAPI) => Promise<void>): Promise<void> {
+    let role = (refs.alphaRole?.value || '').trim() || await getAlphaRole();
+    if (!role) {
+        // Attempt to acquire role via a pinned aihorizons.school tab
+        appendAlphaOutput('Missing role. Attempting to acquire from aihorizons.school…');
+        try { console.debug('[KH][AlphaSIS] role missing; attempting pinned-tab acquisition'); } catch {}
+        role = await tryAcquireAlphaRoleViaPinnedTab();
+        if (role) {
+            if (refs.alphaRole) refs.alphaRole.value = role;
+            try { chrome.storage.sync.set({ aih_customSisRole: role }); } catch {}
+            appendAlphaOutput('Acquired role from aihorizons.school.');
+        }
+    }
+    if (!role) {
+        const msg = '[AlphaSIS] Missing custom SIS role. Please open aihorizons.school and sign in.';
+        try { console.warn('[KH]' + msg); } catch {}
+        appendAlphaOutput(msg);
+        return;
+    }
+    try {
+        const api = new AIHorizonsAPI(role);
+        await fn(api);
+    } catch (err: any) {
+        try { console.error('[KH][AlphaSIS] API error in ' + label, err); } catch {}
+        appendAlphaOutput({ error: String(err?.message || err) });
+    }
+}
+
+function appendAlphaOutput(data: unknown): void {
+    if (!refs.alphaOutput) return;
+    const now = new Date();
+    const ts = now.toLocaleTimeString();
+    const text = typeof data === 'string' ? data : safeStringify(data);
+    const line = `[${ts}] ${text}`;
+    refs.alphaOutput.textContent = (refs.alphaOutput.textContent && refs.alphaOutput.textContent !== '(no output)')
+        ? refs.alphaOutput.textContent + '\n' + line
+        : line;
+}
+
+function safeStringify(obj: unknown): string {
+    try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+}
+
+// Try to retrieve role by opening (or reusing) a pinned aihorizons.school tab and closing it if we opened it
+async function tryAcquireAlphaRoleViaPinnedTab(): Promise<string> {
+    const AIH_URL = 'https://aihorizons.school/';
+    const roleFromResults = (results?: chrome.scripting.InjectionResult[] | void): string => {
+        try {
+            const r = results && results[0] && (results[0] as any).result;
+            return typeof r === 'string' ? r : '';
+        } catch { return ''; }
+    };
+
+    const executeGetRole = (tabId: number): Promise<string> => new Promise(resolve => {
+        try {
+            chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => {
+                    try { return localStorage.getItem('currentUserRole') || ''; } catch { return ''; }
+                },
+            }, (res) => resolve(roleFromResults(res)));
+        } catch { resolve(''); }
+    });
+
+    const waitForComplete = (tabId: number): Promise<void> => new Promise(resolve => {
+        try {
+            chrome.tabs.get(tabId, (t) => {
+                if (!t || t.status === 'complete') return resolve();
+                const listener = (updatedTabId: number, info: chrome.tabs.TabChangeInfo) => {
+                    if (updatedTabId === tabId && info.status === 'complete') {
+                        chrome.tabs.onUpdated.removeListener(listener);
+                        resolve();
+                    }
+                };
+                chrome.tabs.onUpdated.addListener(listener);
+            });
+        } catch { resolve(); }
+    });
+
+    const getFromExisting = (): Promise<string> => new Promise(resolve => {
+        try {
+            chrome.tabs.query({ url: 'https://aihorizons.school/*' }, async (tabs) => {
+                const tab = tabs && tabs[0];
+                if (!tab?.id) return resolve('');
+                const r = await executeGetRole(tab.id);
+                return resolve(r);
+            });
+        } catch { resolve(''); }
+    });
+
+    // 1) Try existing tab first
+    let role = await getFromExisting();
+    if (role) {
+        try { console.debug('[KH][AlphaSIS] acquired role from existing aihorizons tab'); } catch {}
+        return role;
+    }
+
+    // 2) Open a pinned tab, wait complete, read role, then close the tab
+    return new Promise(resolve => {
+        try {
+            chrome.tabs.create({ url: AIH_URL, active: false, pinned: true }, async (tab) => {
+                const createdId = tab?.id;
+                if (!createdId) return resolve('');
+                try { console.debug('[KH][AlphaSIS] created pinned tab to acquire role', { tabId: createdId }); } catch {}
+                await waitForComplete(createdId);
+                // give the content script a brief moment
+                await new Promise(r => setTimeout(r, 250));
+                const r = await executeGetRole(createdId);
+                // Close the tab we opened
+                try { chrome.tabs.remove(createdId); } catch {}
+                resolve(r || '');
+            });
+        } catch { resolve(''); }
+    });
 }
 
 /* ─ helpers for settings ─ */

@@ -30,10 +30,19 @@ const KAYAKO_MEDIA_RE = /\/media\/url\//i;
 const extractUrls = (html?: string): string[] => {
     const src = html ?? '';
     const out = new Set<string>();
-    const re  = /https?:\/\/[^\s"'\\\]]+/gi;
+    // Match http(s)://, protocol-relative //, and www.-prefixed domains
+    const re  = /(?:(?:https?:)?\/\/|www\.)[^\s"'\\\]]+/gi;
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) out.add(m[0]);
-    return [...out];
+    const arr = [...out];
+    try {
+        console.info('[AssetsInspector][data] extractUrls', {
+            inputLength: src.length,
+            found: arr.length,
+            sample: arr.slice(0, 10),
+        });
+    } catch {}
+    return arr;
 };
 
 /** Remove terminal commas/periods accidentally appended to URLs (e.g., Kayako compose). */
@@ -73,6 +82,13 @@ const extractAnchors = (html?: string): Array<{ url: string; text: string }> => 
             }
             out.push({ url: sanitizeUrl(absolute), text });
         });
+        try {
+            console.info('[AssetsInspector][data] extractAnchors', {
+                inputLength: src.length,
+                found: out.length,
+                sample: out.slice(0, 10),
+            });
+        } catch {}
         return out;
     } catch (err) {
         try { console.warn('[AssetsInspector] extractAnchors failed', err); } catch {}
@@ -89,6 +105,13 @@ const grabInlineImageSrc = (html?: string): string[] => {
         const captured = m[1] ?? '';
         if (captured) urls.push(captured);
     }
+    try {
+        console.info('[AssetsInspector][data] grabInlineImageSrc', {
+            inputLength: src.length,
+            found: urls.length,
+            sample: urls.slice(0, 10),
+        });
+    } catch {}
     return urls;
 };
 
@@ -157,14 +180,16 @@ export const getState = () => ({ fetched, totalPosts, cache, isLoading });
 /* ───────────── Loader ───────────── */
 
 export async function loadAssets(limit: number): Promise<void> {
-    if (isLoading) return;
+    if (isLoading) { try { console.warn('[AssetsInspector][data] loadAssets: already loading, skipping'); } catch {} return; }
     isLoading = true;
 
     try {
+        try { console.info('[AssetsInspector][data] loadAssets:start', { limit }); } catch {}
         const rawResp = await fetchCasePostsWithAssets(limit) as unknown;
         const obj     = rawResp as Record<string, unknown>;
         const posts   = (obj['posts'] ?? obj['data'] ?? []) as PostWithAssets[];
         const total   = Number(obj['total_count'] ?? obj['total'] ?? posts.length);
+        try { console.info('[AssetsInspector][data] loadAssets:response', { posts: posts.length, total }); } catch {}
 
         if (!posts.length) return;
 
@@ -173,13 +198,93 @@ export async function loadAssets(limit: number): Promise<void> {
 
         cache = { links: [], images: [], attachments: [] };
 
+        // High-level response overview
+        try {
+            console.info('[AssetsInspector][data] posts overview', {
+                fetched,
+                totalPosts,
+                postIds: posts.map(p => p.id),
+                sample: posts.slice(0, 3).map(p => ({
+                    id: p.id,
+                    contentsLength: (p.contents || '').length,
+                    hasContents: !!p.contents,
+                    attachmentsCount: (p.attachments || []).length,
+                    hasDownloadAll: !!p.download_all,
+                })),
+            });
+        } catch {}
+
+        // Helper: extract HTML/text content from various possible fields
+        const pickPostHtml = (post: any): string => {
+            try {
+                const keyedCandidates: Array<[string, unknown]> = [
+                    ['contents', post?.contents],
+                    ['content', post?.content],
+                    ['body_html', post?.body_html],
+                    ['body', post?.body],
+                    ['bodyText', post?.bodyText],
+                    ['body_text', post?.body_text],
+                    ['message', post?.message],
+                    ['note.body_html', post?.note?.body_html],
+                    ['post.body_html', post?.post?.body_html],
+                    ['original.body_html', post?.original?.body_html],
+                    ['original.body_text', post?.original?.body_text],
+                ];
+                const found = keyedCandidates.find(([, v]) => typeof v === 'string' && (v as string).length > 0);
+                const chosen = (found?.[1] as string) || '';
+                const key = found?.[0] || '';
+                if (key) { try { console.info('[AssetsInspector][data] pickPostHtml', { id: post?.id, key, length: chosen.length }); } catch {} }
+                if (!chosen) {
+                    try { console.warn('[AssetsInspector][data] No HTML contents for post', { id: post?.id, keys: Object.keys(post || {}) }); } catch {}
+                }
+                return chosen;
+            } catch {
+                return '';
+            }
+        };
+
+        // Helper: normalize attachments array from various possible fields
+        const pickAttachments = (post: any): Attachment[] => {
+            try {
+                const raw = (post?.attachments ?? post?.attachment ?? post?.files ?? []) as any;
+                const arr: any[] = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+                return arr.map(x => ({ url: x?.url, url_download: x?.url_download ?? x?.download_url ?? x?.href, type: x?.type ?? x?.mime_type })) as Attachment[];
+            } catch {
+                return [] as Attachment[];
+            }
+        };
+
         for (const p of posts) {
-            const inlineImgs = new Set(grabInlineImageSrc(p.contents));
+            try {
+                const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                console.groupCollapsed?.('[AssetsInspector][data] post', p.id);
+                console.info(prefix, 'meta', {
+                    id: p.id,
+                    keys: Object.keys(p || {}),
+                    contentsLength: (pickPostHtml(p) || '').length,
+                    attachmentsCount: (pickAttachments(p) || []).length,
+                    hasDownloadAll: !!p.download_all,
+                });
+                // Full dump for visibility in consoles where groups don't expand
+                console.info(prefix, 'full-post-object', p);
+                const full = pickPostHtml(p) ?? '';
+                console.info(prefix, 'full-contents', full);
+            } catch {}
+            const html = pickPostHtml(p);
+            const inlineImgs = new Set(grabInlineImageSrc(html));
             inlineImgs.forEach(u => cache.images.push({ url: u, post: p.id }));
+            try {
+                const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                console.info(prefix, 'inlineImgs -> images[]', { count: inlineImgs.size, sample: [...inlineImgs].slice(0, 10) });
+            } catch {}
 
             // First, collect anchors with their visible text
-            const anchors = extractAnchors(p.contents);
+            const anchors = extractAnchors(html);
             const anchorUrlSet = new Set(anchors.map(a => a.url));
+            try {
+                const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                console.info(prefix, 'anchors', { count: anchors.length, sample: anchors.slice(0, 10) });
+            } catch {}
             anchors.forEach(({ url, text }) => {
                 const clean = sanitizeUrl(url);
                 cache.links.push({ url: clean, post: p.id, text });
@@ -187,38 +292,78 @@ export async function loadAssets(limit: number): Promise<void> {
             });
 
             // Then, collect any remaining bare URLs not already covered by anchors
-            extractUrls(p.contents).forEach(u => {
-                if (inlineImgs.has(u)) return;
-                if (anchorUrlSet.has(u)) return;
+            const rawUrls = extractUrls(html);
+            let skippedInline = 0, skippedAnchorDupe = 0, kept = 0;
+            rawUrls.forEach(u => {
+                if (inlineImgs.has(u)) { skippedInline++; return; }
+                if (anchorUrlSet.has(u)) { skippedAnchorDupe++; return; }
                 const clean = sanitizeUrl(u);
                 cache.links.push({ url: clean, post: p.id });
                 if (isProbablyImage(clean)) cache.images.push({ url: clean, post: p.id });
+                kept++;
             });
+            try {
+                const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                console.info(prefix, 'bareUrls processed', {
+                    raw: rawUrls.length,
+                    kept,
+                    skippedInline,
+                    skippedAnchorDupe,
+                });
+            } catch {}
 
             let hasNonImageAttachment = false;
-            for (const att of p.attachments ?? []) {
+            const attachments = pickAttachments(p);
+            try {
+                const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                console.info(prefix, 'attachments (normalized)', { count: attachments.length, sample: attachments.slice(0, 10) });
+            } catch {}
+            for (const att of attachments) {
                 const dl = att.url_download ?? att.url;
                 if (!dl) continue;
                 const clean = sanitizeUrl(dl);
                 if (att.type?.startsWith('image/')) {
                     // Image attachments should appear only in Images, not in Attachments
                     cache.images.push({ url: clean, post: p.id });
+                    try {
+                        const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                        console.info(prefix, 'attachment:image -> images[]', { url: clean, type: att.type });
+                    } catch {}
                 } else {
                     cache.attachments.push({ url: clean, post: p.id });
                     hasNonImageAttachment = true;
+                    try {
+                        const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                        console.info(prefix, 'attachment:file -> attachments[]', { url: clean, type: att.type });
+                    } catch {}
                 }
             }
             // Only include download_all when there is at least one non-image attachment
-            if (hasNonImageAttachment && p.download_all)
-                cache.attachments.push({ url: sanitizeUrl(p.download_all), post: p.id });
+            const dlAllRaw = (p as any)?.download_all ?? (p as any)?.downloadAll ?? (p as any)?.attachments_download_all;
+            if (hasNonImageAttachment && dlAllRaw) {
+                const dlAll = sanitizeUrl(dlAllRaw);
+                cache.attachments.push({ url: dlAll, post: p.id });
+                try {
+                    const prefix = `[AssetsInspector][data][post:${p.id}]`;
+                    console.info(prefix, 'download_all -> attachments[]', { url: dlAll });
+                } catch {}
+            }
+            try { console.groupEnd?.(); } catch {}
         }
 
         /* dedupe */
+        const before = {
+            links: cache.links.length,
+            images: cache.images.length,
+            attachments: cache.attachments.length,
+        };
         const dedup = <T extends { url: string }>(arr: T[]) =>
             Array.from(new Map(arr.map(o => [o.url, o])).values());
         cache.links       = dedup(cache.links);
         cache.images      = dedup(cache.images);
         cache.attachments = dedup(cache.attachments);
+        try { console.info('[AssetsInspector][data] dedupe', { before, after: { links: cache.links.length, images: cache.images.length, attachments: cache.attachments.length } }); } catch {}
+        try { console.info('[AssetsInspector][data] loadAssets:cache built', { links: cache.links.length, images: cache.images.length, attachments: cache.attachments.length }); } catch {}
 
         /* group links by domain (adds header rows) */
         if (cache.links.length) {
@@ -230,7 +375,11 @@ export async function loadAssets(limit: number): Promise<void> {
             cache.links.forEach(l => grouped[classify(l.url)].push(l));
 
             // Diagnostic counts for categories
-            try { console.log('[AssetsInspector] Link categories', Object.fromEntries(Object.entries(grouped).map(([k,v]) => [k, v.length]))); } catch {}
+            try {
+                const counts = Object.fromEntries(Object.entries(grouped).map(([k,v]) => [k, v.length]));
+                const samples = Object.fromEntries(Object.entries(grouped).map(([k,v]) => [k, v.slice(0, 5)]));
+                console.log('[AssetsInspector] Link categories', counts, samples);
+            } catch {}
 
             const order: (keyof typeof grouped)[] = [
                 'kayako_instances', 'kayako_tickets', 'kayako_articles', 'kayako',
@@ -244,6 +393,8 @@ export async function loadAssets(limit: number): Promise<void> {
                         : []),
             );
         }
+    } catch (err) {
+        try { console.error('[AssetsInspector][data] loadAssets:error', err); } catch {}
     } finally {
         isLoading = false;
     }

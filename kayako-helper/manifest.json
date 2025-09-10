@@ -1,7 +1,7 @@
 {
   "name": "OmniHelper",
   "description": "Every Central Support agent's best friend.",
-  "version": "1.0.2",
+  "version": "0.7.0.0",
   "manifest_version": 3,
 
   "icons": {
@@ -20,6 +20,15 @@
     {
       "matches": ["https://*.kayako.com/*"],
       "js": ["dist/tagCleanerInjector.js"],
+      "run_at": "document_start",
+      "type": "module"
+    },
+    {
+      "matches": [
+        "https://aihorizons.school/*",
+        "https://*.aihorizons.school/*"
+      ],
+      "js": ["dist/captureAihRole.js"],
       "run_at": "document_start",
       "type": "module"
     },

@@ -61,6 +61,7 @@ export function openCannedPromptModal(store: EphorStore): void {
     const SYSTEM_FILE_ID       = "__system_file__";
     const SYSTEM_PAST_ID       = "__system_past__";
     const SYSTEM_STYLE_ID      = "__system_style__";
+    // Removed: Recent Tickets merged into Past Tickets
 
     const isSystem = (id: string | null) => id === SYSTEM_TRANSCRIPT_ID || id === SYSTEM_FILE_ID || id === SYSTEM_PAST_ID || id === SYSTEM_STYLE_ID;
 
@@ -108,6 +109,7 @@ export function openCannedPromptModal(store: EphorStore): void {
         addSys(SYSTEM_FILE_ID, "File Analysis");
         addSys(SYSTEM_PAST_ID, "Past Tickets");
         addSys(SYSTEM_STYLE_ID, "Style Guide");
+        // Recent Tickets merged into Past Tickets
 
         for (const cp of store.cannedPrompts) {
             const row = document.createElement("div");
@@ -164,19 +166,19 @@ export function openCannedPromptModal(store: EphorStore): void {
             if (id === SYSTEM_TRANSCRIPT_ID) {
                 titleInp.value = "Transcript";
                 phInp.value    = "@#TRANSCRIPT#@";
-                bodyTa.value   = "";
+                bodyTa.value   = "Includes the entire ticket transcript for the current case.";
             } else if (id === SYSTEM_FILE_ID) {
                 titleInp.value = "File Analysis";
                 phInp.value    = "@#FILE_ANALYSIS#@";
-                bodyTa.value   = (store.systemPromptBodies?.fileAnalysis ?? "");
+                bodyTa.value   = (store.systemPromptBodies?.fileAnalysis ?? "Describe how to analyze and extract insights from attached files.");
             } else if (id === SYSTEM_PAST_ID) {
                 titleInp.value = "Past Tickets";
                 phInp.value    = "@#PAST_TICKETS#@";
-                bodyTa.value   = (store.systemPromptBodies?.pastTickets ?? "");
+                bodyTa.value   = (store.systemPromptBodies?.pastTickets ?? "Insert relevant excerpts from the customer's previous tickets.");
             } else if (id === SYSTEM_STYLE_ID) {
                 titleInp.value = "Style Guide";
                 phInp.value    = "@#STYLE_GUIDE#@";
-                bodyTa.value   = (store.systemPromptBodies?.styleGuide ?? "");
+                bodyTa.value   = (store.systemPromptBodies?.styleGuide ?? "Guidelines for tone, formatting, and response style.");
             }
         } else {
             const cp = store.cannedPrompts.find(p => p.id === id);
@@ -184,10 +186,10 @@ export function openCannedPromptModal(store: EphorStore): void {
             phInp.value    = cp?.placeholder ?? "";
             bodyTa.value   = cp?.body ?? "";
         }
-        // Disable editing for Transcript only (cannot edit/delete). Others editable but non-deletable.
-        titleInp.disabled = id === SYSTEM_TRANSCRIPT_ID;
-        phInp.disabled    = id === SYSTEM_TRANSCRIPT_ID;
-        bodyTa.disabled   = false;
+        // Disable editing for all system placeholders
+        titleInp.disabled = isSystem(id);
+        phInp.disabled    = isSystem(id);
+        bodyTa.disabled   = isSystem(id);
     };
 
     const writeBack = () => {
