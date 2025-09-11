@@ -12,6 +12,37 @@ export class HiddenEphorTab {
     private static sharedTabId: number | null = null;
     static get tabId(): number | null { return this.sharedTabId; }
 
+    /* simple retain/release to debounce auto-closing */
+    private static activeUsers = 0;
+    private static closeTimer: number | null = null as unknown as number | null;
+    private static retain(): void {
+        this.activeUsers++;
+        if (this.closeTimer != null) {
+            try { clearTimeout(this.closeTimer as unknown as number); } catch {}
+            this.closeTimer = null;
+        }
+    }
+    private static scheduleRelease(reason: string): void {
+        this.activeUsers = Math.max(0, this.activeUsers - 1);
+        if (this.activeUsers === 0) {
+            try { if (this.closeTimer != null) clearTimeout(this.closeTimer as unknown as number); } catch {}
+            this.closeTimer = setTimeout(() => {
+                this.closeTimer = null;
+                void this.closeTabIfOpen(reason || 'idle');
+            }, 600) as unknown as number;
+        }
+    }
+
+    /** Public acquire/release helpers for long-lived sequences */
+    static async acquire(): Promise<number | undefined> {
+        HiddenEphorTab.retain();
+        try { return await HiddenEphorTab.ensureTab(); }
+        catch (e) { HiddenEphorTab.scheduleRelease('acquire-failed'); throw e; }
+    }
+    static release(reason: string = 'manual'): void {
+        HiddenEphorTab.scheduleRelease(reason);
+    }
+
     constructor(private readonly preferredTabId?: number) {}
 
     /* ---------- ensure (or create) the /blank tab ------------------ */
@@ -57,42 +88,45 @@ export class HiddenEphorTab {
 
     /* ---------- Clerk session JWT ---------------------------------- */
     public async getSessionJwt(): Promise<{ token: string; expiresAt: number }> {
-        const tabId = await HiddenEphorTab.ensureTab();
-        if (tabId === undefined || !chrome.scripting?.executeScript) {
-            throw new Error("HiddenEphorTab: chrome.scripting unavailable.");
+        HiddenEphorTab.retain();
+        try {
+            const tabId = await HiddenEphorTab.ensureTab();
+            if (tabId === undefined || !chrome.scripting?.executeScript) {
+                throw new Error("HiddenEphorTab: chrome.scripting unavailable.");
+            }
+
+            const [{ result }] = await chrome.scripting.executeScript<{
+                token: string; exp: number;
+            }>({
+                target: { tabId },
+                world : "MAIN",
+                func  : async () => {
+                    // Wait until Clerk booted
+                    // @ts-ignore – Clerk injected by app
+                    await (window as any).Clerk.load?.();
+                    // @ts-ignore
+                    const jwt: string = await (window as any).Clerk.session?.getToken?.();
+                    if (!jwt) throw new Error("Failed to obtain Clerk JWT");
+
+                    const payload = JSON.parse(atob(jwt.split(".")[1]));
+                    return { token: jwt, exp: payload.exp * 1000 };
+                },
+            });
+            return { token: result.token, expiresAt: result.exp };
+        } finally {
+            HiddenEphorTab.scheduleRelease('getSessionJwt');
         }
-
-        const [{ result }] = await chrome.scripting.executeScript<{
-            token: string; exp: number;
-        }>({
-            target: { tabId },
-            world : "MAIN",
-            func  : async () => {
-                // Wait until Clerk booted
-                // @ts-ignore – Clerk injected by app
-                await (window as any).Clerk.load?.();
-                // @ts-ignore
-                const jwt: string = await (window as any).Clerk.session?.getToken?.();
-                if (!jwt) throw new Error("Failed to obtain Clerk JWT");
-
-                const payload = JSON.parse(atob(jwt.split(".")[1]));
-                return { token: jwt, exp: payload.exp * 1000 };
-            },
-        });
-        // Close the hidden tab after obtaining the JWT to honor user request
-        void HiddenEphorTab.closeTabIfOpen('getSessionJwt');
-        return { token: result.token, expiresAt: result.exp };
     }
 
     /* ---------- proxy fetch through the tab (cookies!) -------------- */
     public async fetch<T = unknown>(url: string, init: RequestInit = {}) {
-        const tabId = await HiddenEphorTab.ensureTab();      // may be undefined
+        HiddenEphorTab.retain();
         try {
+            const tabId = await HiddenEphorTab.ensureTab();      // may be undefined
             const res = await hiddenFetch<T>(tabId, url, init);
             return res;
         } finally {
-            // Close the hidden tab after proxied fetch completes
-            void HiddenEphorTab.closeTabIfOpen('hiddenFetch');
+            HiddenEphorTab.scheduleRelease('hiddenFetch');
         }
     }
 }

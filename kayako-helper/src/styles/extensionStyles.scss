@@ -594,6 +594,8 @@
   flex-direction: column;
   gap: 8px;
   z-index: 4;                     /* ensure above parent dropdown */
+  max-height: 70vh;               /* keep within viewport */
+  overflow-y: auto;               /* show scrollbar when long */
 }
 
 /* ===== Settings modal ===== */
@@ -1086,4 +1088,9 @@ root {
 .kh-send-ephor-review-btn {
   position: relative;
   top: -2px;
+}
+
+
+#kh-ephor-settings-modal :where(grammarly-extension-vbars) {
+  display: none !important;
 }

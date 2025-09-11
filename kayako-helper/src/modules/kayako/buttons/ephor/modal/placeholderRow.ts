@@ -4,6 +4,7 @@
 import { EphorStore, saveEphorStore } from "../ephorStore.ts";
 import type { ModalRefs } from "../ephorSettingsUI.ts";
 import { waitForRequesterId, waitForOrganization } from "@/modules/kayako/utils/caseContext.ts";
+import { apiToDisplay } from "../modelCatalog.ts";
 import { searchConversationIds, fetchTranscriptByCase, quoteForSearch } from "@/modules/kayako/utils/search.ts";
 import { choiceDialog } from "@/utils/dialog.ts";
 
@@ -60,6 +61,7 @@ export function rebuildPlaceholderRow(
 
     for (let r = 1; r <= stageIdx; r++) {
         const stg = store.workflowStages[r - 1];
+        try { console.debug('[Ephor][PH] Build split for round', r, { selectedCount: stg?.selectedModels?.length || 0 }); } catch {}
 
         /* wrapper */
         const wrap = document.createElement("div");
@@ -77,26 +79,52 @@ export function rebuildPlaceholderRow(
 
         /* dropdown toggle */
         const drop = createSplitBtnPart("▾", "", "kh-split-drop");
+        try { drop.setAttribute('type', 'button'); } catch {}
+        drop.setAttribute('aria-haspopup', 'menu');
+        drop.setAttribute('aria-expanded', 'false');
         wrap.appendChild(drop);
 
         /* dropdown menu */
         const menu = document.createElement("div");
         menu.className = "kh-ph-menu";
+        menu.setAttribute('role', 'menu');
+        menu.addEventListener('click', ev => ev.stopPropagation());
         wrap.appendChild(menu);
 
-        stg.selectedModels.forEach(ai => {
+        // Show selected AIs from that round using display names; clicking inserts placeholder
+        const makeToken = (api: string) => `@#RD_${r}_AI_${api}#@`;
+        const displayFor = (api: string): string => apiToDisplay(api);
+        const models = Array.isArray(stg?.selectedModels) ? stg.selectedModels : [];
+        if (!models.length) {
             const item = document.createElement("div");
-            item.textContent = ai;
-            item.dataset.ph  = `@#RD_${r}_AI_${ai}#@`;
+            item.textContent = `No AIs in Round ${r}`;
+            item.style.opacity = ".65";
+            item.style.pointerEvents = "none";
+            menu.appendChild(item);
+            try { console.debug('[Ephor][PH] No models for round', r); } catch {}
+        }
+        models.forEach(apiId => {
+            const item = document.createElement("div");
+            item.textContent = displayFor(apiId);
+            item.dataset.ph  = makeToken(apiId);
+            item.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                insertPlaceholder(refs, item.dataset.ph || "");
+                menu.style.display = "none";
+                try { console.debug('[Ephor][PH] Inserted placeholder', item.dataset.ph); } catch {}
+            });
             menu.appendChild(item);
         });
 
         /* toggle */
         drop.addEventListener("click", e => {
             e.stopPropagation();
-            menu.style.display = menu.style.display === "block" ? "none" : "block";
+            const next = menu.style.display === "block" ? "none" : "block";
+            menu.style.display = next;
+            drop.setAttribute('aria-expanded', next === 'block' ? 'true' : 'false');
+            try { console.debug('[Ephor][PH] Toggle menu', { round: r, to: next, items: menu.children.length }); } catch {}
         });
-        document.addEventListener("click", () => { menu.style.display = "none"; });
+        document.addEventListener("click", () => { menu.style.display = "none"; drop.setAttribute('aria-expanded', 'false'); });
     }
 
     appendSystemPlaceholders(row, store);

@@ -120,6 +120,9 @@ export interface EphorStore {
     /* 👇 NEW: per-ticket channel mapping (key = `${projectId}::${ticketId}`) */
     channelIdByContext: Record<string, string>;
 
+    /* 👇 NEW: per-ticket project mapping (key = `${ticketId}`) */
+    projectIdByContext?: Record<string, string>;
+
     /* 👇 NEW (legacy): per-ticket custom instructions (key = `${projectId}::${ticketId}`) */
     customInstructionsByContext: Record<string, string>;
 
@@ -174,6 +177,13 @@ export interface EphorStore {
 
     /* 👇 NEW: persist last selected workflow id for UX continuity */
     lastSelectedWorkflowId?: string;
+
+    /* 👇 NEW: per-ticket preference overrides for Mode/Workflow/Run */
+    ticketPrefsByContext?: Record<string, {
+        preferredMode?: ConnectionMode;
+        preferredQueryMode?: "single" | "workflow";
+        runMode?: RunMode;
+    }>;
 }
 
 const KEY = "kh-ephor-store";
@@ -184,34 +194,71 @@ const KEY = "kh-ephor-store";
 const defaultStages: WorkflowStage[] = [
     {
         id   : crypto.randomUUID(),
+        name : "Check Past Tickets",
+        prompt:
+            `Please check these past tickets from the same requester and other members of their organization and make a highly detailed and informative summary of all important information that is relevant to the current ticket.
+
+Make sure to ONLY include relevant information. If none of the information in the past tickets is relevant to the current ticket, reply with nothing except "No relevant information found in past tickets."
+
+CURRENT TICKET
+@#TRANSCRIPT#@
+
+
+PAST TICKETS
+@#PAST_TICKETS#@`,
+        selectedModels: ["gpt-4o"],
+    },
+    {
+        id   : crypto.randomUUID(),
         name : "Write Public Reply",
         prompt:
-            `Write a public reply using the following ticket transcript:
+            `Please write a reply to this user
 
-{{TRANSCRIPT}}`,
+CURRENT TICKET
+@#TRANSCRIPT#@
+
+RELEVANT INFORMATION FROM PAST TICKETS
+@#RD_1_COMBINED#@`,
         selectedModels: ["gpt-4o"],
     },
     {
         id   : crypto.randomUUID(),
         name : "Review Public Reply",
         prompt:
-            `Review the draft reply below for accuracy, clarity and tone.  
-Return ONLY corrections / suggested edits.
+            `Please review and fact-check this reply. Please ensure: 
 
-{{PRV_RD_OUTPUT}}`,
+1) all possible troubleshooting steps have been provided
+2) the client's concerns have been fully addressed 
+3) the reply contains no incorrect information
+4) CRUCIAL: confirm all UI paths look correct in case any paths are mentioned in the reply
+
+CURRENT TICKET
+@#TRANSCRIPT#@
+
+RELEVANT INFORMATION FROM PAST TICKETS
+@#RD_1_COMBINED#@
+
+REPLY
+@#RD_2_COMBINED#@`,
         selectedModels: ["claude-4-opus-latest-thinking", "gemini-2.5-pro", "gpt-4o"],
     },
     {
         id   : crypto.randomUUID(),
         name : "Adapt Initial Public Reply",
         prompt:
-            `Apply the reviewer corrections to produce the final reply.
+            `Here's what our RAG fact-checking AI ensemble output when asked to review the reply below. Please confirm their feedback does not include any mistakes and adapt the reply if necessary. Keep in mind that not all feedback may be relevant or accurate.
 
-=== CORRECTIONS ===
-{{PRV_RD_OUTPUT}}
+CURRENT TICKET
+@#TRANSCRIPT#@
 
-=== ORIGINAL TRANSCRIPT ===
-{{TRANSCRIPT}}`,
+RELEVANT INFORMATION FROM PAST TICKETS
+@#RD_1_COMBINED#@
+
+REPLY
+@#RD_2_COMBINED#@
+
+FEEDBACK
+@#RD_3_COMBINED#@`,
         selectedModels: ["gpt-4o"],
     },
 ];
@@ -232,7 +279,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         messagePrompt     : "Please summarize the following ticket.",
         selectedModels    : ["gpt-4o"],
 
-        preferredMode     : "multiplexer",
+        preferredMode     : "stream",
         runMode           : "automatic",
 
         workflowStages    : defaultStages,
@@ -245,6 +292,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         lastOutputs: {},
         lastMsgIdByChannel: {},
         channelIdByContext: {},
+        projectIdByContext: {},
         customInstructionsByContext: {},
         customInstructionsByStage: {},
         instructionsScopeForWorkflow: "ticket",
@@ -260,6 +308,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         workflows: [],
         savedInstructions: [],
         lastSelectedWorkflowId: "",
+        ticketPrefsByContext: {},
     };
     return {
         ...defaults,
@@ -267,6 +316,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         lastOutputs: saved?.lastOutputs ?? {},
         lastMsgIdByChannel: saved?.lastMsgIdByChannel ?? {},
         channelIdByContext: saved?.channelIdByContext ?? {},
+        projectIdByContext: saved?.projectIdByContext ?? {},
         customInstructionsByContext: saved?.customInstructionsByContext ?? {},
         customInstructionsByStage: saved?.customInstructionsByStage ?? {},
         instructionsScopeForWorkflow: saved?.instructionsScopeForWorkflow ?? "ticket",
@@ -283,6 +333,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         workflows: saved?.workflows ?? [],
         savedInstructions: saved?.savedInstructions ?? [],
         lastSelectedWorkflowId: saved?.lastSelectedWorkflowId ?? "",
+        ticketPrefsByContext: saved?.ticketPrefsByContext ?? {},
     };
 }
 

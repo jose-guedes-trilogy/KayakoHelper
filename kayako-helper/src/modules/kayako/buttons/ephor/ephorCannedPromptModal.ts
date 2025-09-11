@@ -15,7 +15,7 @@ export function openCannedPromptModal(store: EphorStore): void {
     Object.assign(modal.style, {
         position:"fixed", top:"120px", left:"50%", transform:"translateX(-50%)",
         minWidth:"720px", background:"#fff", border:"1px solid #ccc", borderRadius:"6px",
-        padding:"12px", zIndex:"10001", boxShadow:"0 4px 16px rgba(0,0,0,.2)",
+        padding:"12px", zIndex:"10004", boxShadow:"0 4px 16px rgba(0,0,0,.2)",
         fontFamily:"system-ui", fontSize:"13px", display:"flex", flexDirection:"column", gap:"10px",
     } as CSSStyleDeclaration);
 
@@ -186,10 +186,11 @@ export function openCannedPromptModal(store: EphorStore): void {
             phInp.value    = cp?.placeholder ?? "";
             bodyTa.value   = cp?.body ?? "";
         }
-        // Disable editing for all system placeholders
-        titleInp.disabled = isSystem(id);
-        phInp.disabled    = isSystem(id);
-        bodyTa.disabled   = isSystem(id);
+        // Allow editing of system bodies (File Analysis / Past Tickets / Style Guide), but lock title/placeholder
+        const sysEditing = isSystem(id);
+        titleInp.disabled = sysEditing;
+        phInp.disabled    = sysEditing;
+        bodyTa.disabled   = false;
     };
 
     const writeBack = () => {

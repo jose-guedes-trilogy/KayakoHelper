@@ -12,6 +12,8 @@ export interface UrlEntry {
     prompt: string;
     supportsInsertion: boolean;
     mode?: 'new-tab' | 'active-tab';
+    /** Optional product association used for Ephor per-product defaults */
+    product?: string;
 }
 
 /** A chat‑export provider (e.g. ChatGPT, Gemini …) */
@@ -24,6 +26,8 @@ export interface Provider {
     /** `true` ⇒ user‑added, can hold many URLs
      *  `false`/`undefined` ⇒ built‑in single‑URL provider */
     multi?: boolean;              //  ← NEW
+    /** Per-product default URL mapping (key = product name lowercased) */
+    defaultUrlIdByProduct?: Record<string, string>;
 }
 
 export interface Store {
@@ -48,7 +52,7 @@ const DEFAULTS: Store = {
 
 function makeDefault(id: string, name: string): Provider {
     /* built‑ins are single‑URL (“multi” = false) */
-    return { id, name, urls: [], defaultUrlId: null, multi: false };   // ← CHANGED
+    return { id, name, urls: [], defaultUrlId: null, multi: false, defaultUrlIdByProduct: {} };   // ← CHANGED
 }
 
 /** normalises optional fields added over time (forward‑compat) */
@@ -56,6 +60,7 @@ export function normalizeStore(s: Store): Store {
     for (const p of s.providers) {
         /* add fields that may be missing in configs saved by older versions */
         if (p.multi === undefined) p.multi = true;                     // ← NEW
+        if (!p.defaultUrlIdByProduct) p.defaultUrlIdByProduct = {};    // ← NEW
         for (const u of p.urls)
             if (!u.mode) u.mode = 'new-tab';
     }

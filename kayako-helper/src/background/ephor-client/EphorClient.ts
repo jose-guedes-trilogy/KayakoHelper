@@ -590,7 +590,7 @@ export class EphorClient {
      * 2) Poll /projects via cookie/JWT to verify membership.
      * 3) Fallback: open the join URL in the hidden pinned tab, close it after load, and re-check.
      */
-    async quietJoinByInvite(inviteId: string, projectId: string, timeoutMs = 15_000): Promise<boolean> {
+    async quietJoinByInvite(inviteId: string, projectId: string, timeoutMs = 12_000): Promise<boolean> {
         const joinUrl = `https://app.ephor.ai/join/${inviteId}`;
         const start = Date.now();
 
@@ -602,38 +602,47 @@ export class EphorClient {
             } catch { return false; }
         };
 
+        // Attempt join via hidden tab fetch in a loop until membership reflects
+        // Keep the hidden tab retained across the whole join flow to avoid home reload loops
         try {
-            await this.hiddenTab.fetch<string>(joinUrl, { method: "GET" });
-        } catch {}
+            await (HiddenEphorTab as any).acquire?.();
+            try { await this.hiddenTab.fetch<string>(joinUrl, { method: "GET" }); } catch {}
+        } finally {
+            try { (HiddenEphorTab as any).release?.('join-prefetch'); } catch {}
+        }
 
         // Poll for membership
         while (Date.now() - start < timeoutMs) {
             if (await hasJoined()) return true;
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 700));
         }
 
-        // Fallback: open in hidden pinned tab and close after load
+        // Fallback: drive hidden tab to the join URL (never open a normal tab)
         try {
-            const tabId = (HiddenEphorTab as any)["ensureTab"] ? await (HiddenEphorTab as any)["ensureTab"]() : undefined;
-            if (tabId != null && chrome.tabs?.update) {
-                await chrome.tabs.update(tabId, { url: joinUrl, active: false, pinned: true });
+            await (HiddenEphorTab as any).acquire?.();
+            const tabId = (HiddenEphorTab as any)["tabId"]?.() ?? (HiddenEphorTab as any)["tabId"];
+            const ensureId = (HiddenEphorTab as any)["ensureTab"] ? await (HiddenEphorTab as any)["ensureTab"]() : tabId;
+            if (ensureId != null && chrome.tabs?.update) {
+                await chrome.tabs.update(ensureId, { url: joinUrl, active: false, pinned: true });
                 await new Promise<void>(resolve => {
                     const lis = (id: number, _ci: any, info: chrome.tabs.TabChangeInfo) => {
-                        if (id === tabId && info.status === "complete") {
+                        if (id === ensureId && info.status === "complete") {
                             chrome.tabs.onUpdated.removeListener(lis);
                             resolve();
                         }
                     };
                     chrome.tabs.onUpdated.addListener(lis);
                 });
-                try { await chrome.tabs.remove(tabId); } catch {}
             }
         } catch {}
+        finally {
+            try { (HiddenEphorTab as any).release?.('join-fallback'); } catch {}
+        }
 
         const start2 = Date.now();
-        while (Date.now() - start2 < 10_000) {
+        while (Date.now() - start2 < 8_000) {
             if (await hasJoined()) return true;
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 700));
         }
         return false;
     }

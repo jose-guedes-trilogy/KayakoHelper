@@ -42,14 +42,14 @@ export function bootTrainingMode(): void {
 
 /** Hide “Complete”+“Trash” buttons while training mode is enabled */
 function setRestrictedButtonsVisibility(hide: boolean): void {
-    const display = 'none';
-    [
-        KAYAKO_SELECTORS.completeTicketButton,
-        KAYAKO_SELECTORS.trashTicketButton,
-    ].forEach(sel => {
-        document.querySelectorAll<HTMLElement>(sel)
-            .forEach(el => (el.style.display = display));
-    });
+    // const display = 'none';
+    // [
+    //     KAYAKO_SELECTORS.completeTicketButton,
+    //     KAYAKO_SELECTORS.trashTicketButton,
+    // ].forEach(sel => {
+    //     document.querySelectorAll<HTMLElement>(sel)
+    //         .forEach(el => (el.style.display = display));
+    // });
 }
 
 function onReplyButtonClick(e: MouseEvent): void {

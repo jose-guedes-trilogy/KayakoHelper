@@ -9,12 +9,12 @@ export const MODEL_DISPLAY_TO_API: Record<string, string | null> = {
   "GPT-5": "gpt-5",
   "Llama 4 Scout": "cerebras-4-scout",
   "Claude 4 Sonnet": "claude-4-sonnet-latest-thinking",
-  "OpenAI 4.1": "gpt-4.1",
+  "ChatGPT 4.1": "gpt-4.1",
   "Grok 3": "grok-3",
   "DeepSeek V3 0324": "deepseek-v3",
   "Llama R1 Distill 70B": "groq-r1-llama",
   "Mistral Small 3.1": "mistral-small-31",
-  "OpenAI o4 Mini": "o4-mini",
+  "ChatGPT o4 Mini": "o4-mini",
   "Gemini 2.5 Flash": "gemini-2.5-flash",
   "Haiku 3.5": "anthropic-haiku35",
   "Mistral Medium 3": "mistral-medium-3",
@@ -24,7 +24,7 @@ export const MODEL_DISPLAY_TO_API: Record<string, string | null> = {
   "Grok 4": "grok-4",
   "DeepSeek R1": "deepseek-r1",
   "Claude 4 Opus": "claude-4-opus-latest-thinking",
-  "OpenAI o3": "o3",
+  "ChatGPT o3": "o3",
   "Perplexity Sonar Pro": null,
 };
 

@@ -30,6 +30,8 @@ import { openAiSelectionsModal } from "./ephorAiSelectionsModal.ts";
 
 import { attachPlaceholderRowHandler, rebuildPlaceholderRow } from "./modal/placeholderRow.ts";
 import { currentKayakoTicketId } from "@/utils/kayakoIds.ts";
+import { extractProductValueSafe } from "@/modules/kayako/utils/product.ts";
+import { loadStore, findProvider } from "@/utils/providerStore.ts";
 
 
 /* ------------------------------------------------------------------ */
@@ -55,6 +57,77 @@ export async function openEphorSettingsModal(
         channels: [],
         hasProjects: false,
         availableModels: [],
+    };
+
+    /* ------------------------------------------------------------------ *
+     * Per-ticket defaults and preferences (Mode/Workflow/Run)
+     * - Defaults: Mode: Normal (multiplexer), Workflow: Multi-stage, Run: Auto
+     * - Persist any changes per ticket so they survive refreshes
+     * ------------------------------------------------------------------ */
+    const applyTicketPrefsForCurrentTicket = async () => {
+        try {
+            const tid = currentKayakoTicketId() || "";
+            const prefs = tid ? (store.ticketPrefsByContext?.[tid] ?? null) : null;
+
+            // Desired defaults when none exist yet for this ticket
+            const desiredMode: typeof store.preferredMode = "stream";
+            const desiredQuery: typeof store.preferredQueryMode = "workflow";
+            const desiredRun: typeof store.runMode = "automatic";
+
+            let changed = false;
+            if (prefs) {
+                if (prefs.preferredMode && prefs.preferredMode !== store.preferredMode) {
+                    store.preferredMode = prefs.preferredMode;
+                    changed = true;
+                }
+                if (prefs.preferredQueryMode && prefs.preferredQueryMode !== store.preferredQueryMode) {
+                    store.preferredQueryMode = prefs.preferredQueryMode;
+                    changed = true;
+                }
+                if (prefs.runMode && prefs.runMode !== store.runMode) {
+                    store.runMode = prefs.runMode;
+                    changed = true;
+                }
+            } else if (tid) {
+                // Initialize defaults for this ticket
+                store.ticketPrefsByContext = store.ticketPrefsByContext || {} as any;
+                store.ticketPrefsByContext[tid] = {
+                    preferredMode: desiredMode,
+                    preferredQueryMode: desiredQuery,
+                    runMode: desiredRun,
+                };
+                if (store.preferredMode !== desiredMode) { store.preferredMode = desiredMode; changed = true; }
+                if (store.preferredQueryMode !== desiredQuery) { store.preferredQueryMode = desiredQuery; changed = true; }
+                if (store.runMode !== desiredRun) { store.runMode = desiredRun; changed = true; }
+            }
+
+            if (changed) await saveEphorStore(store);
+
+            // Reflect in UI immediately
+            try {
+                refs.modeMultiplexer.checked = store.preferredMode === "multiplexer";
+                refs.modeStream.checked = store.preferredMode === "stream";
+                refs.queryWorkflowRadio.checked = (store.preferredQueryMode ?? "workflow") === "workflow";
+                refs.querySingleRadio.checked = !refs.queryWorkflowRadio.checked;
+                refs.runAutoRadio.checked = store.runMode === "automatic";
+                refs.runManualRadio.checked = store.runMode === "manual";
+            } catch {}
+        } catch {}
+    };
+
+    const saveTicketPrefsPartial = async (partial: Partial<{
+        preferredMode: typeof store.preferredMode;
+        preferredQueryMode: typeof store.preferredQueryMode;
+        runMode: typeof store.runMode;
+    }>) => {
+        try {
+            const tid = currentKayakoTicketId() || "";
+            if (!tid) return;
+            store.ticketPrefsByContext = store.ticketPrefsByContext || {} as any;
+            store.ticketPrefsByContext[tid] = { ...(store.ticketPrefsByContext[tid] || {}), ...partial } as any;
+            await saveEphorStore(store);
+            try { log("UI", `Saved per-ticket prefs for ${tid}`); } catch {}
+        } catch {}
     };
 
     /* Preselect the mapped channel for the current ticket (Stream mode) so the UI highlights it */
@@ -179,71 +252,83 @@ export async function openEphorSettingsModal(
      * Prompt placeholder highlighting                                    *
      * ------------------------------------------------------------------ */
     const promptTa = refs.promptInput;
+    // Prevent huge pasted content from expanding layout; keep scroll within textarea
+    try {
+        promptTa.style.overflow = "auto";
+        // Respect reduced motion layout but cap height to viewport
+        if (!promptTa.style.maxHeight) promptTa.style.maxHeight = "60vh";
+    } catch {}
     const highlightPre = modal.querySelector<HTMLPreElement>("#kh-ephor-prompt-highlight");
-    const renderHighlight = () => {
-        if (!highlightPre) return;
-
-        const cannedMap = new Map<string, string>();
-        try {
-            for (const cp of store.cannedPrompts ?? []) {
-                const core = String(cp.placeholder || "").replace(/^@#\s*|\s*#@$/g, "");
-                if (core) cannedMap.set(core, cp.title || core);
-            }
-        } catch {}
-
-        const toLabel = (name: string): string => {
-            const canned = cannedMap.get(name);
-            if (canned) return canned;
-            if (/^TRANSCRIPT$/i.test(name)) return "Transcript";
-            if (/^PRV_RD_OUTPUT$/i.test(name)) return "Previous Round";
-            const m1 = name.match(/^RD_(\d+)_COMBINED$/i);
-            if (m1) return `Round ${m1[1]} Combined`;
-            const m2 = name.match(/^RD_(\d+)_AI_(.+)$/i);
-            if (m2) return `Round ${m2[1]} ${m2[2]}`;
-            return name;
-        };
-
-        const esc = (s: string) => s
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-
-        const pill = (name: string, fullToken: string) => {
-            const label = esc(toLabel(name));
-            const tokenEsc = esc(fullToken);
-            return `<span class=\"kh-pill\" title=\"${tokenEsc}\">${label}</span>`;
-        };
-
-        const raw = promptTa.value;
-        const tokens1 = raw.match(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g) ?? [];
-        try { console.debug("[Ephor] Placeholder highlight", { count: tokens1.length }); } catch {}
-
-        let t = esc(raw);
-        // Replace @#PLACEHOLDER#@
-        t = t.replace(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g, (_m, name) => pill(String(name), `@#${String(name)}#@`));
-
-        highlightPre.innerHTML = t;
-    };
+    const PLACEHOLDER_PILLS_ENABLED = false; // Temporarily disabled per request
     if (highlightPre) {
-        renderHighlight();
-        promptTa.addEventListener("input", () => {
+        if (!PLACEHOLDER_PILLS_ENABLED) {
+            // Hide preview to avoid layout expansion and turn feature off without removing code
+            try { highlightPre.style.display = "none"; } catch {}
+        } else {
+            const renderHighlight = () => {
+                if (!highlightPre) return;
+
+                const cannedMap = new Map<string, string>();
+                try {
+                    for (const cp of store.cannedPrompts ?? []) {
+                        const core = String(cp.placeholder || "").replace(/^@#\s*|\s*#@$/g, "");
+                        if (core) cannedMap.set(core, cp.title || core);
+                    }
+                } catch {}
+
+                const toLabel = (name: string): string => {
+                    const canned = cannedMap.get(name);
+                    if (canned) return canned;
+                    if (/^TRANSCRIPT$/i.test(name)) return "Transcript";
+                    if (/^PRV_RD_OUTPUT$/i.test(name)) return "Previous Round";
+                    const m1 = name.match(/^RD_(\d+)_COMBINED$/i);
+                    if (m1) return `Round ${m1[1]} Combined`;
+                    const m2 = name.match(/^RD_(\d+)_AI_(.+)$/i);
+                    if (m2) return `Round ${m2[1]} ${m2[2]}`;
+                    return name;
+                };
+
+                const esc = (s: string) => s
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+
+                const pill = (name: string, fullToken: string) => {
+                    const label = esc(toLabel(name));
+                    const tokenEsc = esc(fullToken);
+                    return `<span class=\"kh-pill\" title=\"${tokenEsc}\">${label}</span>`;
+                };
+
+                const raw = promptTa.value;
+                const tokens1 = raw.match(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g) ?? [];
+                try { console.debug("[Ephor] Placeholder highlight", { count: tokens1.length }); } catch {}
+
+                let t = esc(raw);
+                // Replace @#PLACEHOLDER#@
+                t = t.replace(/@#\s*([A-Z0-9_.-]+(?:\(.*?\))?)\s*#@/g, (_m, name) => pill(String(name), `@#${String(name)}#@`));
+
+                highlightPre.innerHTML = t;
+            };
             renderHighlight();
-            // live validation for placeholder syntax in Default Instructions
-            const hasCurly = /\{\{[^}]+\}\}/.test(promptTa.value);
-            promptTa.style.borderColor = hasCurly ? "#c33" : "";
-            promptTa.style.boxShadow = hasCurly ? "0 0 0 2px rgba(195,51,51,.15)" : "";
-        });
-        promptTa.addEventListener("blur", () => {
-            // normalize any {{NAME}} → @#NAME#@
-            const before = promptTa.value;
-            const after = before.replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_m, name) => `@#${String(name).toUpperCase()}#@`);
-            if (after !== before) {
-                promptTa.value = after;
-                promptTa.dispatchEvent(new Event("input", { bubbles: true }));
-            }
-            promptTa.style.borderColor = "";
-            promptTa.style.boxShadow = "";
-        });
+            promptTa.addEventListener("input", () => {
+                renderHighlight();
+                // live validation for placeholder syntax in Default Instructions
+                const hasCurly = /\{\{[^}]+\}\}/.test(promptTa.value);
+                promptTa.style.borderColor = hasCurly ? "#c33" : "";
+                promptTa.style.boxShadow = hasCurly ? "0 0 0 2px rgba(195,51,51,.15)" : "";
+            });
+            promptTa.addEventListener("blur", () => {
+                // normalize any {{NAME}} → @#NAME#@
+                const before = promptTa.value;
+                const after = before.replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_m, name) => `@#${String(name).toUpperCase()}#@`);
+                if (after !== before) {
+                    promptTa.value = after;
+                    promptTa.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+                promptTa.style.borderColor = "";
+                promptTa.style.boxShadow = "";
+            });
+        }
     }
 
     /* ------------------------------------------------------------------ *
@@ -531,6 +616,7 @@ export async function openEphorSettingsModal(
     refs.tabSettingsBtn.addEventListener("click", () => setMainTab("settings"));
     refs.tabOutputsBtn.addEventListener("click", () => setMainTab("outputs"));
 
+    await applyTicketPrefsForCurrentTicket();
     refs.modeMultiplexer.checked = store.preferredMode === "multiplexer";
     refs.modeStream.checked = store.preferredMode === "stream";
     const onMode = () => {
@@ -539,6 +625,7 @@ export async function openEphorSettingsModal(
         log(`Connection mode → ${store.preferredMode}`);
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
         refreshCustomInstr();
+        void saveTicketPrefsPartial({ preferredMode: store.preferredMode });
     };
     refs.modeMultiplexer.addEventListener("change", onMode);
     refs.modeStream.addEventListener("change", onMode);
@@ -597,6 +684,7 @@ export async function openEphorSettingsModal(
         rebuildAiSelectionButtons();
         rebuildChannelList(state, refs, refs.channelSearchInp.value);
         updateWorkflowDirtyIndicator();
+        void saveTicketPrefsPartial({ preferredQueryMode: store.preferredQueryMode });
     }
 
     refs.querySingleRadio.addEventListener("change", updateQueryMode);
@@ -608,6 +696,7 @@ export async function openEphorSettingsModal(
         store.runMode = refs.runAutoRadio.checked ? "automatic" : "manual";
         void saveEphorStore(store);
         updateWorkflowDirtyIndicator();
+        void saveTicketPrefsPartial({ runMode: store.runMode });
     };
     refs.runAutoRadio.addEventListener("change", updateRunMode);
     refs.runManualRadio.addEventListener("change", updateRunMode);
@@ -856,11 +945,25 @@ export async function openEphorSettingsModal(
     /* ------------------------------------------------------------------ *
      * Close & log buttons                                                *
      * ------------------------------------------------------------------ */
+    // Allow closing via ESC (handle both 'Escape' and legacy 'Esc', on document and window)
+    const onKeydownEsc = (ev: KeyboardEvent) => {
+        const k = String(ev.key || "");
+        if (k === "Escape" || k === "Esc") {
+            try { log("UI", "Closed via Escape"); } catch {}
+            ev.preventDefault();
+            refs.closeBtn.click();
+        }
+    };
+    document.addEventListener("keydown", onKeydownEsc, { capture: true });
+    window.addEventListener("keydown", onKeydownEsc, { capture: true });
+
     refs.closeBtn.addEventListener("click", () => {
         EphorClient.setLogger(null);
         document.removeEventListener("ephorOutputsUpdated", outputsUpdatedListener);
         document.removeEventListener('ephorSetPerTicketSystemBody', onSetPerTicketSystemBody as EventListener);
         document.removeEventListener("ephorSkipCurrentStage", skipStageListener as EventListener);
+        document.removeEventListener("keydown", onKeydownEsc, { capture: true } as any);
+        window.removeEventListener("keydown", onKeydownEsc, { capture: true } as any);
         modal.remove();
     });
     modal
@@ -1202,6 +1305,14 @@ export async function openEphorSettingsModal(
         const id = (e.target as HTMLElement).dataset.projectId;
         if (!id || id === store.selectedProjectId) return;
         store.selectedProjectId = id;
+        // Remember user's explicit choice for this ticket from now on
+        try {
+            const tid = currentKayakoTicketId();
+            if (tid) {
+                store.projectIdByContext = store.projectIdByContext || {};
+                store.projectIdByContext[tid] = id;
+            }
+        } catch {}
         store.selectedChannelId = null;
         state.channels = [];
         void saveEphorStore(store);
@@ -1268,7 +1379,42 @@ export async function openEphorSettingsModal(
     rebuildProjectList(state, refs);
     rebuildChannelList(state, refs);
     syncModelListHeight();
-    void refreshProjects(state, refs, log);
+    // Fetch projects first, then apply per-ticket auto-selection if no prior choice
+    await refreshProjects(state, refs, log);
+    try {
+        const tid0 = currentKayakoTicketId();
+        const mappedPid = tid0 ? (store.projectIdByContext?.[tid0] || "") : "";
+        if (!mappedPid && !store.selectedProjectId) {
+            const detected = (extractProductValueSafe() || "").trim().toLowerCase();
+            if (detected) {
+                const expStore = await loadStore();
+                const ephorProv = findProvider(expStore, "ephor");
+                let projFromUrl = "";
+                if (ephorProv) {
+                    const byProd = (ephorProv as any).defaultUrlIdByProduct || {};
+                    const urlId = byProd[detected] || null;
+                    const urlEntry = urlId
+                        ? ephorProv.urls.find(u => u.id === urlId)
+                        : ephorProv.urls.find(u => (u.product || "").trim().toLowerCase() === detected);
+                    if (urlEntry) {
+                        try { projFromUrl = new URL(urlEntry.url).pathname.split("/").pop() || ""; } catch {}
+                    }
+                }
+                if (projFromUrl) {
+                    const exists = state.store.projects.some(p => String(p.project_id) === projFromUrl);
+                    if (exists) {
+                        state.store.selectedProjectId = projFromUrl;
+                        await saveEphorStore(state.store);
+                        rebuildProjectList(state, refs, refs.projectSearchInp.value);
+                        await fetchChannels(state, refs, log);
+                        try { log("UI", `Auto-selected project for Product='${detected}' → ${projFromUrl}`); } catch {}
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        try { log("ERROR auto-select", String(e)); } catch {}
+    }
     setTimeout(() => syncModelListHeight(), 0);
     // Initialize custom-instructions textarea for current ticket/project context.
     refreshCustomInstr();
@@ -1882,6 +2028,19 @@ export async function openEphorSettingsModal(
         if (now === lastTicketId) return;
         lastTicketId = now;
         refreshCustomInstr(); // swap instructions textarea to the new ticket
+        // Apply mapped project for this ticket if user chose one before
+        try {
+            const pid = now ? (store.projectIdByContext?.[now] || "") : "";
+            if (pid && pid !== store.selectedProjectId) {
+                store.selectedProjectId = pid;
+                store.selectedChannelId = null;
+                await saveEphorStore(store);
+                rebuildProjectList(state, refs, refs.projectSearchInp.value);
+                rebuildChannelList(state, refs);
+                void fetchChannels(state, refs, log);
+                try { log("UI", `Applied per-ticket project mapping for ticket ${now} → ${pid}`); } catch {}
+            }
+        } catch {}
         // In Stream mode, auto-select mapped chat for the new ticket if available.
         try {
             if (store.preferredMode === "stream" && store.selectedProjectId && now) {
@@ -1894,6 +2053,11 @@ export async function openEphorSettingsModal(
                 }
             }
         } catch { /* non-fatal */ }
+        // Apply per-ticket Mode/Workflow/Run preferences when switching tickets
+        try {
+            await applyTicketPrefsForCurrentTicket();
+            updateQueryMode();
+        } catch {}
     }, 800);
 
     // Cleanup watcher on modal close

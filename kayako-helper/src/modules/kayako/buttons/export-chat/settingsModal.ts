@@ -9,6 +9,7 @@ import {
 } from './defaultProviders.ts';
 import {saveStore, Store, UrlEntry} from "@/utils/providerStore.ts";
 import { openCannedPromptModal } from "@/modules/kayako/buttons/ephor/ephorCannedPromptModal.ts";
+import { extractProductValueSafe } from "@/modules/kayako/utils/product.ts";
 import { loadEphorStore } from "@/modules/kayako/buttons/ephor/ephorStore.ts";
 import { requestMessageSafe } from '@/utils/sendMessageSafe';
 
@@ -19,6 +20,8 @@ const NEW_ADD_SEL   = '.kh-exp-add-url-submit';
 const NEW_LABEL_CLASS = 'kh-exp-new-label';
 const NEW_URL_CLASS   = 'kh-exp-new-url';
 const NEW_ADD_CLASS   = 'kh-exp-add-url-submit';
+const NEW_PRODUCT_SEL   = '.kh-exp-new-product';
+const NEW_PRODUCT_CLASS = 'kh-exp-new-product';
 
 export function openSettingsModal(store: Store): void {
     if (document.querySelector(EXTENSION_SELECTORS.exportSettingsModal)) return;
@@ -169,7 +172,8 @@ export function openSettingsModal(store: Store): void {
         <div class="kh-exp-footer" style="margin-top:16px;display:flex;align-items:center;gap:8px;">
           <button class="kh-btn ${EXTENSION_SELECTORS.exportCannedBtn.replace(/^\./,'')}" title="Manage placeholders">📑 Placeholders</button>
           <span style="margin-left:auto"></span>
-          <button id="${EXTENSION_SELECTORS.exportAddProviderBtn.slice(1)}" class="kh-btn">➕ Add provider</button>
+          <!-- Add provider disabled per requirements -->
+          <button id="${EXTENSION_SELECTORS.exportAddProviderBtn.slice(1)}" class="kh-btn" style="display:none;">➕ Add provider</button>
         </div>
     `;
     document.body.appendChild(modal);
@@ -185,6 +189,10 @@ export function openSettingsModal(store: Store): void {
     /* close */
     modal.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportSettingsClose)!
         .addEventListener('click', () => modal.remove());
+
+    // ESC closes the modal
+    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { modal.remove(); window.removeEventListener('keydown', onKey); } };
+    window.addEventListener('keydown', onKey);
 
     /* ────────── modal drag-move (padding or header, not ✕ button) ────────── */
     const headerEl = modal.querySelector<HTMLDivElement>('.kh-exp-header')!;
@@ -233,15 +241,7 @@ export function openSettingsModal(store: Store): void {
 
     // Normal scrolling: remove snap-sizing and wheel interception
 
-    /* add-provider */
-    modal.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportAddProviderBtn)!
-        .addEventListener('click', () => {
-            const name = prompt('Provider name?'); if (!name?.trim()) return;
-            const id   = `${name.toLowerCase().replace(/\s+/g,'-')}-${crypto.randomUUID().slice(0,4)}`;
-            store.providers.push({ id, name, multi:true, urls: [], defaultUrlId: null });
-            saveStore(store).then(() =>
-                rebuildSettingsUi(modal.querySelector(EXTENSION_SELECTORS.exportSettingsContent)! as HTMLElement, store));
-        });
+    /* add-provider disabled */
 
     /* initial size/position: center within viewport and fit safely */
     try {
@@ -428,9 +428,11 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         const accBody = h(`<div class="kh-acc-body"></div>`);
         accItem.appendChild(accBody);
 
+        const detectedProduct = extractProductValueSafe()?.trim() || '';
         const newRow = h(`
           <div class="kh-exp-url-row" style="margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input class="${NEW_LABEL_CLASS} kh-exp-input" placeholder="Name" style="flex:0 0 160px;min-width:140px;">
+            <input class="${NEW_PRODUCT_CLASS} kh-exp-input" placeholder="Product (optional)" value="${detectedProduct.replace(/&/g,'&amp;').replace(/</g,'&lt;')}" style="flex:0 0 180px;min-width:160px;">
             <input class="${NEW_URL_CLASS} kh-exp-input" placeholder="URL" style="flex:1 1 320px;min-width:220px;">
             <button class="${NEW_ADD_CLASS} kh-btn-primary" style="padding:6px 12px;">Add URL</button>
           </div>
@@ -438,24 +440,25 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         accBody.appendChild(newRow);
 
         /* Search bar */
-        const searchRow = h(`
-          <div class="kh-exp-search">
-            <input class="kh-exp-input ${EXTENSION_SELECTORS.exportSearchInput.slice(1)}" placeholder="Search links by name or URL…">
-            <button class="kh-btn ${EXTENSION_SELECTORS.exportSearchClear.replace(/^\./,'')}" title="Clear">✕</button>
-          </div>
-        `);
-        accBody.appendChild(searchRow);
-
         /* two-column container */
         const twoCol = h(`<div style="display:flex;gap:12px;align-items:flex-start;"></div>`);
         accBody.appendChild(twoCol);
-        const listCol = h(`<div style="flex:0 0 320px;min-width:240px;max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:6px;"></div>`);
+        const listCol = h(`<div style="flex:0 0 320px;min-width:240px;display:flex;flex-direction:column;gap:6px;"></div>`);
         const detailCol = h(`<div class="${EXTENSION_SELECTORS.exportDetailPane.slice(1)}" style="flex:1 1 auto;min-width:260px;"></div>`);
         twoCol.appendChild(listCol);
         twoCol.appendChild(detailCol);
 
+        // Search row at the very top of the list column
+        const searchRow = h(`
+          <div class="kh-exp-search" style="position:sticky;top:0;background:#fff;z-index:1;padding-bottom:4px;">
+            <input class="kh-exp-input ${EXTENSION_SELECTORS.exportSearchInput.slice(1)}" placeholder="Search links by name or URL…">
+            <button class="kh-btn ${EXTENSION_SELECTORS.exportSearchClear.replace(/^\./,'')}" title="Clear">✕</button>
+          </div>
+        `);
+        listCol.appendChild(searchRow);
+
         /* url-list container */
-        const urlList = h(`<div class="${EXTENSION_SELECTORS.exportUrlList.slice(1)}"></div>`);
+        const urlList = h(`<div class="${EXTENSION_SELECTORS.exportUrlList.slice(1)}" style="flex:1 1 auto;min-height:0;overflow:auto;"></div>`);
         listCol.appendChild(urlList);
 
         /* Show more button (lazy rendering) */
@@ -490,11 +493,13 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         const addFromInputs = (): void => {
             const nameEl = wrap.querySelector<HTMLInputElement>(NEW_LABEL_SEL)!;
             const urlEl  = wrap.querySelector<HTMLInputElement>(NEW_URL_SEL)!;
+            const productEl = wrap.querySelector<HTMLInputElement>(NEW_PRODUCT_SEL)!;
             const addBtn = wrap.querySelector<HTMLButtonElement>(NEW_ADD_SEL)!;
 
             const rawName = (nameEl.value ?? '').trim();
             const rawUrl  = (urlEl.value ?? '').trim();
-            console.log('[exportSettings] addUrl clicked', { providerId: p.id, nameLen: rawName.length, urlPreview: rawUrl.slice(0, 64) });
+            const rawProduct = (productEl.value ?? '').trim();
+            console.log('[exportSettings] addUrl clicked', { providerId: p.id, nameLen: rawName.length, urlPreview: rawUrl.slice(0, 64), product: rawProduct });
 
             if (!rawName) { console.warn('[exportSettings] addUrl aborted: empty name'); nameEl.focus(); return; }
             if (!rawUrl)  { console.warn('[exportSettings] addUrl aborted: empty url');  urlEl.focus();  return; }
@@ -513,15 +518,32 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
                 supportsInsertion: DEFAULT_INSERTER_PROVIDERS.has(p.id),
                 // Default to "active-tab" as requested
                 mode: 'active-tab',
+                product: rawProduct || (detectedProduct || ''),
             };
 
             p.urls.push(newEntry);
             autoSetDefaultUrl(p);
+            // Auto-assign default by product if provided
+            const prodKey = (newEntry.product || '').trim().toLowerCase();
+            if (prodKey) {
+                (p as any).defaultUrlIdByProduct = (p as any).defaultUrlIdByProduct || {};
+                const prev = (p as any).defaultUrlIdByProduct[prodKey];
+                if (prev && prev !== newEntry.id) {
+                    if (!confirm(`Product "${newEntry.product}" already has a default URL.\nReplace it with this one?`)) {
+                        // keep previous mapping; do not override
+                    } else {
+                        (p as any).defaultUrlIdByProduct[prodKey] = newEntry.id;
+                    }
+                } else {
+                    (p as any).defaultUrlIdByProduct[prodKey] = newEntry.id;
+                }
+            }
             addBtn.disabled = true;
             saveStore(store).then(() => {
                 console.info('[exportSettings] URL added & saved', { providerId: p.id, urlId: newEntry.id });
                 nameEl.value = '';
                 urlEl.value = '';
+                productEl.value = detectedProduct;
                 rebuildSettingsUi(target, store);
             }).catch(err => {
                 console.error('[exportSettings] failed to save new URL', err);
@@ -531,6 +553,7 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
 
         const nameInput = wrap.querySelector<HTMLInputElement>(NEW_LABEL_SEL)!;
         const urlInput  = wrap.querySelector<HTMLInputElement>(NEW_URL_SEL)!;
+        const productInputNew  = wrap.querySelector<HTMLInputElement>(NEW_PRODUCT_SEL)!;
         const addBtn    = wrap.querySelector<HTMLButtonElement>(NEW_ADD_SEL)!;
 
         const updateAddBtn = () => {
@@ -539,6 +562,7 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         };
         nameInput.addEventListener('input', updateAddBtn);
         urlInput .addEventListener('input', updateAddBtn);
+        productInputNew.addEventListener('input', () => {/* no-op; optional */});
         nameInput.addEventListener('keyup', (e) => { if ((e as KeyboardEvent).key === 'Enter') addFromInputs(); });
         urlInput .addEventListener('keyup', (e) => { if ((e as KeyboardEvent).key === 'Enter') addFromInputs(); });
         addBtn   .addEventListener('click', addFromInputs);
@@ -595,10 +619,14 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
             const nameInputEl = h(
                 `<input class="${EXTENSION_SELECTORS.exportLabelInput.slice(1)} kh-exp-input" value="${u.label}" placeholder="Name" style="flex:0 0 220px;min-width:180px;">`
             ) as HTMLInputElement;
+            const productInputEl = h(
+                `<input class="kh-exp-product kh-exp-input" value="${(u.product || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}" placeholder="Product (optional)" style="flex:0 0 180px;min-width:160px;">`
+            ) as HTMLInputElement;
             const urlInputEl = h(
                 `<input class="${EXTENSION_SELECTORS.exportUrlInput.slice(1)} kh-exp-input" value="${u.url}" placeholder="URL" style="flex:1 1 420px;min-width:260px;">`
             ) as HTMLInputElement;
             nameUrlRow.appendChild(nameInputEl);
+            nameUrlRow.appendChild(productInputEl);
             nameUrlRow.appendChild(urlInputEl);
 
             const promptHead = h('<div class="kh-exp-row-head"></div>');
@@ -632,6 +660,21 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
             nameInputEl.addEventListener('change', e => { u.label = (e.target as HTMLInputElement).value; void saveStore(store); });
             urlInputEl .addEventListener('change', e => { u.url   = (e.target as HTMLInputElement).value; void saveStore(store); });
             promptTextarea.addEventListener('change', e => { u.prompt= (e.target as HTMLTextAreaElement).value; void saveStore(store); });
+            productInputEl.addEventListener('change', e => {
+                const val = ((e.target as HTMLInputElement).value || '').trim();
+                u.product = val;
+                // enforce single default per product: map product → urlId
+                try {
+                    const key = val.toLowerCase();
+                    (p as any).defaultUrlIdByProduct = (p as any).defaultUrlIdByProduct || {};
+                    const prev = (p as any).defaultUrlIdByProduct[key];
+                    if (!prev || prev !== u.id) {
+                        (p as any).defaultUrlIdByProduct[key] = u.id;
+                        console.info('[exportSettings] default URL set for product', { providerId: p.id, product: key, urlId: u.id });
+                    }
+                    void saveStore(store);
+                } catch {}
+            });
 
             const modeRadios = group.querySelectorAll<HTMLInputElement>(`input[name="exp-mode-${u.id}"]`);
             modeRadios.forEach(r => { r.checked = r.value === (u.mode ?? 'new-tab'); });
@@ -700,7 +743,34 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
                     (async () => {
                         try {
                             const joined = await ensureEphorJoinedIds();
-                            statusTag.textContent = joined.has(projId) ? 'Joined' : 'Invite';
+                            if (joined.has(projId)) {
+                                statusTag.textContent = 'Joined';
+                            } else {
+                                const inviteId = EPHOR_PROJECT_INVITES[projId || ''];
+                                if (inviteId) {
+                                    const a = document.createElement('a');
+                                    a.href = `https://ephor.ai/join/${inviteId}`;
+                                    a.target = '_blank';
+                                    a.rel = 'noopener noreferrer';
+                                    a.textContent = 'Click to join';
+                                    a.style.fontSize = '11px';
+                                    a.addEventListener('click', async (ev) => {
+                                        try {
+                                            ev.preventDefault();
+                                            statusTag.textContent = 'Joining…';
+                                            const res = await new Promise<{ ok?: boolean; joined?: boolean }>(resolve =>
+                                                chrome.runtime.sendMessage({ action: 'ephor.joinByInvite', inviteId, projectId: projId }, resolve),
+                                            );
+                                            if (res?.ok || res?.joined) statusTag.textContent = 'Joined';
+                                            else window.open(a.href, '_blank', 'noopener');
+                                        } catch { window.open(a.href, '_blank', 'noopener'); }
+                                    });
+                                    statusTag.textContent = '';
+                                    statusTag.appendChild(a);
+                                } else {
+                                    statusTag.textContent = 'Not a member';
+                                }
+                            }
                         } catch { statusTag.textContent = ''; }
                     })();
                 }
@@ -720,8 +790,8 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
         if (p.urls.length) { selectedId = p.urls[0]!.id; renderDetail(p.urls[0]!); }
 
         /* Search handlers */
-        const searchInput = accBody.querySelector<HTMLInputElement>(EXTENSION_SELECTORS.exportSearchInput)!;
-        const searchClear = accBody.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportSearchClear)!;
+        const searchInput = listCol.querySelector<HTMLInputElement>(EXTENSION_SELECTORS.exportSearchInput)!;
+        const searchClear = listCol.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportSearchClear)!;
         const showMoreBtn = accBody.querySelector<HTMLButtonElement>(EXTENSION_SELECTORS.exportShowMoreBtn)!;
         const doFilter = () => renderRows(searchInput.value || '');
         searchInput.addEventListener('input', doFilter);
@@ -730,5 +800,32 @@ function rebuildSettingsUi(target: HTMLElement, store: Store): void {
             showMoreBtn.disabled = true;
             renderRows(searchInput.value || '', true);
         });
+
+        // Match list column height to detail column by default
+        const syncHeights = () => {
+            try {
+                const dRect = detailCol.getBoundingClientRect();
+                // Set max-height to match detail; urlList is flex child with overflow:auto
+                (urlList as HTMLElement).style.maxHeight = Math.max(220, Math.floor(dRect.height)) + 'px';
+            } catch {}
+        };
+        new ResizeObserver(() => syncHeights()).observe(detailCol as HTMLElement);
+        // initial
+        requestAnimationFrame(syncHeights);
+        // Auto-select default per detected product if available
+        try {
+            const prod = (detectedProduct || '').trim().toLowerCase();
+            if (p.id && prod) {
+                (p as any).defaultUrlIdByProduct = (p as any).defaultUrlIdByProduct || {};
+                if (!(p as any).defaultUrlIdByProduct[prod]) {
+                    const match = p.urls.find(x => (x.product || '').trim().toLowerCase() === prod);
+                    if (match) {
+                        (p as any).defaultUrlIdByProduct[prod] = match.id;
+                        void saveStore(store);
+                        console.info('[exportSettings] auto-assigned default URL for product', { providerId: p.id, product: prod, urlId: match.id });
+                    }
+                }
+            }
+        } catch {}
     }
 }

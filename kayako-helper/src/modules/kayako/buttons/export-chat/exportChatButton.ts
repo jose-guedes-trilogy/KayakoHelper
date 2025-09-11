@@ -17,6 +17,7 @@ import {
 import { EXTENSION_SELECTORS } from '@/generated/selectors.ts';
 import { fetchTranscript }      from '@/utils/api.js';
 import { isConvPage, currentConvId } from '@/utils/location.js';
+import { extractProductValueSafe } from '@/modules/kayako/utils/product.ts';
 import {
     loadStore, saveStore, findProvider, findUrl,
     Store, UrlEntry,
@@ -33,6 +34,15 @@ let uiState: UiState = 'idle';
 let store:   Store;
 let currentConv: string | null = null;
 let lastMenuSig = '';
+let ephorJoinedIds: Set<string> | null = null;
+
+// Load last fetched joined project ids (persisted) to avoid flicker/showing all
+try {
+    chrome.storage.local.get('kh-ephor-joined-ids').then(r => {
+        const arr = r['kh-ephor-joined-ids'];
+        if (Array.isArray(arr)) ephorJoinedIds = new Set<string>(arr.map(String));
+    }).catch(() => {});
+} catch {}
 
 /* ───────────────────────── boot ────────────────────────── */
 export async function bootExportChatButton(): Promise<void> {
@@ -58,7 +68,17 @@ export async function bootExportChatButton(): Promise<void> {
                 uiState === 'ok'   ? 'Done' : 'Failed'}`,
         routeTest: isConvPage,
         onClick  : () => {
-            const url = mainDefaultUrl(store);
+            // Prefer per-product default if mapped
+            let url = mainDefaultUrl(store);
+            try {
+                const prod = (extractProductValueSafe() || '').trim().toLowerCase();
+                if (prod) {
+                    const p = findProvider(store, store.mainDefaultProviderId ?? '');
+                    const byProd = (p as any)?.defaultUrlIdByProduct || {};
+                    const urlId = byProd[prod];
+                    if (urlId) url = findUrl(p!, urlId) ?? url;
+                }
+            } catch {}
             if (!url) alert('Please configure a default URL first.');
             else      void performExport(url);
         },
@@ -122,7 +142,37 @@ function rebuildDropdown(menu: HTMLElement): void {
         row.addEventListener('mouseenter', () => sub.style.display = 'flex');
         row.addEventListener('mouseleave', () => sub.style.display = 'none');
 
-        for (const u of p.urls) {
+        // Filter Ephor subitems to only joined projects
+        let urls = p.urls;
+        if (p.id === 'ephor') {
+            const parseProj = (u: UrlEntry) => { try { return new URL(u.url).pathname.split('/').pop() || ''; } catch { return ''; } };
+            const useAllForNow = () => urls;
+            if (ephorJoinedIds) {
+                urls = urls.filter(u => ephorJoinedIds!.has(parseProj(u)) || !/\/project\//.test(u.url));
+            } else {
+                // kick off fetch and rebuild when ready
+                (async () => {
+                    try {
+                        const res = await new Promise<{ ok?: boolean; data?: any }>(resolve =>
+                            chrome.runtime.sendMessage({ action: 'ephor.listProjects' }, resolve),
+                        );
+                        const list: any[] = Array.isArray(res?.data) ? res!.data : (res?.data?.items ?? res?.data?.data ?? []);
+                        ephorJoinedIds = new Set<string>(list.map((it: any) => String(it.id ?? it.project_id ?? it.uuid)));
+                        try { chrome.storage.local.set({ 'kh-ephor-joined-ids': Array.from(ephorJoinedIds) }); } catch {}
+                        lastMenuSig = '';
+                        rebuildDropdown(menu);
+                    } catch {
+                        /* ignore */
+                    }
+                })();
+                // Until fetched, prefer last persisted set; if none, show nothing for Ephor
+                urls = (Array.isArray((ephorJoinedIds && Array.from(ephorJoinedIds))) && ephorJoinedIds)
+                    ? urls.filter(u => ephorJoinedIds!.has(parseProj(u)) || !/\/project\//.test(u.url))
+                    : urls.filter(u => !/\/project\//.test(u.url));
+            }
+        }
+
+        for (const u of urls) {
             const li = div(EXTENSION_SELECTORS.twoPartBtnDropdownItem.replace(/^./,''));
             li.textContent = u.label;
             li.addEventListener('click', () => void performExport(u));
