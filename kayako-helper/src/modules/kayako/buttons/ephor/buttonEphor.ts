@@ -51,10 +51,18 @@ export async function bootEphorButton(): Promise<void> {
     const hasOAuth  = !!auth.refreshToken;
     const hasApiKey = !!misc.token && misc.token.startsWith("eph-");
 
+    // If user never set a mode, prefer Normal (stream). API mode can be enabled later via Preferences
     if (!store.preferredMode) {
-        store.preferredMode = (hasJwt || hasOAuth) ? "stream" : "multiplexer";
+        store.preferredMode = "stream";
         await saveEphorStore(store);
-        console.info("[Ephor] Auto-selecting connection mode →", store.preferredMode);
+        console.info("[Ephor] Defaulting connection mode → stream");
+    }
+
+    // Respect the new preference to disable API mode globally unless explicitly enabled
+    if (store.preferredMode === "multiplexer" && !store.enableApiMode) {
+        console.info("[Ephor] API mode disabled → forcing Normal (stream)");
+        store.preferredMode = "stream";
+        await saveEphorStore(store);
     }
 
     /* ─── 3.  Register UI button (SIMPLE) ─────────────────────────── */
@@ -70,10 +78,6 @@ export async function bootEphorButton(): Promise<void> {
                 : `${ICON_SVG}<span class="kh-ephor-text" style="margin-left:.35em;">Ephor</span>`;
         },
         onClick  : () => { void openEphorSettingsModal(store, client); },
-        onContextMenu: ev => {
-            ev.preventDefault(); ev.stopPropagation();
-            void onMainClick();
-        },
     });
 }
 

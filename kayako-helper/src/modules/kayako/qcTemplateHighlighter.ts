@@ -153,7 +153,9 @@ function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyNo
         : EXTENSION_SELECTORS.qcHighlightBodyAdditional;
 
     // Mark only the header block (keep container clean to avoid inherited styles)
-    try { headerBlock.classList.add(cls(headerClass)); } catch {}
+    if (highlightEnabled) {
+        try { headerBlock.classList.add(cls(headerClass)); } catch {}
+    }
 
     // Wrap all body nodes into a single rectangular wrapper if not already wrapped
     if (!bodyNodes.length) return;
@@ -199,7 +201,9 @@ function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyNo
 
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-kh-qc-wrap', kind);
-    wrapper.classList.add(cls(bodyClass));
+    if (highlightEnabled) {
+        wrapper.classList.add(cls(bodyClass));
+    }
 
     // Insert wrapper before the first body node and move all collected nodes into it
     try {
@@ -242,6 +246,13 @@ function applyHighlight(container: HTMLElement, headerBlock: HTMLElement, bodyNo
 
 function processContainer(container: HTMLElement): void {
     try {
+        // Always ensure the per-post toggle button exists so users can re-enable highlighting
+        try {
+            const postEl = container.closest(KAYAKO_SELECTORS.timelineItem) as HTMLElement | null
+                ?? container.closest(KAYAKO_SELECTORS.messageOrNote) as HTMLElement | null;
+            if (postEl) ensureButtons(postEl);
+        } catch {}
+
         if (!highlightEnabled) { return; }
         if (!originalHtmlByContainer.has(container)) {
             try { originalHtmlByContainer.set(container, container.innerHTML); } catch {}
@@ -421,7 +432,9 @@ function wrapBodyWithoutCleanup(container: HTMLElement, headerBlock: HTMLElement
         : kind === 'pr' ? EXTENSION_SELECTORS.qcHighlightBodyPR
         : EXTENSION_SELECTORS.qcHighlightBodyAdditional;
 
-    try { headerBlock.classList.add(cls(headerClass)); } catch {}
+    if (highlightEnabled) {
+        try { headerBlock.classList.add(cls(headerClass)); } catch {}
+    }
     if (!bodyNodes.length) return;
 
     const first = bodyNodes[0]!;
@@ -443,7 +456,9 @@ function wrapBodyWithoutCleanup(container: HTMLElement, headerBlock: HTMLElement
 
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-kh-qc-wrap', kind);
-    wrapper.classList.add(cls(bodyClass));
+    if (highlightEnabled) {
+        wrapper.classList.add(cls(bodyClass));
+    }
     try {
         parent.insertBefore(wrapper, first);
         for (const node of bodyNodes) {
@@ -617,6 +632,23 @@ function ensureButtons(post: HTMLElement): void {
         const firstChild = feedMenu.firstElementChild;
         feedMenu.insertBefore(toggleBtn, firstChild);
 
+        // Hide the eye toggle if this post has no divider-based sections
+        try {
+            const content = post.querySelector<HTMLElement>(KAYAKO_SELECTORS.timelineItemContentInner);
+            const hasSectionsFlag = !!content && content.dataset['khQcTplHasSections'] === 'yes';
+            let hasDividers = false;
+            if (content) {
+                const nodes = Array.from(content.childNodes);
+                hasDividers = nodes.some(n => isDividerNode(n));
+            }
+            const shouldShow = hasSectionsFlag || hasDividers;
+            toggleBtn.style.display = shouldShow ? '' : 'none';
+            toggleBtn.setAttribute('aria-hidden', String(!shouldShow));
+            try { console.debug('[KH][QC-TPL-HL] Toggle visibility for post:', { hasSectionsFlag, hasDividers, shown: shouldShow }); } catch {}
+        } catch (e) {
+            try { console.debug('[KH][QC-TPL-HL] Failed determining toggle visibility:', e); } catch {}
+        }
+
         // Move existing QC button (if present) to follow our group
         try {
             const existingQc = feedMenu.querySelector<HTMLElement>(EXTENSION_SELECTORS.qcerButton);
@@ -727,32 +759,26 @@ function updateToggleVisuals(): void {
     const pressed = String(highlightEnabled);
     document.querySelectorAll<HTMLElement>(EXTENSION_SELECTORS.qcToggleButton).forEach(btn => {
         btn.setAttribute('aria-pressed', pressed);
+        // Keep button visuals neutral; only CSS highlights are toggled, not features
         btn.style.opacity = highlightEnabled ? '' : '0.5';
         btn.setAttribute('title', highlightEnabled ? 'Disable QC highlighting' : 'Enable QC highlighting');
     });
     // Remove visual header styles when disabled so text is not centered
     if (!highlightEnabled) {
-        const classesToRemove = [
-            EXTENSION_SELECTORS.qcHighlightHeaderAction,
-            EXTENSION_SELECTORS.qcHighlightHeaderPR,
-            EXTENSION_SELECTORS.qcHighlightHeaderAdditional,
-            EXTENSION_SELECTORS.qcHighlightBodyAction,
-            EXTENSION_SELECTORS.qcHighlightBodyPR,
-            EXTENSION_SELECTORS.qcHighlightBodyAdditional,
-        ].map(cls);
+        // Do not remove wrappers or controls; only strip highlight classes
         try {
-            const els = Array.from(document.querySelectorAll<HTMLElement>(
-                [
-                    EXTENSION_SELECTORS.qcHighlightHeaderAction,
-                    EXTENSION_SELECTORS.qcHighlightHeaderPR,
-                    EXTENSION_SELECTORS.qcHighlightHeaderAdditional,
-                    EXTENSION_SELECTORS.qcHighlightBodyAction,
-                    EXTENSION_SELECTORS.qcHighlightBodyPR,
-                    EXTENSION_SELECTORS.qcHighlightBodyAdditional,
-                ].join(',')));
+            const classList = [
+                EXTENSION_SELECTORS.qcHighlightHeaderAction,
+                EXTENSION_SELECTORS.qcHighlightHeaderPR,
+                EXTENSION_SELECTORS.qcHighlightHeaderAdditional,
+                EXTENSION_SELECTORS.qcHighlightBodyAction,
+                EXTENSION_SELECTORS.qcHighlightBodyPR,
+                EXTENSION_SELECTORS.qcHighlightBodyAdditional,
+            ];
+            const els = Array.from(document.querySelectorAll<HTMLElement>(classList.join(',')));
+            const toRemove = classList.map(cls);
             els.forEach(el => {
-                classesToRemove.forEach(c => el.classList.remove(c));
-                // Clear any inline centering that might have been applied
+                toRemove.forEach(c => el.classList.remove(c));
                 if ((el.style?.textAlign || '') === 'center') el.style.textAlign = '';
             });
         } catch {}

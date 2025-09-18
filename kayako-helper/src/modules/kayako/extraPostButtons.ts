@@ -17,6 +17,8 @@ const FEED_MENU_SEL     = KAYAKO_SELECTORS.feedItemMenu;
 
 const CL_SCROLL_BTN = EXTENSION_SELECTORS.scrollTopButton.replace(/^\./, '');
 const CL_COPY_BTN   = EXTENSION_SELECTORS.copyPostButton.replace(/^\./, '');
+const CL_QCER_BTN   = EXTENSION_SELECTORS.qcerButton.replace(/^\./, '');
+const CL_QC_TOGGLE_BTN = EXTENSION_SELECTORS.qcToggleButton.replace(/^\./, '');
 
 /* ----------  PERFORMANCE LIMITS ------------------------------------------ */
 const COPY_PERF_LIMITS = {
@@ -87,6 +89,10 @@ function addButtons(post: HTMLElement): void {
           <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
         </svg>
     `;
+    // Ensure consistent icon color and remove unintended dimming
+    try { (copyBtn.style as any).opacity = ''; } catch {}
+    try { (copyBtn.querySelector('svg') as SVGElement | null)?.setAttribute('stroke', '#838D94'); } catch {}
+
     // Prevent upstream listeners from firing; capture-phase guards
     const stopAllEarly = (ev: Event) => { try { console.debug('[KH][CopyPost] Captured', ev.type, '– stopping propagation'); } catch {} ev.preventDefault(); ev.stopImmediatePropagation(); };
     copyBtn.addEventListener('mousedown', stopAllEarly, { capture: true });
@@ -206,6 +212,8 @@ function addButtons(post: HTMLElement): void {
           <path d="M12 19l-7-7m7 7l7-7m-7 7V5" />
         </svg>
     `;
+    try { (scrollDownBtn.style as any).opacity = ''; } catch {}
+    try { (scrollDownBtn.querySelector('svg') as SVGElement | null)?.setAttribute('stroke', '#838D94'); } catch {}
     scrollDownBtn.addEventListener('click', e => {
         e.stopPropagation();
         post.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -554,6 +562,16 @@ function buildBottomToolbar(post: HTMLElement, topMenu: HTMLElement, nativeClass
     const topChildren = Array.from(topMenu.children) as HTMLElement[];
 
     topChildren.forEach((child, index) => {
+        // Skip QCer button: it should only appear inside the PR wrapper, not in mirrored bottom menu
+        if (child.classList.contains(CL_QCER_BTN)) {
+            try { console.debug('[KH][BottomToolbar] Skipping QCer button in bottom toolbar mirror'); } catch {}
+            return;
+        }
+        // Skip QC toggle (eye) button: should not appear in mirrored bottom menu
+        if (child.classList.contains(CL_QC_TOGGLE_BTN)) {
+            try { console.debug('[KH][BottomToolbar] Skipping QC toggle button in bottom toolbar mirror'); } catch {}
+            return;
+        }
         // Replace the scroll-down button with a scroll-up at the bottom
         const isScrollDown = child.classList.contains('kh-scroll-bottom-btn');
         if (isScrollDown) {

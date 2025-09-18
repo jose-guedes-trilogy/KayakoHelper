@@ -35,12 +35,13 @@ let store:   Store;
 let currentConv: string | null = null;
 let lastMenuSig = '';
 let ephorJoinedIds: Set<string> | null = null;
+let ephorJoinedIdsPersisted: Set<string> | null = null;
 
-// Load last fetched joined project ids (persisted) to avoid flicker/showing all
+// Load last fetched joined project ids (persisted) – cached only
 try {
     chrome.storage.local.get('kh-ephor-joined-ids').then(r => {
         const arr = r['kh-ephor-joined-ids'];
-        if (Array.isArray(arr)) ephorJoinedIds = new Set<string>(arr.map(String));
+        if (Array.isArray(arr)) ephorJoinedIdsPersisted = new Set<string>(arr.map(String));
     }).catch(() => {});
 } catch {}
 
@@ -148,9 +149,11 @@ function rebuildDropdown(menu: HTMLElement): void {
             const parseProj = (u: UrlEntry) => { try { return new URL(u.url).pathname.split('/').pop() || ''; } catch { return ''; } };
             const useAllForNow = () => urls;
             if (ephorJoinedIds) {
+                const before = urls.length;
                 urls = urls.filter(u => ephorJoinedIds!.has(parseProj(u)) || !/\/project\//.test(u.url));
+                try { console.info('[exportChat] Ephor filter applied', { before, after: urls.length }); } catch {}
             } else {
-                // kick off fetch and rebuild when ready
+                // Always fetch fresh membership; rebuild when ready
                 (async () => {
                     try {
                         const res = await new Promise<{ ok?: boolean; data?: any }>(resolve =>
@@ -158,17 +161,20 @@ function rebuildDropdown(menu: HTMLElement): void {
                         );
                         const list: any[] = Array.isArray(res?.data) ? res!.data : (res?.data?.items ?? res?.data?.data ?? []);
                         ephorJoinedIds = new Set<string>(list.map((it: any) => String(it.id ?? it.project_id ?? it.uuid)));
-                        try { chrome.storage.local.set({ 'kh-ephor-joined-ids': Array.from(ephorJoinedIds) }); } catch {}
+                        try {
+                            chrome.storage.local.set({ 'kh-ephor-joined-ids': Array.from(ephorJoinedIds) });
+                            console.info('[exportChat] Ephor joined projects fetched', { count: ephorJoinedIds.size });
+                        } catch {}
                         lastMenuSig = '';
                         rebuildDropdown(menu);
-                    } catch {
-                        /* ignore */
+                    } catch (e) {
+                        try { console.warn('[exportChat] Ephor listProjects failed', e); } catch {}
                     }
                 })();
-                // Until fetched, prefer last persisted set; if none, show nothing for Ephor
-                urls = (Array.isArray((ephorJoinedIds && Array.from(ephorJoinedIds))) && ephorJoinedIds)
-                    ? urls.filter(u => ephorJoinedIds!.has(parseProj(u)) || !/\/project\//.test(u.url))
-                    : urls.filter(u => !/\/project\//.test(u.url));
+                // Until fetched, hide project-specific entries to avoid showing unjoined projects
+                const before = urls.length;
+                urls = urls.filter(u => !/\/project\//.test(u.url));
+                try { console.info('[exportChat] Ephor placeholder filter (pending fetch)', { before, after: urls.length, cached: ephorJoinedIdsPersisted?.size ?? 0 }); } catch {}
             }
         }
 

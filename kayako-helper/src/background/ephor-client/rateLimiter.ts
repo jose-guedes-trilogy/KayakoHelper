@@ -66,7 +66,9 @@ function bucketFor(url: string): SlidingWindowRL {
     try { origin = new URL(url).origin; } catch {}
     let b = buckets.get(origin);
     if (!b) {
-        b = new SlidingWindowRL({ maxCalls: 12, windowMs: 1000 }, origin); // 👈 pass tag once
+        // Use the current global configuration when creating a new bucket
+        // so callers can tune limits centrally via setRateLimitConfig().
+        b = new SlidingWindowRL({ maxCalls: globalCfg.maxCalls, windowMs: globalCfg.windowMs }, origin);
         buckets.set(origin, b);
     }
     return b;

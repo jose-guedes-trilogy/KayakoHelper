@@ -14,8 +14,28 @@ import { fetchTranscript } from "@/utils/api.js";
 
 /* ---------- timing / retry ---------- */
 const TIMEOUT_MS = 180_000; // 3 minutes
-const MAX_RETRIES = 1; // retry once
+const MAX_RETRIES = 2; // allow two retries for better resilience
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+function parseStatusFromError(err: unknown): number | null {
+    try {
+        const j = JSON.parse((err as any)?.message ?? "");
+        const st = Number(j?.status ?? 0);
+        return Number.isFinite(st) && st > 0 ? st : null;
+    } catch {
+        const msg = String((err as any)?.message ?? err ?? "");
+        const m = msg.match(/HTTP\s+(\d{3})/i);
+        return m ? Number(m[1]) : null;
+    }
+}
+
+function computeBackoffMs(attempt: number, hintMs?: number): number {
+    // Exponential with jitter, cap at 6s between tries. Honor server hint when present.
+    if (hintMs && Number.isFinite(hintMs)) return Math.max(500, Math.min(6000, hintMs));
+    const base = 500 * Math.pow(2, Math.max(0, attempt - 1));
+    const jitter = Math.floor(Math.random() * 400);
+    return Math.min(6000, base + jitter);
+}
 
 /* ---------- helpers ---------- */
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -193,6 +213,8 @@ async function collectAssistantReplies(
     let lastSeenCount = 0;
     let lastSeenNewestTs = 0;
 
+    // Adaptive polling with backoff and quiet-finish
+    let pollAttempt = 0;
     while (Date.now() < deadline) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         try {
@@ -268,10 +290,22 @@ async function collectAssistantReplies(
             } else if (count > 0 && Date.now() - lastProgressAt >= QUIET_MS) {
                 break;
             }
-        } catch {
-            /* transient – keep polling */
+        } catch (err) {
+            // transient – slow down a bit on errors, especially 429
+            let extraWait = 0;
+            try {
+                const st = parseStatusFromError(err);
+                if (st === 429) extraWait = 800; // add cushion on rate limit
+            } catch {}
+            const wait = Math.min(1500, 250 + pollAttempt * 75 + extraWait);
+            await delay(wait);
+            pollAttempt++;
+            continue;
         }
-        await delay(350);
+        // successful poll → small delay with mild growth to avoid hammering
+        const wait = Math.min(1200, 250 + pollAttempt * 50);
+        await delay(wait);
+        pollAttempt = Math.min(pollAttempt + 1, 10);
     }
 
     return { byModel, totalCost, newestAssistantId };
@@ -329,6 +363,25 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                         const LIMIT = 10;
                         const POSTS_PER_CASE = 100;
                         const results: string[] = [];
+                        // Helper to lightly summarize and deduplicate near-identical tickets
+                        const normalize = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+                        const fingerprint = (text: string) => {
+                            const body = text.slice(0, 8000); // cap for hashing
+                            let h = 0;
+                            for (let i = 0; i < body.length; i++) {
+                                h = (h * 31 + body.charCodeAt(i)) | 0;
+                            }
+                            return h;
+                        };
+                        const seen = new Set<number>();
+                        const summarize = (t: string) => {
+                            // keep header lines and the first ~800 chars of content
+                            const lines = t.split(/\r?\n/);
+                            const head = lines.slice(0, 12).join("\n");
+                            const rest = lines.slice(12).join("\n");
+                            const trimmed = rest.length > 800 ? rest.slice(0, 800) + "\n…" : rest;
+                            return head + "\n" + trimmed;
+                        };
                         // Requester branch
                         try {
                             if (requesterId) {
@@ -336,13 +389,20 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                                 const ids = await searchConversationIds(q, LIMIT, 0);
                                 const texts = await Promise.all(ids.map(async id => {
                                     const raw = await fetchTranscriptByCase(id, POSTS_PER_CASE);
-                                    return raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                                    const t = raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                                    const fp = fingerprint(normalize(t));
+                                    if (seen.has(fp)) return ""; // drop near-duplicate
+                                    seen.add(fp);
+                                    return summarize(t);
                                 }));
-                                const section = [
-                                    '===== Recent Requester Tickets =====',
-                                    ...texts.map((t, i) => `--- [Requester ${i+1}] ---\n${t}`),
-                                ].join('\n\n');
-                                results.push(section);
+                                const items = texts.filter(Boolean);
+                                if (items.length) {
+                                    const section = [
+                                        '===== Recent Requester Tickets =====',
+                                        ...items.map((t, i) => `--- [Requester ${i+1}] ---\n${t}`),
+                                    ].join('\n\n');
+                                    results.push(section);
+                                }
                             }
                         } catch {}
                         // Organization branch
@@ -352,16 +412,27 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                                 const ids = await searchConversationIds(q, LIMIT, 0);
                                 const texts = await Promise.all(ids.map(async id => {
                                     const raw = await fetchTranscriptByCase(id, POSTS_PER_CASE);
-                                    return raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                                    const t = raw.replace(/^Ticket ID:\s+Unknown ID\b/m, `Ticket ID: ${id}`);
+                                    const fp = fingerprint(normalize(t));
+                                    if (seen.has(fp)) return "";
+                                    seen.add(fp);
+                                    return summarize(t);
                                 }));
-                                const section = [
-                                    '===== Recent Organization Tickets =====',
-                                    ...texts.map((t, i) => `--- [Org ${i+1}] ---\n${t}`),
-                                ].join('\n\n');
-                                results.push(section);
+                                const items = texts.filter(Boolean);
+                                if (items.length) {
+                                    const section = [
+                                        '===== Recent Organization Tickets =====',
+                                        ...items.map((t, i) => `--- [Org ${i+1}] ---\n${t}`),
+                                    ].join('\n\n');
+                                    results.push(section);
+                                }
                             }
                         } catch {}
-                        const text = results.join('\n\n[=========== Next Conversation ===========]\n\n');
+                        // Remove empty entries and shrink payload
+                        const text = results
+                            .map(s => s.trim())
+                            .filter(Boolean)
+                            .join('\n\n[=========== Next Conversation ===========]\n\n');
                         if (text) {
                             store.systemPromptBodiesByContext = store.systemPromptBodiesByContext || {} as any;
                             (store.systemPromptBodiesByContext as any)[key] = {
@@ -370,6 +441,17 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                             };
                             await saveEphorStore(store);
                             opts.onStatus?.("Past tickets cached for this ticket.");
+                        } else {
+                            // No requester/org tickets found – warn politely in UI next to status
+                            try {
+                                const span = document.querySelector<HTMLSpanElement>("#kh-ephor-warning");
+                                if (span) {
+                                    span.textContent = "⚠ No past tickets found for requester or organization";
+                                    span.title = "No past tickets found for the current requester and their organization";
+                                }
+                            } catch {}
+                            Logger.log("INFO", "WORKFLOW no past tickets found", { requesterId, orgName });
+                            opts.onStatus?.("No past tickets found for requester/org.");
                         }
                     } catch (err: any) {
                         opts.onStatus?.(`Past tickets fetch failed: ${err?.message || 'unknown error'}`);
@@ -377,13 +459,17 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                 }
             }
         } catch {}
-        // Replace system placeholders (prefer per-ticket overrides)
+        // Replace system placeholders (prefer per-ticket overrides; include ephemeral)
         try {
             const ticketId = currentKayakoTicketId();
             const projectId = store.selectedProjectId || "" as any;
             const key = projectId && ticketId ? `${projectId}::${ticketId}` : "";
             const sysGlobal = store.systemPromptBodies || { fileAnalysis: "", pastTickets: "", styleGuide: "" };
-            const sysCtx = key ? (store.systemPromptBodiesByContext?.[key] || {}) : {};
+            const sysCtxPersisted = key ? (store.systemPromptBodiesByContext?.[key] || {}) : {};
+            // Ephemeral runtime overrides (not persisted; cleared on reload)
+            let sysCtxEphemeral: any = {};
+            try { sysCtxEphemeral = key ? (await import('./ephorStore')).ephemeralSystemPromptBodiesByContext?.[key] || {} : {}; } catch {}
+            const sysCtx = { ...sysCtxPersisted, ...sysCtxEphemeral } as any;
             const bodyOf = (field: "fileAnalysis"|"pastTickets"|"styleGuide"): string => {
                 const v = (sysCtx as any)[field];
                 return (typeof v === 'string' && v) ? v : (sysGlobal as any)[field] || "";
@@ -507,8 +593,18 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                     throw err;
                 }
                 if (attempt <= MAX_RETRIES && isTransient(err)) {
-                    tell(`Retrying (${attempt}/${MAX_RETRIES + 1})…`);
-                    await delay(400 + Math.random() * 600);
+                    // Respect Retry-After when available (passed via error body if any)
+                    let retryAfterMs: number | undefined;
+                    try {
+                        const j = JSON.parse((err as Error)?.message ?? "");
+                        const ra = Number(j?.headers?.["retry-after"] ?? j?.retry_after_ms ?? j?.retry_after);
+                        if (Number.isFinite(ra) && ra > 0) retryAfterMs = ra >= 100 ? ra : ra * 1000;
+                    } catch {}
+                    const st = parseStatusFromError(err);
+                    const waitMs = computeBackoffMs(attempt, retryAfterMs);
+                    Logger.log("WARN", "STREAM backoff", { attempt, waitMs, status: st ?? undefined, retryAfterMs });
+                    tell(`Retrying (${attempt}/${MAX_RETRIES + 1}) after ${waitMs} ms${st ? ` (HTTP ${st})` : ""}…`);
+                    await delay(waitMs);
                     continue;
                 }
                 tell(`Models failed — ${(err as Error).message}`);
@@ -600,8 +696,17 @@ export async function sendEphorMessage(opts: SendMessageOpts): Promise<StageResu
                     throw err;
                 }
                 if (attempt <= MAX_RETRIES && isTransient(err)) {
-                    tell(`Retrying ${model} (${attempt}/${MAX_RETRIES + 1})…`);
-                    await delay(400 + Math.random() * 600);
+                    let retryAfterMs: number | undefined;
+                    try {
+                        const j = JSON.parse((err as Error)?.message ?? "");
+                        const ra = Number(j?.headers?.["retry-after"] ?? j?.retry_after_ms ?? j?.retry_after);
+                        if (Number.isFinite(ra) && ra > 0) retryAfterMs = ra >= 100 ? ra : ra * 1000;
+                    } catch {}
+                    const st = parseStatusFromError(err);
+                    const waitMs = computeBackoffMs(attempt, retryAfterMs);
+                    Logger.log("WARN", "MUX backoff", { model, attempt, waitMs, status: st ?? undefined, retryAfterMs });
+                    tell(`Retrying ${model} (${attempt}/${MAX_RETRIES + 1}) after ${waitMs} ms${st ? ` (HTTP ${st})` : ""}…`);
+                    await delay(waitMs);
                     continue;
                 }
                 tell(`Model failed: ${model} – ${(err as Error).message}`);
@@ -724,6 +829,8 @@ export async function runAiReplyWorkflow(
         document.dispatchEvent(new CustomEvent("ephorOutputsUpdated", { detail: { stageId: stg.id } }));
 
         history.push(result);
+        // Mark stage complete in the progress badge for clarity
+        if (progressEl) progressEl.textContent = `${label(stg.name)} · ${aiTotalThisStage}/${aiTotalThisStage} — done`;
     }
 
     tell("Workflow finished ✅");

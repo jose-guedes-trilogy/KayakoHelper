@@ -69,7 +69,8 @@ function addQcButton(post: HTMLElement): void {
         qcBtn.setAttribute('aria-label', 'Extract PR to reply');
         qcBtn.setAttribute('title', 'Extract PR to reply');
         qcBtn.innerHTML = '<strong>✔️</strong>';
-        qcBtn.style.opacity = '0.65';
+        // Keep consistent color; avoid dimming so icons render at ~#838D94 per design
+        try { qcBtn.style.opacity = ''; } catch {}
         qcBtn.addEventListener('click', async e => {
             e.stopPropagation();
             await onQcClick(post);

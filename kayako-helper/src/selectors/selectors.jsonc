@@ -255,12 +255,16 @@
 
     // Messenger widget container (hideable)
     // Prefer id when present, fall back to a resilient class contains selector.
-    "messenger": "#kayako-messenger, [id='kayako-messenger'], [class*='kayako-messenger']"
+    "messenger": "#kayako-messenger, [id='kayako-messenger'], [class*='kayako-messenger']",
 
+    "changeRequestContainer": "[class*=ko-instant-entity__instant-entity-results_]",
   },
 
   "extension": {
     "defaultButtonClass": ".kh-default-button",
+    
+    // Ephor modal ephemeral warning next to status (added when no past tickets found)
+    "ephorWarning": "#kh-ephor-warning",
 
     "sendInChunksButton": "#kh-send-in-chunks-btn",
 
@@ -404,6 +408,10 @@
     "assetsNavItem":           ".kh-assets-nav-item",
     "assetsPane":              ".kh-assets-pane",
     "assetsSummary":           ".kh-assets-summary",
+    // Refresh button in assets inspector headerbar
+    // Purpose: Manually refreshes current ticket assets (forces re-fetch)
+    // Resilient selector: class-based to survive DOM changes
+    "assetsRefreshButton":     ".kh-assets-refresh-btn",
     "assetsFetchNextBtn":      ".kh-assets-fetch-next-btn",
     "assetsFetchAllBtn":       ".kh-assets-fetch-all-btn",
     "assetsNav":               ".kh-assets-nav",

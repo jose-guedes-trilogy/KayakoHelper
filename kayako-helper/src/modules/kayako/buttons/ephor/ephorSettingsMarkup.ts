@@ -198,6 +198,7 @@ export const EPHOR_SETTINGS_MARKUP = /* HTML */ `
         </div>
         <span class="kh-send-controls">
           <span id="kh-ephor-progress">Idle</span>
+          <span id="kh-ephor-warning" class="kh-ephor-warning" title=""></span>
           <button id="kh-ephor-cancel-btn" class="kh-btn">Cancel</button>
           <button id="kh-ephor-send-btn" class="kh-btn kh-btn-primary">Send</button>
         </span>

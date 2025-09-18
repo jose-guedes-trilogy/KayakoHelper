@@ -26,12 +26,32 @@ export async function fillPromptShared(tpl: string, transcript: string): Promise
         const ephor = await loadEphorStore();
         let out = base;
 
-        // System placeholder bodies
-        const sys = ephor.systemPromptBodies || { fileAnalysis: '', pastTickets: '', styleGuide: '' };
-        out = out
-            .replace(/@#\s*FILE_ANALYSIS\s*#@/gi, sys.fileAnalysis || '')
-            .replace(/@#\s*PAST_TICKETS\s*#@/gi, sys.pastTickets  || '')
-            .replace(/@#\s*STYLE_GUIDE\s*#@/gi, sys.styleGuide   || '');
+        // System placeholder bodies (prefer ephemeral per-ticket overrides, then per-ticket persisted, then global)
+        try {
+            const ticketId = currentConvId();
+            const projectId = ephor.selectedProjectId || '';
+            const key = projectId && ticketId ? `${projectId}::${ticketId}` : '';
+            const sysGlobal = ephor.systemPromptBodies || { fileAnalysis: '', pastTickets: '', styleGuide: '' };
+            const persisted = key ? (ephor.systemPromptBodiesByContext?.[key] || {}) : {};
+            let eph: any = {};
+            try {
+                eph = key ? ((await import('@/modules/kayako/buttons/ephor/ephorStore.ts')).ephemeralSystemPromptBodiesByContext?.[key] || {}) : {};
+            } catch {}
+            const bodyOf = (f: 'fileAnalysis'|'pastTickets'|'styleGuide') => {
+                const v = (eph as any)[f] ?? (persisted as any)[f] ?? (sysGlobal as any)[f] ?? '';
+                return typeof v === 'string' ? v : '';
+            };
+            out = out
+                .replace(/@#\s*FILE_ANALYSIS\s*#@/gi, bodyOf('fileAnalysis'))
+                .replace(/@#\s*PAST_TICKETS\s*#@/gi, bodyOf('pastTickets'))
+                .replace(/@#\s*STYLE_GUIDE\s*#@/gi, bodyOf('styleGuide'));
+        } catch {
+            const sys = ephor.systemPromptBodies || { fileAnalysis: '', pastTickets: '', styleGuide: '' };
+            out = out
+                .replace(/@#\s*FILE_ANALYSIS\s*#@/gi, sys.fileAnalysis || '')
+                .replace(/@#\s*PAST_TICKETS\s*#@/gi, sys.pastTickets  || '')
+                .replace(/@#\s*STYLE_GUIDE\s*#@/gi, sys.styleGuide   || '');
+        }
 
         // User-defined canned placeholders
         const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -34,7 +34,8 @@ export function rebuildProjectList(state: ModalState, refs: ModalRefs, filter = 
     for (const p of filtered) {
         const el = document.createElement("div");
         el.textContent = p.name;
-        el.dataset.projectId = p.project_id;
+        // Use bracket-notation for dataset keys to satisfy TS index-signature rules
+        (el.dataset as Record<string,string>)["projectId"] = p.project_id;
         el.style.cssText = "padding:6px 8px;cursor:pointer;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
         if (p.project_id === store.selectedProjectId) {
             el.style.position = "relative";
@@ -93,7 +94,7 @@ export function rebuildChannelList(state: ModalState, refs: ModalRefs, filter = 
     for (const c of visible) {
         const el = document.createElement("div");
         el.textContent = c.name || `(created ${new Date(c.created_at).toLocaleDateString()})`;
-        el.dataset.channelId = c.id;
+        (el.dataset as Record<string,string>)["channelId"] = c.id;
         el.style.cssText = "padding:6px 8px;cursor:pointer;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
         if (c.id === store.selectedChannelId) {
             el.style.position = "relative";

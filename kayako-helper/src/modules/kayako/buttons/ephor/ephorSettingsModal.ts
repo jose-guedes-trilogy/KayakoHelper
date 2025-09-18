@@ -33,6 +33,9 @@ import { currentKayakoTicketId } from "@/utils/kayakoIds.ts";
 import { extractProductValueSafe } from "@/modules/kayako/utils/product.ts";
 import { loadStore, findProvider } from "@/utils/providerStore.ts";
 
+/* Local helper types to avoid indexing into optional array types */
+type WorkflowPreset = NonNullable<EphorStore["workflows"]>[number];
+type WorkflowPresetData = WorkflowPreset["data"];
 
 /* ------------------------------------------------------------------ */
 /* Entry-point                                                        */
@@ -67,10 +70,11 @@ export async function openEphorSettingsModal(
     const applyTicketPrefsForCurrentTicket = async () => {
         try {
             const tid = currentKayakoTicketId() || "";
-            const prefs = tid ? (store.ticketPrefsByContext?.[tid] ?? null) : null;
+            // Safely read per-ticket preferences
+            const prefs = tid ? ((store.ticketPrefsByContext ?? {})[tid] ?? null) : null;
 
             // Desired defaults when none exist yet for this ticket
-            const desiredMode: typeof store.preferredMode = "stream";
+            const desiredMode: typeof store.preferredMode = "multiplexer";
             const desiredQuery: typeof store.preferredQueryMode = "workflow";
             const desiredRun: typeof store.runMode = "automatic";
 
@@ -90,8 +94,8 @@ export async function openEphorSettingsModal(
                 }
             } else if (tid) {
                 // Initialize defaults for this ticket
-                store.ticketPrefsByContext = store.ticketPrefsByContext || {} as any;
-                store.ticketPrefsByContext[tid] = {
+                const prefsBy = (store.ticketPrefsByContext ?? (store.ticketPrefsByContext = {} as any)) as NonNullable<EphorStore["ticketPrefsByContext"]>;
+                prefsBy[tid] = {
                     preferredMode: desiredMode,
                     preferredQueryMode: desiredQuery,
                     runMode: desiredRun,
@@ -123,7 +127,7 @@ export async function openEphorSettingsModal(
         try {
             const tid = currentKayakoTicketId() || "";
             if (!tid) return;
-            store.ticketPrefsByContext = store.ticketPrefsByContext || {} as any;
+            store.ticketPrefsByContext = (store.ticketPrefsByContext ?? {}) as NonNullable<EphorStore["ticketPrefsByContext"]>;
             store.ticketPrefsByContext[tid] = { ...(store.ticketPrefsByContext[tid] || {}), ...partial } as any;
             await saveEphorStore(store);
             try { log("UI", `Saved per-ticket prefs for ${tid}`); } catch {}
@@ -398,7 +402,8 @@ export async function openEphorSettingsModal(
                 Array.from(content.children).forEach(el => ((el as HTMLElement).style.display = el === ta ? "block" : "none"));
             });
         });
-        if (tabs.length) tabs[0].click();
+        const firstTab = tabs[0];
+        if (firstTab) firstTab.click();
     }
 
     /* Rebuild on persisted-output updates during a run */
@@ -409,21 +414,29 @@ export async function openEphorSettingsModal(
     };
     document.addEventListener("ephorOutputsUpdated", outputsUpdatedListener);
     // Listen for per-ticket system body updates (e.g., Recent Tickets placeholder)
-    const onSetPerTicketSystemBody = (ev: Event) => {
+    const onSetPerTicketSystemBody = async (ev: Event) => {
         try {
             const d = (ev as CustomEvent).detail || {};
             const field = String(d.field || '');
             const body  = String(d.body ?? '');
+            const ephemeral = Boolean(d.ephemeral);
             if (!field) return;
             const ticketId = currentKayakoTicketId();
             const projectId = store.selectedProjectId || '';
             if (!(ticketId && projectId)) return;
-            store.systemPromptBodiesByContext = store.systemPromptBodiesByContext || {};
             const key = `${projectId}::${ticketId}`;
-            const rec = store.systemPromptBodiesByContext[key] || {};
-            (rec as any)[field] = body;
-            store.systemPromptBodiesByContext[key] = rec;
-            void saveEphorStore(store);
+            if (ephemeral) {
+                try {
+                    const mod = await import('./ephorStore.ts');
+                    mod.setEphemeralSystemBody(projectId, ticketId, field as any, body);
+                } catch {}
+            } else {
+                store.systemPromptBodiesByContext = store.systemPromptBodiesByContext || {};
+                const rec = store.systemPromptBodiesByContext[key] || {};
+                (rec as any)[field] = body;
+                store.systemPromptBodiesByContext[key] = rec;
+                void saveEphorStore(store);
+            }
             // Update highlight preview immediately
             try { (modal.querySelector('#kh-ephor-prompt-highlight') as HTMLElement | null)?.dispatchEvent(new Event('input')); } catch {}
         } catch {}
@@ -436,7 +449,9 @@ export async function openEphorSettingsModal(
         const stages = store.workflowStages;
         const idx = stages.findIndex(s => s.id === currentStageId);
         if (idx >= 0 && idx < stages.length - 1) {
-            currentStageId = stages[idx + 1].id;
+            const next = stages[idx + 1];
+            if (!next) return;
+            currentStageId = next.id;
             onStageChange();
             setMainTab("settings");
             try { log("UI", "Stage skipped by external action"); } catch {}
@@ -489,7 +504,10 @@ export async function openEphorSettingsModal(
         });
         overlay.appendChild(dlg);
         modal.appendChild(overlay);
-        (dlg.querySelector<HTMLInputElement>(`#${CSS.escape(fields[0].id)}`) as HTMLInputElement | null)?.focus();
+        const firstField = fields[0];
+        if (firstField) {
+            (dlg.querySelector<HTMLInputElement>(`#${CSS.escape(firstField.id)}`) as HTMLInputElement | null)?.focus();
+        }
     }
 
     function openMessageDialog(title: string, message: string): void {
@@ -619,6 +637,19 @@ export async function openEphorSettingsModal(
     await applyTicketPrefsForCurrentTicket();
     refs.modeMultiplexer.checked = store.preferredMode === "multiplexer";
     refs.modeStream.checked = store.preferredMode === "stream";
+    // Hide API mode option initially if disabled
+    try {
+        const apiLabel = modal.querySelector<HTMLInputElement>("#kh-ephor-mode-multiplexer")?.closest("label") as HTMLLabelElement | null;
+        if (apiLabel) apiLabel.style.display = store.enableApiMode ? "" : "none";
+    } catch {}
+    // If API mode is disabled globally, coerce to Normal and reflect immediately
+    if (!store.enableApiMode && refs.modeMultiplexer.checked) {
+        store.preferredMode = "stream";
+        refs.modeMultiplexer.checked = false;
+        refs.modeStream.checked = true;
+        void saveEphorStore(store);
+        try { log("UI", "API mode disabled – coerced to Normal"); } catch {}
+    }
     const onMode = () => {
         store.preferredMode = refs.modeMultiplexer.checked ? "multiplexer" : "stream";
         void saveEphorStore(store);
@@ -747,7 +778,9 @@ export async function openEphorSettingsModal(
                 const isAfter = (e as DragEvent).offsetX / (wrap.clientWidth) > 0.5;
 
                 // Remove dragged first
-                const dragged = store.workflowStages.splice(dragIndex, 1)[0];
+                const removed = store.workflowStages.splice(dragIndex, 1);
+                const dragged = removed.length ? removed[0] : undefined;
+                if (!dragged) { dragIndex = -1; return; }
 
                 // Adjust hovered index if needed after removal
                 let baseIndex = index;
@@ -980,7 +1013,7 @@ export async function openEphorSettingsModal(
             log("Log cleared");
         });
 
-    // Settings gear → open preferences (toggle API Log visibility)
+    // Settings gear → open preferences (toggle API Log visibility + API mode availability)
     const gearBtn = modal.querySelector<HTMLButtonElement>("#kh-ephor-gear");
     gearBtn?.addEventListener("click", () => {
         const overlay = document.createElement("div");
@@ -993,6 +1026,9 @@ export async function openEphorSettingsModal(
             <label style="display:flex;align-items:center;gap:8px">
               <input id="kh-pref-show-log" type="checkbox"> Show API Log section
             </label>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
+              <input id="kh-pref-enable-api" type="checkbox"> Enable API mode (advanced)
+            </label>
           </main>
           <footer>
             <button class="kh-btn" data-act="cancel">Close</button>
@@ -1004,6 +1040,28 @@ export async function openEphorSettingsModal(
             await saveEphorStore(store);
             const sec = modal.querySelector<HTMLDivElement>("#kh-ephor-log-section");
             if (sec) sec.style.display = store.showApiLog ? "" : "none";
+        });
+
+        // API mode master toggle
+        const apiCbx = dlg.querySelector<HTMLInputElement>("#kh-pref-enable-api")!;
+        apiCbx.checked = !!store.enableApiMode;
+        apiCbx.addEventListener("change", async () => {
+            store.enableApiMode = apiCbx.checked;
+            await saveEphorStore(store);
+            const apiLabel = modal.querySelector<HTMLInputElement>("#kh-ephor-mode-multiplexer")?.closest("label") as HTMLLabelElement | null;
+            if (apiLabel) apiLabel.style.display = store.enableApiMode ? "" : "none";
+            if (!store.enableApiMode && store.preferredMode === "multiplexer") {
+                // Force back to Normal when disabling API mode
+                store.preferredMode = "stream";
+                await saveEphorStore(store);
+                refs.modeMultiplexer.checked = false;
+                refs.modeStream.checked = true;
+                rebuildChannelList(state, refs, refs.channelSearchInp.value);
+                refreshCustomInstr();
+                try { log("UI", "Disabled API mode → switched to Normal"); } catch {}
+            } else if (store.enableApiMode) {
+                try { log("UI", "Enabled API mode – option visible"); } catch {}
+            }
         });
         dlg.querySelector<HTMLButtonElement>("[data-act=cancel]")!.addEventListener("click", () => overlay.remove());
         overlay.appendChild(dlg);
@@ -1199,7 +1257,13 @@ export async function openEphorSettingsModal(
         if (modelsToUse.length === 0) { openMessageDialog("Send", "Pick at least one model."); return; }
 
         const channelId = store.preferredMode === "multiplexer" ? "" : store.selectedChannelId ?? "";
-        if (store.preferredMode !== "multiplexer" && !channelId) { openMessageDialog("Send", "Pick a chat."); return; }
+        // In multi-stage mode, chats are auto-created/selected; no pre-selection needed.
+        if (store.preferredMode === "stream" && useWorkflow) {
+            try { log("UI", "Stream + multi-stage: skipping chat requirement (auto-create)"); } catch {}
+        } else if (store.preferredMode !== "multiplexer" && !channelId) {
+            openMessageDialog("Send", "Pick a chat.");
+            return;
+        }
 
         const totalForWorkflow =
             useWorkflow && store.runMode === "automatic"
@@ -1209,7 +1273,11 @@ export async function openEphorSettingsModal(
         const stageName = useWorkflow
             ? store.workflowStages.find(s => s.id === currentStageId)?.name ?? "Stage"
             : "Single Stage";
-        setProgress(stageName, 0, totalForWorkflow, "sending");
+        try { if (refs.warningBadge) refs.warningBadge.textContent = ""; } catch {}
+        // For automatic multi-stage runs, let the workflow code manage the per-stage indicator
+        if (!(useWorkflow && store.runMode === "automatic")) {
+            setProgress(stageName, 0, totalForWorkflow, "sending");
+        }
         refs.sendBtn.disabled = true;
         refs.sendBtn.textContent = "Sending…";
         refs.cancelBtn.style.display = "";
@@ -1224,14 +1292,7 @@ export async function openEphorSettingsModal(
                     store,
                     store.selectedProjectId,
                     await fetchTranscript(1000),
-                    m => {
-                        log("STATUS", m);
-                        const parts = refs.progressBadge.textContent?.match(/(\d+)\s*\/\s*(\d+)/);
-                        const curr = parts ? Number(parts[1]) : 0;
-                        if (/Retrying/i.test(m)) setProgress(stageName, curr, totalForWorkflow, "retrying");
-                        else if (/failed/i.test(m)) setProgress(stageName, curr, totalForWorkflow, "error");
-                        else if (/Query|cost|STATUS/i.test(m)) setProgress(stageName, curr, totalForWorkflow, "sending");
-                    },
+                    m => { log("STATUS", m); },
                     refs.progressBadge,
                     abortCtl.signal,
                 );
@@ -1273,7 +1334,10 @@ export async function openEphorSettingsModal(
                     const stages = store.workflowStages;
                     const idx = stages.findIndex(s => s.id === currentStageId);
                     if (idx >= 0 && idx < stages.length - 1) {
-                        currentStageId = stages[idx + 1].id;
+                        const next = stages[idx + 1];
+                        if (!next) { /* safety */ } else {
+                            currentStageId = next.id;
+                        }
                         onStageChange();
                         setMainTab("settings");
                     }
@@ -1302,7 +1366,7 @@ export async function openEphorSettingsModal(
      * List clicks                                                        *
      * ------------------------------------------------------------------ */
     refs.projectListDiv.addEventListener("click", e => {
-        const id = (e.target as HTMLElement).dataset.projectId;
+        const id = ((e.target as HTMLElement).dataset as Record<string,string>)["projectId"];
         if (!id || id === store.selectedProjectId) return;
         store.selectedProjectId = id;
         // Remember user's explicit choice for this ticket from now on
@@ -1322,7 +1386,7 @@ export async function openEphorSettingsModal(
         void fetchChannels(state, refs, log);
     });
     refs.channelListDiv.addEventListener("click", e => {
-        const id = (e.target as HTMLElement).dataset.channelId;
+        const id = ((e.target as HTMLElement).dataset as Record<string,string>)["channelId"];
         if (!id) return;
 
         store.selectedChannelId = id;
@@ -1471,8 +1535,8 @@ export async function openEphorSettingsModal(
         for (const cp of store.cannedPrompts) {
             const btn = document.createElement("button");
             btn.className = "kh-ph-btn";
-            btn.dataset.ph = cp.placeholder;
-            btn.dataset.canned = "1";
+            (btn.dataset as Record<string,string>)["ph"] = cp.placeholder;
+            (btn.dataset as Record<string,string>)["canned"] = "1";
             btn.textContent = cp.title || cp.placeholder;
             btn.title = `${cp.title || "Custom placeholder"} (${cp.placeholder}) — Right-click to set its value from your clipboard`;
 
@@ -1483,7 +1547,8 @@ export async function openEphorSettingsModal(
                     const text = await navigator.clipboard.readText();
                     const idx = store.cannedPrompts.findIndex(p => p.id === cp.id);
                     if (idx !== -1) {
-                        store.cannedPrompts[idx] = { ...store.cannedPrompts[idx], body: text };
+                        const prev = store.cannedPrompts[idx]!;
+                        store.cannedPrompts[idx] = { ...prev, body: text };
                         await saveEphorStore(store);
                         document.dispatchEvent(new CustomEvent("cannedPromptsChanged"));
                         btn.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 180 });
@@ -1525,21 +1590,21 @@ export async function openEphorSettingsModal(
         updateWorkflowDirtyIndicator();
     }
 
-    function snapshotCurrentWorkflow(): EphorStore["workflows"][number]["data"] {
+    function snapshotCurrentWorkflow(): WorkflowPresetData {
         return {
-            workflowStages: JSON.parse(JSON.stringify(store.workflowStages)),
+            workflowStages: JSON.parse(JSON.stringify(store.workflowStages)) as WorkflowStage[],
             preferredMode: store.preferredMode,
-            preferredQueryMode: store.preferredQueryMode,
+            preferredQueryMode: (store.preferredQueryMode ?? "workflow") as "single" | "workflow",
             runMode: store.runMode,
             selectedModels: [...(store.selectedModels ?? [])],
             systemPromptBodies: store.systemPromptBodies ? { ...store.systemPromptBodies } : undefined,
-        };
+        } satisfies WorkflowPresetData;
     }
 
-    async function restoreWorkflow(data: EphorStore["workflows"][number]["data"]): Promise<void> {
+    async function restoreWorkflow(data: WorkflowPresetData): Promise<void> {
         store.workflowStages = JSON.parse(JSON.stringify(data.workflowStages || []));
         store.preferredMode = data.preferredMode ?? store.preferredMode;
-        store.preferredQueryMode = data.preferredQueryMode ?? store.preferredQueryMode;
+        store.preferredQueryMode = (data.preferredQueryMode ?? store.preferredQueryMode ?? "workflow") as "single" | "workflow";
         store.runMode = data.runMode ?? store.runMode;
         store.selectedModels = [...(data.selectedModels ?? [])];
         if (data.systemPromptBodies) store.systemPromptBodies = { ...data.systemPromptBodies };
@@ -1559,7 +1624,7 @@ export async function openEphorSettingsModal(
         let name = (refs.wfNameInp?.value || "").trim();
         if (!id) {
             if (!name) name = "New Workflow";
-            const wf = { id: crypto.randomUUID(), name, data: snapshotCurrentWorkflow() } as EphorStore["workflows"][number];
+            const wf: WorkflowPreset = { id: crypto.randomUUID(), name, data: snapshotCurrentWorkflow() } as WorkflowPreset;
             store.workflows = store.workflows ?? [];
             store.workflows.push(wf);
             await saveEphorStore(store);
@@ -1571,16 +1636,20 @@ export async function openEphorSettingsModal(
             try { log("UI", `Workflow created: ${name}`); } catch {}
             return;
         }
-        const idx = (store.workflows ?? []).findIndex(w => w.id === id);
+        const list = store.workflows ?? [];
+        const idx = list.findIndex(w => w.id === id);
         if (idx === -1) return;
-        if (name) store.workflows![idx].name = name;
-        store.workflows![idx].data = snapshotCurrentWorkflow();
+        if (name && list[idx]) list[idx] = { ...list[idx], name } as WorkflowPreset;
+        if (list[idx]) list[idx] = { ...list[idx], data: snapshotCurrentWorkflow() } as WorkflowPreset;
+        // write back if we were operating on a copy
+        if (!store.workflows) store.workflows = list;
         store.lastSelectedWorkflowId = id;
         await saveEphorStore(store);
         rebuildWorkflowSelect();
         if (refs.wfSelect) refs.wfSelect.value = id;
-        if (refs.wfNameInp) refs.wfNameInp.value = store.workflows![idx].name;
-        try { log("UI", `Workflow saved: ${store.workflows![idx].name}`); } catch {}
+        const savedName = (store.workflows ?? list)[idx]?.name ?? "";
+        if (refs.wfNameInp) refs.wfNameInp.value = savedName;
+        try { log("UI", `Workflow saved: ${savedName}`); } catch {}
         updateWorkflowDirtyIndicator();
     });
 
@@ -1597,11 +1666,12 @@ export async function openEphorSettingsModal(
 
     refs.wfDeleteBtn?.addEventListener("click", async () => {
         const id = refs.wfSelect?.value || "";
-        const wf = (store.workflows ?? []).find(w => w.id === id);
+        const wfList = store.workflows ?? [];
+        const wf = wfList.find(w => w.id === id);
         if (!wf) return;
         const ok = await openConfirmDialog(`Delete workflow "${wf.name}"?`);
         if (!ok) return;
-        store.workflows = (store.workflows ?? []).filter(w => w.id !== id);
+        store.workflows = wfList.filter(w => w.id !== id);
         if (store.lastSelectedWorkflowId === id) store.lastSelectedWorkflowId = "";
         await saveEphorStore(store);
         rebuildWorkflowSelect();
@@ -1787,9 +1857,12 @@ export async function openEphorSettingsModal(
 
         nameInp.addEventListener("input", () => {
             if (!currentId) return;
-            const idx = (store.savedInstructions ?? []).findIndex(x => x.id === currentId);
+            const list = store.savedInstructions ?? [];
+            const idx = list.findIndex(x => x.id === currentId);
             if (idx === -1) return;
-            store.savedInstructions![idx].name = nameInp.value.trim();
+            if (!store.savedInstructions) store.savedInstructions = [...list];
+            const prev = store.savedInstructions[idx]!;
+            store.savedInstructions[idx] = { id: prev.id, body: prev.body, name: nameInp.value.trim() };
             void saveEphorStore(store).then(() => {
                 rebuildList();
                 try { document.dispatchEvent(new CustomEvent("savedInstructionsChanged")); } catch {}
@@ -1798,9 +1871,12 @@ export async function openEphorSettingsModal(
 
         bodyTa.addEventListener("input", () => {
             if (!currentId) return;
-            const idx = (store.savedInstructions ?? []).findIndex(x => x.id === currentId);
+            const list = store.savedInstructions ?? [];
+            const idx = list.findIndex(x => x.id === currentId);
             if (idx === -1) return;
-            store.savedInstructions![idx].body = bodyTa.value;
+            if (!store.savedInstructions) store.savedInstructions = [...list];
+            const prev2 = store.savedInstructions[idx]!;
+            store.savedInstructions[idx] = { id: prev2.id, name: prev2.name, body: bodyTa.value };
             void saveEphorStore(store);
         });
 

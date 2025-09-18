@@ -28,9 +28,11 @@ export async function fetchCasePostsWithAssets(
     if (!caseId) throw new Error('Case ID not found in URL');
 
     const hostname = window.location.hostname;
+    // Request full payload to ensure attachments and related fields are included
+    const include = encodeURIComponent('*');
     const url =
         `https://${hostname}/api/v1/cases/${caseId}` +
-        `/posts?include=attachment,post,note&filters=all&limit=${limit}`;
+        `/posts?include=${include}&filters=all&limit=${limit}`;
 
     const t0 = Date.now();
     try {

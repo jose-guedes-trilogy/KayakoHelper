@@ -3,6 +3,7 @@
 import type { Post } from '@/modules/kayako/buttons/copy-chat/cleanConversation.ts';
 import { fetchCasePostsWithAssets, PAGE_SIZE } from '@/utils/api.ts';
 import { EXTENSION_SELECTORS } from '@/generated/selectors.ts';
+import { currentConvId } from '@/utils/location.ts';
 
 export interface Attachment {
     url?: string;
@@ -53,6 +54,11 @@ const sanitizeUrl = (raw: string): string => {
         const TRIM_CHARS = /[.,\uFF0C\u3002]+$/u;
         const original = u;
         while (TRIM_CHARS.test(u)) u = u.replace(TRIM_CHARS, '');
+        // Normalize protocol-relative and www-only links to absolute using page protocol
+        try {
+            if (u.startsWith('//')) u = `${location?.protocol || 'https:'}${u}`;
+            else if (/^www\./i.test(u)) u = `${location?.protocol || 'https:'}//${u}`;
+        } catch {}
         if (u !== original) {
             try { console.log('[AssetsInspector] Sanitized URL', { original, sanitized: u }); } catch {}
         }
@@ -163,46 +169,80 @@ export const CATEGORY_LABELS = {
 
 /* ───────────── State ───────────── */
 
-let fetched     = 0;
-let totalPosts  = 0;
+let fetched     = 0;   // legacy, replaced by per-ticket state below
+let totalPosts  = 0;   // legacy, replaced by per-ticket state below
 type CacheType = {
     links: LinkItem[];
     images: { url: string; post: number }[];
     attachments: { url: string; post: number }[];
 };
-let cache: CacheType = { links: [], images: [], attachments: [] };
-let isLoading   = false;
+let cache: CacheType = { links: [], images: [], attachments: [] }; // legacy
+let isLoading   = false; // legacy
+
+type TicketState = {
+    fetched: number;
+    totalPosts: number;
+    cache: CacheType;
+    isLoading: boolean;
+    lastLoadedAt?: number;
+};
+
+const DEFAULT_STATE: TicketState = { fetched: 0, totalPosts: 0, cache: { links: [], images: [], attachments: [] }, isLoading: false };
+const ticketState: Record<string, TicketState> = Object.create(null);
+
+const getTicketKey = (): string => currentConvId() || '__no_ticket__';
+const ensureState = (key: string): TicketState => (ticketState[key] ||= { ...DEFAULT_STATE, cache: { links: [], images: [], attachments: [] } });
 
 export const PAGE_LIMIT = PAGE_SIZE;
 
-export const getState = () => ({ fetched, totalPosts, cache, isLoading });
+export const getState = () => {
+    const k = getTicketKey();
+    const st = ensureState(k);
+    return st;
+};
+
+export const hasCacheForCurrentTicket = (): boolean => {
+    const st = getState();
+    return !!(st.cache.links.length || st.cache.images.length || st.cache.attachments.length);
+};
+
+export const resetStateForCurrentTicket = (): void => {
+    const k = getTicketKey();
+    ticketState[k] = { ...DEFAULT_STATE, cache: { links: [], images: [], attachments: [] } };
+};
 
 /* ───────────── Loader ───────────── */
 
-export async function loadAssets(limit: number): Promise<void> {
-    if (isLoading) { try { console.warn('[AssetsInspector][data] loadAssets: already loading, skipping'); } catch {} return; }
-    isLoading = true;
+export async function loadAssets(limit: number, options?: { force?: boolean }): Promise<void> {
+    const k = getTicketKey();
+    const st = ensureState(k);
+    if (st.isLoading) { try { console.warn('[AssetsInspector][data] loadAssets: already loading, skipping'); } catch {} return; }
+    if (!options?.force && (st.cache.links.length || st.cache.images.length || st.cache.attachments.length)) {
+        try { console.info('[AssetsInspector][data] loadAssets: using cached data', { ticket: k }); } catch {}
+        return;
+    }
+    st.isLoading = true;
 
     try {
-        try { console.info('[AssetsInspector][data] loadAssets:start', { limit }); } catch {}
+        try { console.info('[AssetsInspector][data] loadAssets:start', { limit, ticket: k, force: !!options?.force }); } catch {}
         const rawResp = await fetchCasePostsWithAssets(limit) as unknown;
         const obj     = rawResp as Record<string, unknown>;
         const posts   = (obj['posts'] ?? obj['data'] ?? []) as PostWithAssets[];
         const total   = Number(obj['total_count'] ?? obj['total'] ?? posts.length);
-        try { console.info('[AssetsInspector][data] loadAssets:response', { posts: posts.length, total }); } catch {}
+        try { console.info('[AssetsInspector][data] loadAssets:response', { posts: posts.length, total, ticket: k }); } catch {}
 
         if (!posts.length) return;
 
-        totalPosts = total;
-        fetched    = posts.length;
+        st.totalPosts = total;
+        st.fetched    = posts.length;
 
-        cache = { links: [], images: [], attachments: [] };
+        st.cache = { links: [], images: [], attachments: [] };
 
         // High-level response overview
         try {
             console.info('[AssetsInspector][data] posts overview', {
-                fetched,
-                totalPosts,
+                fetched: st.fetched,
+                totalPosts: st.totalPosts,
                 postIds: posts.map(p => p.id),
                 sample: posts.slice(0, 3).map(p => ({
                     id: p.id,
@@ -272,7 +312,7 @@ export async function loadAssets(limit: number): Promise<void> {
             } catch {}
             const html = pickPostHtml(p);
             const inlineImgs = new Set(grabInlineImageSrc(html));
-            inlineImgs.forEach(u => cache.images.push({ url: u, post: p.id }));
+            inlineImgs.forEach(u => st.cache.images.push({ url: u, post: p.id }));
             try {
                 const prefix = `[AssetsInspector][data][post:${p.id}]`;
                 console.info(prefix, 'inlineImgs -> images[]', { count: inlineImgs.size, sample: [...inlineImgs].slice(0, 10) });
@@ -287,8 +327,8 @@ export async function loadAssets(limit: number): Promise<void> {
             } catch {}
             anchors.forEach(({ url, text }) => {
                 const clean = sanitizeUrl(url);
-                cache.links.push({ url: clean, post: p.id, text });
-                if (isProbablyImage(clean)) cache.images.push({ url: clean, post: p.id });
+                st.cache.links.push({ url: clean, post: p.id, text });
+                if (isProbablyImage(clean)) st.cache.images.push({ url: clean, post: p.id });
             });
 
             // Then, collect any remaining bare URLs not already covered by anchors
@@ -298,8 +338,8 @@ export async function loadAssets(limit: number): Promise<void> {
                 if (inlineImgs.has(u)) { skippedInline++; return; }
                 if (anchorUrlSet.has(u)) { skippedAnchorDupe++; return; }
                 const clean = sanitizeUrl(u);
-                cache.links.push({ url: clean, post: p.id });
-                if (isProbablyImage(clean)) cache.images.push({ url: clean, post: p.id });
+                st.cache.links.push({ url: clean, post: p.id });
+                if (isProbablyImage(clean)) st.cache.images.push({ url: clean, post: p.id });
                 kept++;
             });
             try {
@@ -324,13 +364,13 @@ export async function loadAssets(limit: number): Promise<void> {
                 const clean = sanitizeUrl(dl);
                 if (att.type?.startsWith('image/')) {
                     // Image attachments should appear only in Images, not in Attachments
-                    cache.images.push({ url: clean, post: p.id });
+                    st.cache.images.push({ url: clean, post: p.id });
                     try {
                         const prefix = `[AssetsInspector][data][post:${p.id}]`;
                         console.info(prefix, 'attachment:image -> images[]', { url: clean, type: att.type });
                     } catch {}
                 } else {
-                    cache.attachments.push({ url: clean, post: p.id });
+                    st.cache.attachments.push({ url: clean, post: p.id });
                     hasNonImageAttachment = true;
                     try {
                         const prefix = `[AssetsInspector][data][post:${p.id}]`;
@@ -342,7 +382,7 @@ export async function loadAssets(limit: number): Promise<void> {
             const dlAllRaw = (p as any)?.download_all ?? (p as any)?.downloadAll ?? (p as any)?.attachments_download_all;
             if (hasNonImageAttachment && dlAllRaw) {
                 const dlAll = sanitizeUrl(dlAllRaw);
-                cache.attachments.push({ url: dlAll, post: p.id });
+                st.cache.attachments.push({ url: dlAll, post: p.id });
                 try {
                     const prefix = `[AssetsInspector][data][post:${p.id}]`;
                     console.info(prefix, 'download_all -> attachments[]', { url: dlAll });
@@ -353,26 +393,26 @@ export async function loadAssets(limit: number): Promise<void> {
 
         /* dedupe */
         const before = {
-            links: cache.links.length,
-            images: cache.images.length,
-            attachments: cache.attachments.length,
+            links: st.cache.links.length,
+            images: st.cache.images.length,
+            attachments: st.cache.attachments.length,
         };
         const dedup = <T extends { url: string }>(arr: T[]) =>
             Array.from(new Map(arr.map(o => [o.url, o])).values());
-        cache.links       = dedup(cache.links);
-        cache.images      = dedup(cache.images);
-        cache.attachments = dedup(cache.attachments);
-        try { console.info('[AssetsInspector][data] dedupe', { before, after: { links: cache.links.length, images: cache.images.length, attachments: cache.attachments.length } }); } catch {}
-        try { console.info('[AssetsInspector][data] loadAssets:cache built', { links: cache.links.length, images: cache.images.length, attachments: cache.attachments.length }); } catch {}
+        st.cache.links       = dedup(st.cache.links);
+        st.cache.images      = dedup(st.cache.images);
+        st.cache.attachments = dedup(st.cache.attachments);
+        try { console.info('[AssetsInspector][data] dedupe', { before, after: { links: st.cache.links.length, images: st.cache.images.length, attachments: st.cache.attachments.length } }); } catch {}
+        try { console.info('[AssetsInspector][data] loadAssets:cache built', { links: st.cache.links.length, images: st.cache.images.length, attachments: st.cache.attachments.length }); } catch {}
 
         /* group links by domain (adds header rows) */
-        if (cache.links.length) {
-            const grouped: Record<keyof typeof CATEGORY_LABELS, typeof cache.links> = {
+        if (st.cache.links.length) {
+            const grouped: Record<keyof typeof CATEGORY_LABELS, typeof st.cache.links> = {
                 salesforce: [], netsuite: [],
                 kayako_instances: [], kayako_tickets: [], kayako_articles: [], kayako: [],
                 github: [], jira: [], other: [],
             };
-            cache.links.forEach(l => grouped[classify(l.url)].push(l));
+            st.cache.links.forEach(l => grouped[classify(l.url)].push(l));
 
             // Diagnostic counts for categories
             try {
@@ -386,7 +426,7 @@ export async function loadAssets(limit: number): Promise<void> {
                 'salesforce', 'netsuite', 'github', 'jira', 'other',
             ];
 
-            cache.links = ([] as typeof cache.links).concat(
+            st.cache.links = ([] as typeof st.cache.links).concat(
                 ...order.flatMap(k =>
                     grouped[k].length
                         ? [{ url: `--- ${CATEGORY_LABELS[k]} ---`, post: 0 }, ...grouped[k]]
@@ -396,6 +436,9 @@ export async function loadAssets(limit: number): Promise<void> {
     } catch (err) {
         try { console.error('[AssetsInspector][data] loadAssets:error', err); } catch {}
     } finally {
-        isLoading = false;
+        const kk = getTicketKey();
+        const s = ensureState(kk);
+        s.isLoading = false;
+        s.lastLoadedAt = Date.now();
     }
 }

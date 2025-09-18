@@ -259,6 +259,7 @@ export interface ExtensionSelectors {
   assetsSummary: string;
   assetsFetchNextBtn: string;
   assetsFetchAllBtn: string;
+  assetsRefreshButton: string;
   assetsNav: string;
   assetsResults: string;
   assetsGrid: string;
@@ -614,6 +615,7 @@ export const EXTENSION_SELECTORS: ExtensionSelectors = {
   assetsSummary: ".kh-assets-summary",
   assetsFetchNextBtn: ".kh-assets-fetch-next-btn",
   assetsFetchAllBtn: ".kh-assets-fetch-all-btn",
+  assetsRefreshButton: ".kh-assets-refresh-btn",
   assetsNav: ".kh-assets-nav",
   assetsResults: ".kh-assets-results",
   assetsGrid: ".kh-assets-grid",

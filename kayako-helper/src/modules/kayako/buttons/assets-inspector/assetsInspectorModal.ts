@@ -42,6 +42,8 @@ const SEARCH_INPUT_SEL = '.kh-assets-search-input';
 // Links tab helpers (also added to selectors.jsonc)
 const LINK_TEXT_SEL = '.kh-links-text';
 const LINK_URL_SEL = '.kh-links-url';
+// Refresh button (added to headerbar)
+const REFRESH_BTN_SEL = '.kh-assets-refresh-btn';
 
 /* Jump-to-post helper (unchanged logic) */
 import { KAYAKO_SELECTORS } from '@/generated/selectors.ts';
@@ -226,6 +228,7 @@ const injectStyles = (modal: HTMLElement) => {
       ${MODAL_SEL} .kh-assets-headerbar { position: relative; display:flex; align-items:center; gap:12px; margin-bottom:8px; cursor: move; -webkit-user-select: none; user-select: none; }
       ${MODAL_SEL} .kh-assets-headerbar h2 { flex:1 1 auto; text-align:center; margin:0; font-size:16px; color:#1f2937; }
       ${MODAL_SEL} .kh-assets-close { position:absolute; right:8px; top:50%; transform:translateY(-50%); margin:0; }
+      ${MODAL_SEL} ${REFRESH_BTN_SEL} { position: absolute; left: 12px; bottom: 10px; z-index: 1; }
       ${MODAL_SEL} .kh-btn{ padding:4px 12px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font:inherit; display:inline-flex; align-items:center; gap:4px; box-shadow: 0 1px 1px rgba(0,0,0,.05), 0 2px 3px rgba(0,0,0,.04); }
       ${MODAL_SEL} .kh-btn:hover{ background:#f5f7ff; border-color:#99a; }
       ${MODAL_SEL} .kh-btn:active{ transform:translateY(1px); box-shadow: 0 1px 1px rgba(0,0,0,.03); }
@@ -294,7 +297,8 @@ export const buildModal = (): HTMLElement => {
         <div class="${PANE_SEL.slice(1)}">
             <div class="${SUMMARY_SEL.slice(1)}"></div>
             <div class="${RESULTS_SEL.slice(1)}"></div>
-        </div>`;
+        </div>
+        <button class="kh-btn ${REFRESH_BTN_SEL.slice(1)}" title="Refresh assets">Refresh</button>`;
     injectStyles(wrap);
     return wrap;
 };
@@ -376,7 +380,12 @@ const buildGrid = (items: { url:string; post:number; text?: string }[]) => {
             const postCell = Object.assign(document.createElement('div'), { className: 'cell' });
             const postBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
             postBtn.title = 'Jump to post';
-            postBtn.addEventListener('click', () => { log('Jump to post', post); jumpToPost(post); });
+            postBtn.addEventListener('click', () => {
+                log('Jump to post', post);
+                // Close modal so the scrolled post is visible
+                try { (modal as any).classList.remove('open'); } catch {}
+                jumpToPost(post);
+            });
             postCell.appendChild(postBtn);
 
             const contentCell = Object.assign(document.createElement('div'), { className: 'cell' });
@@ -444,7 +453,11 @@ const buildAttachmentGroups = (items: { url:string; post:number }[]) => {
         titleLabel.textContent = 'Attachments • Post';
         const jumpBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
         jumpBtn.title = 'Jump to post';
-        jumpBtn.addEventListener('click', () => { log('Jump to post', post); jumpToPost(post); });
+        jumpBtn.addEventListener('click', () => {
+            log('Jump to post', post);
+            try { (modal as any).classList.remove('open'); } catch {}
+            jumpToPost(post);
+        });
         title.append(titleLabel, jumpBtn);
         const actions = Object.assign(document.createElement('div'), { className: 'actions' });
 
@@ -526,7 +539,11 @@ const buildImagesGroups = (items: { url:string; post:number }[]) => {
         titleLabel.textContent = 'Images • Post';
         const jumpBtn = Object.assign(document.createElement('button'), { className: JUMP_BTN_SEL.slice(1), textContent: `#${post}` });
         jumpBtn.title = 'Jump to post';
-        jumpBtn.addEventListener('click', () => { log('Jump to post', post); jumpToPost(post); });
+        jumpBtn.addEventListener('click', () => {
+            log('Jump to post', post);
+            try { (modal as any).classList.remove('open'); } catch {}
+            jumpToPost(post);
+        });
         title.append(titleLabel, jumpBtn);
         const actions = Object.assign(document.createElement('div'), { className: 'actions' });
 
@@ -738,7 +755,7 @@ export const renderPane = (
 };
 
 /* Public helpers for index.ts */
-export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: () => void) => {
+export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: () => void, refreshNow: () => void) => {
     try { console.debug('[AssetsInspector][ui] wireModal'); } catch {}
     modal.addEventListener('mouseover', ev => {
         const li = (ev.target as HTMLElement).closest<HTMLElement>(NAV_ITEM_SEL);
@@ -754,6 +771,10 @@ export const wireModal = (modal: HTMLElement, fetchNext: () => void, fetchAll: (
         }
         if (t.matches(FETCH_NEXT_SEL)) fetchNext();
         if (t.matches(FETCH_ALL_SEL))  fetchAll();
+        if (t.closest(REFRESH_BTN_SEL)) {
+            try { console.info('[AssetsInspector][ui] refresh clicked'); } catch {}
+            refreshNow();
+        }
         if (t.closest('.kh-assets-close')) {
             (modal as any).classList.remove('open');
         }

@@ -9,6 +9,7 @@ export interface ModalRefs {
     runAutoRadio: HTMLInputElement;
     runManualRadio: HTMLInputElement;
     progressBadge: HTMLSpanElement;
+    warningBadge: HTMLSpanElement; /* NEW: ephemeral warning next to status */
     runRow: HTMLSpanElement;
     placeholderRow: HTMLDivElement;
 
@@ -167,6 +168,7 @@ export function createSettingsModal() {
         runAutoRadio: $("#kh-run-auto") as HTMLInputElement,
         runManualRadio: $("#kh-run-manual") as HTMLInputElement,
         progressBadge: $("#kh-ephor-progress"),
+        warningBadge: $("#kh-ephor-warning"),
         runRow: $("#kh-ephor-run-row") as HTMLSpanElement,
         placeholderRow: $("#kh-placeholder-row"),
 
@@ -237,6 +239,16 @@ export function createSettingsModal() {
 
     // Append Add Stage button inside the stage bar; avoid extra wrapper that adds whitespace
     try { refs.stageBarDiv.appendChild(refs.addStageBtn); } catch {}
+
+    // Hide API mode option by default based on persisted preference
+    try {
+        chrome.storage.local.get("kh-ephor-store").then(raw => {
+            const saved = (raw as any)["kh-ephor-store"] || {};
+            const enableApi = !!saved.enableApiMode;
+            const apiLabel = refs.modeMultiplexer.closest("label") as HTMLLabelElement | null;
+            if (apiLabel) apiLabel.style.display = enableApi ? "" : "none";
+        }).catch(() => {});
+    } catch {}
 
     return { modal, refs };
 }

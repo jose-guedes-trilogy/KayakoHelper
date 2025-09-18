@@ -17,12 +17,38 @@ export function attachPlaceholderRowHandler(refs: ModalRefs): void {
     refs.placeholderRow.addEventListener("click", ev => {
         const el = (ev.target as HTMLElement).closest<HTMLElement>("[data-ph]");
         if (!el) return;
-        const act = (el as HTMLElement).dataset.act || "";
+        const act = ((el as HTMLElement).dataset as Record<string,string>)["act"] || "";
+        // Special: File Analysis quick-paste from clipboard (ephemeral per ticket)
+        if (act === "fileAnalysisPaste") {
+            try {
+                void (async () => {
+                    try { console.debug('[Ephor][PH] File Analysis button clicked – reading clipboard'); } catch {}
+                    let text = "";
+                    try {
+                        text = await navigator.clipboard.readText();
+                    } catch (err) {
+                        try { console.warn('[Ephor][PH] Clipboard read failed', err); } catch {}
+                        text = "";
+                    }
+                    // Save per-ticket, but do not persist (ephemeral until refresh)
+                    try {
+                        document.dispatchEvent(new CustomEvent('ephorSetPerTicketSystemBody', {
+                            detail: { field: 'fileAnalysis', body: text, ephemeral: true },
+                        }));
+                        try { console.debug('[Ephor][PH] Set per-ticket fileAnalysis (ephemeral)', { length: text?.length || 0 }); } catch {}
+                    } catch {}
+                    // Also insert the placeholder token into the prompt input
+                    try { insertPlaceholder(refs, '@#FILE_ANALYSIS#@'); } catch {}
+                })();
+            } catch {}
+            return;
+        }
         if (act === "recentTickets") {
             void insertRecentTickets(refs);
             return;
         }
-        if (el.dataset.ph) insertPlaceholder(refs, el.dataset.ph);
+        const ph = ((el as HTMLElement).dataset as Record<string,string>)["ph"];
+        if (ph) insertPlaceholder(refs, ph);
     });
 }
 
@@ -106,12 +132,12 @@ export function rebuildPlaceholderRow(
         models.forEach(apiId => {
             const item = document.createElement("div");
             item.textContent = displayFor(apiId);
-            item.dataset.ph  = makeToken(apiId);
+            (item.dataset as Record<string,string>)["ph"]  = makeToken(apiId);
             item.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                insertPlaceholder(refs, item.dataset.ph || "");
+                insertPlaceholder(refs, ((item.dataset as Record<string,string>)["ph"]) || "");
                 menu.style.display = "none";
-                try { console.debug('[Ephor][PH] Inserted placeholder', item.dataset.ph); } catch {}
+                try { console.debug('[Ephor][PH] Inserted placeholder', (item.dataset as Record<string,string>)["ph"]); } catch {}
             });
             menu.appendChild(item);
         });
@@ -136,13 +162,13 @@ export function rebuildPlaceholderRow(
         buttons.forEach((btn, index) => {
             btn.draggable = true;
             btn.addEventListener("dragstart", (e) => {
-                btn.dataset.dragIndex = String(index);
+                (btn.dataset as Record<string,string>)["dragIndex"] = String(index);
                 e.dataTransfer?.setData("text/plain", String(index));
             });
             btn.addEventListener("dragover", (e) => { e.preventDefault(); });
             btn.addEventListener("drop", async (e) => {
                 e.preventDefault();
-                const fromIdx = Number(e.dataTransfer?.getData("text/plain") ?? btn.dataset.dragIndex ?? -1);
+                const fromIdx = Number(e.dataTransfer?.getData("text/plain") ?? (btn.dataset as Record<string,string>)["dragIndex"] ?? -1);
                 const toIdx = buttons.indexOf(btn);
                 if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
                 const arr = store.cannedPrompts ?? [];
@@ -180,7 +206,7 @@ function createPlainBtn(label: string, token: string, parent: HTMLElement): HTML
     const btn = document.createElement("button");
     btn.className  = "kh-ph-btn";
     btn.textContent = label;
-    btn.dataset.ph  = token;
+    (btn.dataset as Record<string,string>)["ph"]  = token;
     parent.appendChild(btn);
     return btn;
 }
@@ -193,14 +219,15 @@ function createSplitBtnPart(
     const btn = document.createElement("button");
     btn.className = `kh-ph-btn ${extraClass}`;
     btn.textContent = label;
-    if (token) btn.dataset.ph = token;
+    if (token) (btn.dataset as Record<string,string>)["ph"] = token;
     return btn;
 }
 
 function appendSystemPlaceholders(parent: HTMLElement, store: EphorStore): void {
     // System placeholders: File Analysis, Past Tickets, Style Guide (Transcript already included above)
     try {
-        createPlainBtn("File Analysis", "@#FILE_ANALYSIS#@", parent);
+        const fileBtn = createPlainBtn("File Analysis", "@#FILE_ANALYSIS#@", parent);
+        (fileBtn.dataset as Record<string,string>)["act"] = "fileAnalysisPaste";
         createPlainBtn("Past Tickets", "@#PAST_TICKETS#@", parent);
         createPlainBtn("Style Guide", "@#STYLE_GUIDE#@", parent);
     } catch {}

@@ -568,12 +568,12 @@
 
   /* subtle hover/active animation */
   transition: background-color 120ms ease, color 120ms ease;
-  &:hover { background: #f7f7f7; }
-  &:active { background: #efefef; }
 }
 
 #{sel.$twoPartBtnDropdownItem} {
   position: relative;
+  &:hover { background: #f7f7f7; }
+  &:active { background: #efefef; }
 
   #{sel.$twoPartBtnChevron} {
     transform: scaleX(0.75);
@@ -592,7 +592,7 @@
   display: none;                 /* opened by TS */
 
   flex-direction: column;
-  gap: 8px;
+  gap: 0;                       /* items handle their own padding/hover */
   z-index: 4;                     /* ensure above parent dropdown */
   max-height: 70vh;               /* keep within viewport */
   overflow-y: auto;               /* show scrollbar when long */
@@ -752,7 +752,8 @@
 }
 
 #{sel.$assetsFetchNextBtn},
-#{sel.$assetsFetchAllBtn} {
+#{sel.$assetsFetchAllBtn},
+#{sel.$assetsRefreshButton} {
   margin-left: 8px;
   font-size: 11px;
   cursor: pointer;
@@ -976,6 +977,10 @@ root {
   padding-right: 0 !important;
 }
 
+#{sel.$changeRequestContainer} {
+  min-width: 500px !important;
+}
+
 .kh-close-button {
   padding: 4px 8px;
   font-weight: 600;
@@ -1020,9 +1025,7 @@ root {
 #kh-ephor-close {
   padding: 4px 8px;
 }
-#kh-ephor-gear {
-   padding: 4px 6px;
- }
+
 
 .kh-assets-copy-img {
   background: none;

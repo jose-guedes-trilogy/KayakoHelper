@@ -140,6 +140,8 @@ export interface EphorStore {
 
     /* UI preferences */
     showApiLog?: boolean;
+    /** When false (default), API mode is hidden and unavailable */
+    enableApiMode?: boolean;
 
     /* System prompt bodies (editable, non-deletable) */
     systemPromptBodies?: {
@@ -298,6 +300,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         instructionsScopeForWorkflow: "ticket",
         channelSortOrder: "created",
         showApiLog: false,
+        enableApiMode: false,
         systemPromptBodies: {
             fileAnalysis: "",
             pastTickets : "",
@@ -323,6 +326,7 @@ export async function loadEphorStore(): Promise<EphorStore> {
         preferredQueryMode: saved?.preferredQueryMode ?? "workflow",
         channelSortOrder: saved?.channelSortOrder ?? "created",
         showApiLog: saved?.showApiLog ?? false,
+        enableApiMode: saved?.enableApiMode ?? false,
         systemPromptBodies: {
             fileAnalysis: saved?.systemPromptBodies?.fileAnalysis ?? "",
             pastTickets : saved?.systemPromptBodies?.pastTickets  ?? "",
@@ -356,5 +360,52 @@ export async function saveEphorStore(store: EphorStore): Promise<void> {
     }
 
     await chrome.storage.local.set({ [KEY]: merged });
+}
+
+/**
+ * Runtime-only, per-ticket overrides for system placeholders.
+ * Keyed by `${projectId}::${ticketId}`. Not persisted; cleared on reload.
+ */
+export const ephemeralSystemPromptBodiesByContext: Record<string, {
+    fileAnalysis?: string;
+    pastTickets?: string;
+    styleGuide?: string;
+}> = {};
+
+/** Set or clear an ephemeral system body. Pass empty string to clear field. */
+export function setEphemeralSystemBody(
+    projectId: string | null | undefined,
+    ticketId : string | null | undefined,
+    field    : 'fileAnalysis' | 'pastTickets' | 'styleGuide',
+    body     : string,
+): void {
+    try {
+        const pid = String(projectId || '');
+        const tid = String(ticketId || '');
+        if (!(pid && tid)) return;
+        const key = `${pid}::${tid}`;
+        const rec = ephemeralSystemPromptBodiesByContext[key] || {};
+        if (body) {
+            (rec as any)[field] = body;
+        } else {
+            delete (rec as any)[field];
+        }
+        ephemeralSystemPromptBodiesByContext[key] = rec;
+        try { console.debug('[Ephor][Ephemeral] set', { key, field, length: body?.length || 0 }); } catch {}
+    } catch {}
+}
+
+/** Optional helper: clear all ephemeral entries for a context key. */
+export function clearEphemeralForContext(projectId: string | null | undefined, ticketId: string | null | undefined): void {
+    try {
+        const pid = String(projectId || '');
+        const tid = String(ticketId || '');
+        if (!(pid && tid)) return;
+        const key = `${pid}::${tid}`;
+        if (ephemeralSystemPromptBodiesByContext[key]) {
+            delete ephemeralSystemPromptBodiesByContext[key];
+            try { console.debug('[Ephor][Ephemeral] cleared', { key }); } catch {}
+        }
+    } catch {}
 }
 
